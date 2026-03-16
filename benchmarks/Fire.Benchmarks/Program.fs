@@ -223,10 +223,12 @@ type MiddlewareBenchmark() =
             opts.Listen(IPAddress.Loopback, 0)
         ) |> ignore
         let app = builder.Build()
-        app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next -> task {
-            do! next.Invoke(ctx)
-            ctx.Response.Headers.["X-Request-Id"] <- "bench-123"
-        })) |> ignore
+        app.Use(Func<HttpContext, RequestDelegate, Task>(fun ctx next ->
+            ctx.Response.OnStarting(fun () ->
+                ctx.Response.Headers.["X-Request-Id"] <- "bench-123"
+                Task.CompletedTask)
+            next.Invoke(ctx)
+        )) |> ignore
         app.MapGet("/api/data", Func<IResult>(fun () ->
             Results.Json({| value = 1 |}))
         ) |> ignore
