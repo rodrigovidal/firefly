@@ -5,6 +5,7 @@ open System.Collections.Generic
 type TrieNode = {
     StaticChildren: Map<string, TrieNode>
     ParamChild: (string * TrieNode) option
+    WildcardChild: (string * Map<string, Handler>) option
     Handlers: Map<string, Handler>
 }
 
@@ -14,6 +15,7 @@ module Trie =
     let private emptyNode () = {
         StaticChildren = Map.empty
         ParamChild = None
+        WildcardChild = None
         Handlers = Map.empty
     }
 
@@ -34,7 +36,14 @@ module Trie =
                 { node with Handlers = node.Handlers |> Map.add method' composed }
             else
                 let seg = segments.[idx]
-                if seg.[0] = ':' then
+                if seg.[0] = '*' then
+                    let paramName = seg.Substring(1)
+                    let handlers =
+                        match node.WildcardChild with
+                        | Some (_, existing) -> existing
+                        | None -> Map.empty
+                    { node with WildcardChild = Some (paramName, handlers |> Map.add method' composed) }
+                elif seg.[0] = ':' then
                     let paramName = seg.Substring(1)
                     let child =
                         match node.ParamChild with
@@ -75,7 +84,21 @@ module Trie =
         and tryParam (node: TrieNode) (seg: string) (idx: int) (ps: (string * string) list) =
             match node.ParamChild with
             | Some (paramName, child) ->
-                search child (idx + 1) ((paramName, seg) :: ps)
+                match search child (idx + 1) ((paramName, seg) :: ps) with
+                | Some _ as result -> result
+                | None -> tryWildcard node idx ps
+            | None -> tryWildcard node idx ps
+
+        and tryWildcard (node: TrieNode) (idx: int) (ps: (string * string) list) =
+            match node.WildcardChild with
+            | Some (paramName, handlers) ->
+                match handlers |> Map.tryFind method' with
+                | Some h ->
+                    let captured = System.String.Join("/", segments, idx, segments.Length - idx)
+                    let dict = Dictionary<string, string>()
+                    for (k, v) in ((paramName, captured) :: ps) do dict.[k] <- v
+                    Some (h, dict :> IReadOnlyDictionary<_, _>)
+                | None -> None
             | None -> None
 
         if segments.Length = 0 then
