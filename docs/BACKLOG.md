@@ -2,19 +2,19 @@
 
 ## Tier 1: Essential for any real API
 
-- [ ] POST/PUT body parsing — `req.Form()`, `req.Text()` beyond just `req.Json<'T>()`
-- [ ] Query param helpers — `req.QueryParam "key"` returning `string option` (single value access)
-- [ ] Wildcard routes — `/static/*path` for catch-all segments
-- [ ] Response cookies — `Response.cookie "name" "value"` builder
-- [ ] CORS middleware — ships as built-in middleware
+- [x] POST/PUT body parsing — `req.Form()`, `req.Text()` beyond just `req.Json<'T>()`
+- [x] Query param helpers — `req.QueryParam "key"` returning `string option` (single value access)
+- [x] Wildcard routes — `/static/*path` for catch-all segments
+- [x] Response cookies — `Response.cookie "name" "value"` builder
+- [x] CORS middleware — ships as built-in middleware
 
 ## Tier 2: Developer experience
 
-- [ ] Logging middleware — request method, path, status, duration
-- [ ] Static file serving — `Route.staticFiles "/public" "./wwwroot"`
-- [ ] Content negotiation — `req.Accepts "application/json"`, auto content-type detection
-- [ ] Redirect helper — `Response.redirect "/somewhere" 302`
-- [ ] ETag / caching helpers — `Response.etag`, `Response.cacheControl`
+- [x] Logging middleware — `Log.withOutput`, `Log.toConsole`, `Log.toLogger`
+- [x] Static file serving — `Static.serve "./wwwroot"` with wildcard routes
+- [x] Content negotiation — `req.Accepts`, `req.ContentType`
+- [x] Redirect helper — `Response.redirect "/somewhere" 302`
+- [x] ETag / caching helpers — `Response.etag`, `Response.cacheControl`
 
 ## Tier 3: Production readiness
 
