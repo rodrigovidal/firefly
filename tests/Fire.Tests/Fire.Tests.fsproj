@@ -19,6 +19,7 @@
     <Compile Include="TrieTests.fs" />
     <Compile Include="RouteTests.fs" />
     <Compile Include="AppTests.fs" />
+    <Compile Include="SmokeTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
