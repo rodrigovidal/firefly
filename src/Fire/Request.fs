@@ -62,4 +62,14 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
             return d :> IReadOnlyDictionary<_, _>
         }
 
+    member _.Accepts (mediaType: string) : bool =
+        match ctx.Request.Headers.TryGetValue("Accept") with
+        | true, values -> values.ToString().Contains(mediaType)
+        | false, _ -> false
+
+    member _.ContentType : string option =
+        match ctx.Request.ContentType with
+        | null | "" -> None
+        | ct -> Some ct
+
     member _.Raw = ctx

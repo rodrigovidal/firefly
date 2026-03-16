@@ -16,6 +16,7 @@
   <ItemGroup>
     <Compile Include="RequestTests.fs" />
     <Compile Include="RequestExtensionsTests.fs" />
+    <Compile Include="ContentNegotiationTests.fs" />
     <Compile Include="ResponseTests.fs" />
     <Compile Include="CookieTests.fs" />
     <Compile Include="ResponseHelpersTests.fs" />
