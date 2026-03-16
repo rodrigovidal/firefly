@@ -17,6 +17,7 @@ type FireConfig = {
     Host: string
     OnError: (exn -> Request -> Task<Response>) option
     NotFound: (Request -> Task<Response>) option
+    Middlewares: Middleware list
 }
 
 [<RequireQualifiedAccess>]
@@ -27,12 +28,14 @@ module App =
         Host = "localhost"
         OnError = None
         NotFound = None
+        Middlewares = []
     }
 
     let port p config = { config with Port = p }
     let host h config = { config with Host = h }
     let onError handler config = { config with OnError = Some handler }
     let notFound handler config = { config with NotFound = Some handler }
+    let middleware mw (config: FireConfig) = { config with Middlewares = config.Middlewares @ [mw] }
 
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
@@ -57,34 +60,41 @@ module App =
             do! stream.CopyToAsync(ctx.Response.Body)
     }
 
-    let private handleRequest (trie: TrieNode) (config: FireConfig) (ctx: HttpContext) = task {
+    let private dispatchRequest (trie: TrieNode) (config: FireConfig) (ctx: HttpContext) : Task<Response> = task {
         let path = ctx.Request.Path.Value
         let method' = ctx.Request.Method
-
         match Trie.lookup method' path trie with
         | Some (handler, ps) ->
             let req = Request(ctx, ps)
-            try
-                let! response = handler req
-                do! writeResponse ctx response
-            with ex ->
-                match config.OnError with
-                | Some errorHandler ->
-                    try
-                        let! response = errorHandler ex req
-                        do! writeResponse ctx response
-                    with _ ->
-                        ctx.Response.StatusCode <- 500
-                | None ->
-                    ctx.Response.StatusCode <- 500
+            return! handler req
         | None ->
             match config.NotFound with
             | Some nfHandler ->
                 let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
-                let! response = nfHandler req
-                do! writeResponse ctx response
+                return! nfHandler req
             | None ->
-                ctx.Response.StatusCode <- 404
+                return { Status = 404; Headers = []; Body = Empty }
+    }
+
+    let private handleRequest (trie: TrieNode) (config: FireConfig) (ctx: HttpContext) = task {
+        let baseHandler : Handler = fun _req -> dispatchRequest trie config ctx
+
+        let composed = List.foldBack (fun (mw: Middleware) (h: Handler) -> mw h) config.Middlewares baseHandler
+
+        let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
+        try
+            let! response = composed req
+            do! writeResponse ctx response
+        with ex ->
+            match config.OnError with
+            | Some errorHandler ->
+                try
+                    let! response = errorHandler ex req
+                    do! writeResponse ctx response
+                with _ ->
+                    ctx.Response.StatusCode <- 500
+            | None ->
+                ctx.Response.StatusCode <- 500
     }
 
     let private resolveHost (host: string) =
