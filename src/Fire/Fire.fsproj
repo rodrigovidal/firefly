@@ -10,6 +10,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="Trie.fs" />
     <Compile Include="Route.fs" />
+    <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

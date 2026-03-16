@@ -18,6 +18,7 @@
     <Compile Include="ResponseTests.fs" />
     <Compile Include="TrieTests.fs" />
     <Compile Include="RouteTests.fs" />
+    <Compile Include="AppTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
