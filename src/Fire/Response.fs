@@ -27,6 +27,9 @@ module Response =
     let status code r = { r with Status = code }
     let header key value r = { r with Headers = (key, value) :: r.Headers }
 
+    let cookie name value r =
+        r |> header "Set-Cookie" $"{name}={value}"
+
     let notFound = { ok with Status = 404 }
     let unauthorized = { ok with Status = 401 }
 

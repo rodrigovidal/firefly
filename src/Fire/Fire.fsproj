@@ -7,9 +7,11 @@
   <ItemGroup>
     <Compile Include="Request.fs" />
     <Compile Include="Response.fs" />
+    <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Trie.fs" />
     <Compile Include="Route.fs" />
+    <Compile Include="Cors.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
   <ItemGroup>
