@@ -18,6 +18,7 @@
     <Compile Include="RequestExtensionsTests.fs" />
     <Compile Include="ResponseTests.fs" />
     <Compile Include="CookieTests.fs" />
+    <Compile Include="ResponseHelpersTests.fs" />
     <Compile Include="TrieTests.fs" />
     <Compile Include="WildcardTests.fs" />
     <Compile Include="RouteTests.fs" />

@@ -33,6 +33,13 @@ module Response =
     let notFound = { ok with Status = 404 }
     let unauthorized = { ok with Status = 401 }
 
+    let redirect url code r =
+        { r with Status = code; Headers = ("Location", url) :: r.Headers }
+
+    let etag tag r = r |> header "ETag" tag
+
+    let cacheControl value r = r |> header "Cache-Control" value
+
     let ofResult (onOk: 'T -> Response) (onError: 'E -> Response) (result: Result<'T, 'E>) =
         match result with
         | Ok value -> onOk value
