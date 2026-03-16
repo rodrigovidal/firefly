@@ -5,6 +5,9 @@
     <ParallelCompilation>true</ParallelCompilation>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Response.fs" />
+  </ItemGroup>
+  <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>
