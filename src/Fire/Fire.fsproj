@@ -5,6 +5,7 @@
     <ParallelCompilation>true</ParallelCompilation>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Request.fs" />
     <Compile Include="Response.fs" />
   </ItemGroup>
   <ItemGroup>
