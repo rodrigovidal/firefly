@@ -27,7 +27,7 @@ module Route =
             Middlewares = table.Middlewares
             Handler = handler
         }
-        { table with Routes = table.Routes @ [entry] }
+        { table with Routes = entry :: table.Routes }
 
     let get (pattern: string) (handler: 'H) (table: RouteTable) : RouteTable =
         let triePattern, wrappedHandler = HandlerFactory.create "GET" pattern (box handler)
@@ -60,7 +60,7 @@ module Route =
     let group (prefix: string) (configure: RouteTable -> RouteTable) (parent: RouteTable) =
         let scoped = { Prefix = parent.Prefix + prefix; Middlewares = parent.Middlewares; Routes = [] }
         let result = configure scoped
-        { parent with Routes = parent.Routes @ result.Routes }
+        { parent with Routes = (result.Routes |> List.rev) @ parent.Routes }
 
     let middleware (mw: Middleware) (table: RouteTable) =
         { table with Middlewares = table.Middlewares @ [mw] }

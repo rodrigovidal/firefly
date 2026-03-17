@@ -2,6 +2,7 @@ namespace Fire
 
 open System
 open System.Buffers
+open System.Collections.Generic
 open System.IO
 open System.IO.Pipelines
 open System.Text.Json
@@ -60,6 +61,12 @@ module SchemaCompiler =
     /// Registry for nested schema field specs, keyed by parser delegate identity
     let internal nestedSpecRegistry = ConcurrentDictionary<obj, FieldSpec list>()
 
+    let buildFieldIndex (fields: CompiledField[]) : Dictionary<string, int> =
+        let d = Dictionary<string, int>(fields.Length, StringComparer.OrdinalIgnoreCase)
+        for i in 0..fields.Length-1 do
+            d.[fields.[i].Name] <- i
+        d
+
     let rec readValue (fieldType: FieldType) (reader: byref<Utf8JsonReader>) : obj =
         match fieldType with
         | FString -> box (reader.GetString())
@@ -93,6 +100,7 @@ module SchemaCompiler =
             parseObject nestedFields nestedParamMapping nestedCtor &reader
 
     and parseObject (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> obj) (reader: byref<Utf8JsonReader>) : obj =
+        let fieldIndex = buildFieldIndex fields
         let values = Array.zeroCreate fields.Length
         let found = Array.zeroCreate<bool> fields.Length
 
@@ -102,15 +110,12 @@ module SchemaCompiler =
         while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
             if reader.TokenType = JsonTokenType.PropertyName then
                 let propName = reader.GetString()
-                let mutable fieldIdx = -1
-                for i in 0..fields.Length-1 do
-                    if String.Equals(fields.[i].Name, propName, StringComparison.OrdinalIgnoreCase) then
-                        fieldIdx <- i
-                if fieldIdx >= 0 then
+                match fieldIndex.TryGetValue(propName) with
+                | true, fieldIdx ->
                     reader.Read() |> ignore
                     values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
                     found.[fieldIdx] <- true
-                else
+                | false, _ ->
                     reader.Read() |> ignore
                     reader.Skip()
 
@@ -121,7 +126,7 @@ module SchemaCompiler =
         let args = paramMapping |> Array.map (fun idx -> values.[idx])
         construct args
 
-    let parseAndValidate (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (reader: byref<Utf8JsonReader>) : Result<'T, string list> =
+    let parseAndValidate (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (fieldIndex: Dictionary<string, int>) (reader: byref<Utf8JsonReader>) : Result<'T, string list> =
         let values = Array.zeroCreate fields.Length
         let found = Array.zeroCreate<bool> fields.Length
         let errors = ResizeArray<string>()
@@ -135,18 +140,15 @@ module SchemaCompiler =
             while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
                 if reader.TokenType = JsonTokenType.PropertyName then
                     let propName = reader.GetString()
-                    let mutable fieldIdx = -1
-                    for i in 0..fields.Length-1 do
-                        if String.Equals(fields.[i].Name, propName, StringComparison.OrdinalIgnoreCase) then
-                            fieldIdx <- i
-                    if fieldIdx >= 0 then
+                    match fieldIndex.TryGetValue(propName) with
+                    | true, fieldIdx ->
                         reader.Read() |> ignore
                         try
                             values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
                             found.[fieldIdx] <- true
                         with ex ->
                             errors.Add($"{fields.[fieldIdx].Name}: {ex.Message}")
-                    else
+                    | false, _ ->
                         reader.Read() |> ignore
                         reader.Skip()
 
@@ -169,10 +171,10 @@ module SchemaCompiler =
             let args = paramMapping |> Array.map (fun idx -> values.[idx])
             Ok (construct args)
 
-    let parseFromBuffer (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (buffer: ReadOnlySequence<byte>) : Result<'T, string list> =
+    let parseFromBuffer (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (fieldIndex: Dictionary<string, int>) (buffer: ReadOnlySequence<byte>) : Result<'T, string list> =
         try
             let mutable reader = Utf8JsonReader(buffer)
-            parseAndValidate fields paramMapping construct &reader
+            parseAndValidate fields paramMapping construct fieldIndex &reader
         with ex ->
             Error [$"invalid JSON: {ex.Message}"]
 
@@ -196,6 +198,8 @@ type Schema<'T> = {
     Parse: JsonElement -> Result<'T, string list>
     ParseBuffer: ReadOnlySequence<byte> -> Result<'T, string list>
     Fields: FieldSpec list
+    CompiledFields: SchemaCompiler.CompiledField[]
+    ParamMapping: int[]
 }
 
 [<RequireQualifiedAccess>]
@@ -305,39 +309,11 @@ module Schema =
         if el.ValueKind = JsonValueKind.Null then Ok None
         else parser el |> Result.map Some
 
-    /// Build a compiled FieldType for a nested schema
+    /// Build a compiled FieldType for a nested schema, preserving compiled fields and rules
     let private buildNestedFieldType<'T> (nestedSchema: Schema<'T>) : SchemaCompiler.FieldType =
         let ctor = typeof<'T>.GetConstructors().[0]
-        let ctorParams = ctor.GetParameters()
-
-        // Reconstruct compiled fields from the nested schema's FieldSpecs
-        // For nested schemas built via the CE, the fields carry enough type info
-        let compiledFields =
-            nestedSchema.Fields |> List.map (fun spec ->
-                let fieldType =
-                    match spec.Type with
-                    | "string" -> SchemaCompiler.FString
-                    | "integer" -> SchemaCompiler.FInt
-                    | "boolean" -> SchemaCompiler.FBool
-                    | "number" -> SchemaCompiler.FFloat
-                    | _ -> SchemaCompiler.FString
-                {
-                    SchemaCompiler.CompiledField.Name = spec.Name
-                    SchemaCompiler.CompiledField.Type = fieldType
-                    SchemaCompiler.CompiledField.Required = spec.Required
-                    SchemaCompiler.CompiledField.DefaultValue = null
-                    SchemaCompiler.CompiledField.Rules = []
-                }
-            ) |> Array.ofList
-
-        let paramMapping =
-            ctorParams |> Array.map (fun p ->
-                compiledFields |> Array.findIndex (fun f ->
-                    System.String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
-
         let construct (args: obj[]) = ctor.Invoke(args) |> box
-
-        SchemaCompiler.FNested (compiledFields, paramMapping, construct)
+        SchemaCompiler.FNested (nestedSchema.CompiledFields, nestedSchema.ParamMapping, construct)
 
     /// Creates a nested parser and registers its compiled FieldType for the buffer path.
     /// Usage: Schema.required "address" (Schema.nest addressSchema) []
@@ -474,8 +450,16 @@ module Schema =
         schema.ParseBuffer buffer
 
     let parsePipe (schema: Schema<'T>) (pipeReader: PipeReader) : System.Threading.Tasks.Task<Result<'T, string list>> = task {
-        let! readResult = pipeReader.ReadAsync()
-        let buffer = readResult.Buffer
+        let mutable buffer = ReadOnlySequence<byte>.Empty
+        let mutable isDone = false
+        while not isDone do
+            let! readResult = pipeReader.ReadAsync()
+            buffer <- readResult.Buffer
+            if readResult.IsCompleted then
+                isDone <- true
+            else
+                // Need more data - examine what we have but don't consume
+                pipeReader.AdvanceTo(buffer.Start, buffer.End)
         let result = schema.ParseBuffer buffer
         pipeReader.AdvanceTo(buffer.End)
         return result
@@ -496,10 +480,18 @@ module Schema =
     let validated (schema: Schema<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
         fun req -> task {
             try
-                let! readResult = req.Raw.Request.BodyReader.ReadAsync()
-                let buffer = readResult.Buffer
+                let reader = req.Raw.Request.BodyReader
+                let mutable buffer = ReadOnlySequence<byte>.Empty
+                let mutable isDone = false
+                while not isDone do
+                    let! readResult = reader.ReadAsync()
+                    buffer <- readResult.Buffer
+                    if readResult.IsCompleted then
+                        isDone <- true
+                    else
+                        reader.AdvanceTo(buffer.Start, buffer.End)
                 let result = schema.ParseBuffer buffer
-                req.Raw.Request.BodyReader.AdvanceTo(buffer.End)
+                reader.AdvanceTo(buffer.End)
                 match result with
                 | Ok value -> return! handler value
                 | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
@@ -594,13 +586,17 @@ type SchemaBuilder() =
                 compiledFields |> Array.findIndex (fun f ->
                     String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
 
+        let fieldIndex = SchemaCompiler.buildFieldIndex compiledFields
+
         let construct (args: obj[]) =
             ctor.Invoke(args) :?> 'T
 
         {
             Parse = parser.Parse
-            ParseBuffer = SchemaCompiler.parseFromBuffer compiledFields paramMapping construct
+            ParseBuffer = SchemaCompiler.parseFromBuffer compiledFields paramMapping construct fieldIndex
             Fields = parser.Specs |> List.rev
+            CompiledFields = compiledFields
+            ParamMapping = paramMapping
         }
 
 [<AutoOpen>]

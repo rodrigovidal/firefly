@@ -55,8 +55,10 @@ let ``Route.middleware is scoped to group`` () =
             |> Route.get "/inner" dummyHandler
         )
         |> Route.get "/outer" dummyHandler
-    table.Routes.[0].Middlewares |> List.length |> should equal 1
-    table.Routes.[1].Middlewares |> should haveLength 0
+    // Routes are stored in reverse insertion order internally
+    let routes = table.Routes |> List.rev
+    routes.[0].Middlewares |> List.length |> should equal 1
+    routes.[1].Middlewares |> should haveLength 0
 
 [<Fact>]
 let ``Route registers all HTTP methods`` () =
@@ -69,7 +71,7 @@ let ``Route registers all HTTP methods`` () =
         |> Route.delete "/e" dummyHandler
         |> Route.head "/f" dummyHandler
         |> Route.options "/g" dummyHandler
-    let methods = table.Routes |> List.map (fun r -> r.Method)
+    let methods = table.Routes |> List.rev |> List.map (fun r -> r.Method)
     methods |> should equal ["GET"; "POST"; "PUT"; "PATCH"; "DELETE"; "HEAD"; "OPTIONS"]
 
 [<Fact>]

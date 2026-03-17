@@ -29,7 +29,7 @@ module TestClient =
 
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
-        for entry in routes.Routes do
+        for entry in routes.Routes |> List.rev do
             trie <- Trie.add entry.Method entry.Pattern entry.Middlewares entry.Handler trie
         trie
 

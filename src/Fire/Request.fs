@@ -15,11 +15,17 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
     member _.Params = routeParams
 
     member _.Query : IReadOnlyDictionary<string, string> =
-        let q = ctx.Request.Query
-        let d = Dictionary<string, string>(q.Count)
-        for kvp in q do
-            d.[kvp.Key] <- kvp.Value.ToString()
-        d :> IReadOnlyDictionary<_, _>
+        let key = "fire.query.cache"
+        match ctx.Items.TryGetValue(key) with
+        | true, cached -> cached :?> IReadOnlyDictionary<string, string>
+        | false, _ ->
+            let q = ctx.Request.Query
+            let d = Dictionary<string, string>(q.Count)
+            for kvp in q do
+                d.[kvp.Key] <- kvp.Value.ToString()
+            let result = d :> IReadOnlyDictionary<_, _>
+            ctx.Items.[key] <- result
+            result
 
     member _.Header (name: string) : string option =
         match ctx.Request.Headers.TryGetValue(name) with

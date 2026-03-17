@@ -1,6 +1,7 @@
 namespace Fire
 
 open System
+open System.Globalization
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.Extensions.DependencyInjection
@@ -77,19 +78,24 @@ module HandlerFactory =
             | None -> []
         walk t
 
-    /// Invoke a curried FSharpFunc with arguments
-    let invokeCurried (fn: obj) (args: obj[]) : obj =
-        let mutable current = fn
-        for arg in args do
-            let t = current.GetType()
-            // F# closures may have multiple Invoke overloads (curried + tuple).
-            // Pick the one with exactly one parameter.
-            let invokeMethod =
-                t.GetMethods()
-                |> Array.find (fun m ->
-                    m.Name = "Invoke" && m.GetParameters().Length = 1)
-            current <- invokeMethod.Invoke(current, [| arg |])
-        current
+    /// Build a fast invoker that caches MethodInfo at registration time
+    let private buildInvoker (handler: obj) (paramCount: int) : (obj[] -> obj) =
+        // Walk the FSharpFunc chain to collect MethodInfo for each Invoke
+        let methods = Array.zeroCreate paramCount
+        let mutable currentType = handler.GetType()
+        for i in 0..paramCount-1 do
+            methods.[i] <-
+                currentType.GetMethods()
+                |> Array.find (fun m -> m.Name = "Invoke" && m.GetParameters().Length = 1)
+            // Get the return type for the next step
+            let returnType = methods.[i].ReturnType
+            currentType <- returnType
+        // Return a fast invoker that uses cached MethodInfo
+        fun (args: obj[]) ->
+            let mutable current = handler
+            for i in 0..args.Length-1 do
+                current <- methods.[i].Invoke(current, [| args.[i] |])
+            current
 
     /// Await a Task-like object and extract the Response.
     /// Handles both Task<Response> (concrete) and Task<obj> (erased generic).
@@ -109,10 +115,10 @@ module HandlerFactory =
 
     /// Convert string to target type
     let convertValue (targetType: Type) (value: string) : obj =
-        if targetType = typeof<int> then box (Int32.Parse value)
+        if targetType = typeof<int> then box (Int32.Parse(value, CultureInfo.InvariantCulture))
         elif targetType = typeof<string> then box value
-        elif targetType = typeof<bool> then box (Boolean.Parse value)
-        elif targetType = typeof<float> then box (Double.Parse value)
+        elif targetType = typeof<bool> then box (Boolean.Parse(value))
+        elif targetType = typeof<float> then box (Double.Parse(value, CultureInfo.InvariantCulture))
         else failwith $"cannot convert to {targetType.Name}"
 
     /// Check if a type is assignable to Handler (FSharpFunc<Request, Task<Response>>)
@@ -130,13 +136,17 @@ module HandlerFactory =
             let h = handler :?> Handler
             (triePattern, h)
         else
+            if findFSharpFuncType handlerType = None && not (isHandler handlerType) then
+                failwith $"Route handler must be a function (Request -> Task<Response> or similar), got {handlerType.Name}"
+
             let paramTypes = getParamTypes handlerType
             let isBodyMethod = match httpMethod.ToUpperInvariant() with "POST" | "PUT" | "PATCH" -> true | _ -> false
 
             if paramTypes.IsEmpty || (paramTypes.Length = 1 && paramTypes.[0] = typeof<unit>) then
                 // fun () -> task { ... }
+                let invoker = buildInvoker handler 1
                 let h : Handler = fun _req ->
-                    let result = invokeCurried handler [| box () |]
+                    let result = invoker [| box () |]
                     awaitResponse result
                 (triePattern, h)
             else
@@ -172,6 +182,9 @@ module HandlerFactory =
                         (t, "route", name)
                     | _ -> (t, kind, ""))
 
+                let paramCount = paramBindings.Length
+                let invoker = buildInvoker handler paramCount
+
                 let h : Handler = fun req -> task {
                     let args = ResizeArray<obj>()
                     for (paramType, kind, name) in paramBindings do
@@ -191,7 +204,7 @@ module HandlerFactory =
                             // Erased generic — pass Request boxed as obj
                             args.Add(box req)
                         | _ -> ()
-                    let result = invokeCurried handler (args.ToArray())
+                    let result = invoker (args.ToArray())
                     return! awaitResponse result
                 }
 
