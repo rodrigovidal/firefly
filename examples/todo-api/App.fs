@@ -99,29 +99,21 @@ let routes =
     |> Route.group "/api/todos" (fun group ->
         group
         // List all todos
-        |> Route.get "" (fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
+        |> Route.get "" (fun (store: ITodoStore) -> task {
             let! items = store.GetAll()
             return Response.json {| todos = items |}
         })
         // Get by id
-        |> Route.get "/:id" (fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            match Int32.TryParse(req.Params.["id"]) with
-            | true, id ->
-                let! todo = store.GetById(id)
-                match todo with
-                | Some t -> return Response.json t
-                | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
-            | false, _ ->
-                return Response.json {| errors = ["id: expected integer"] |} |> Response.status 400
+        |> Route.get "/%i" (fun (store: ITodoStore) (id: int) -> task {
+            let! todo = store.GetById(id)
+            match todo with
+            | Some t -> return Response.json t
+            | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
         })
         // Protected routes
         |> Route.middleware jwtAuth
         // Create
-        |> Route.post "" (fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            let! body = req.Json<CreateTodo>()
+        |> Route.post "" (fun (store: ITodoStore) (body: CreateTodo) -> task {
             if String.IsNullOrWhiteSpace body.Title then
                 return Response.json {| errors = ["Title is required"] |} |> Response.status 400
             else
@@ -129,28 +121,17 @@ let routes =
                 return Response.json todo |> Response.status 201
         })
         // Update
-        |> Route.put "/:id" (fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            match Int32.TryParse(req.Params.["id"]) with
-            | true, id ->
-                let! body = req.Json<UpdateTodo>()
-                let! result = store.Update(id, { Title = body.Title; Completed = body.Completed })
-                match result with
-                | Some updated -> return Response.json updated
-                | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
-            | false, _ ->
-                return Response.json {| errors = ["id: expected integer"] |} |> Response.status 400
+        |> Route.put "/%i" (fun (store: ITodoStore) (id: int) (body: UpdateTodo) -> task {
+            let! result = store.Update(id, { Title = body.Title; Completed = body.Completed })
+            match result with
+            | Some updated -> return Response.json updated
+            | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
         })
         // Delete
-        |> Route.delete "/:id" (fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            match Int32.TryParse(req.Params.["id"]) with
-            | true, id ->
-                let! deleted = store.Delete(id)
-                if deleted then return Response.noContent
-                else return Response.json {| error = "todo not found" |} |> Response.status 404
-            | false, _ ->
-                return Response.json {| errors = ["id: expected integer"] |} |> Response.status 400
+        |> Route.delete "/%i" (fun (store: ITodoStore) (id: int) -> task {
+            let! deleted = store.Delete(id)
+            if deleted then return Response.noContent
+            else return Response.json {| error = "todo not found" |} |> Response.status 404
         })
     )
 

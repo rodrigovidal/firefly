@@ -119,134 +119,106 @@ let create () =
                     return Response.json items
             }
 
-    let getPost: Handler =
-        fun req ->
-            task {
-                match req.Params.TryGetValue "postId" with
-                | true, idStr ->
-                    match Int32.TryParse idStr with
-                    | true, id ->
-                        match posts |> Seq.tryFind (fun p -> p.Id = id) with
-                        | Some post ->
-                            let etag = computeETag post
+    let getPost (id: int) (req: Request) =
+        task {
+            match posts |> Seq.tryFind (fun p -> p.Id = id) with
+            | Some post ->
+                let etag = computeETag post
 
-                            match req.Header "If-None-Match" with
-                            | Some clientTag when clientTag = etag ->
-                                return { Status = 304; Headers = []; Body = Empty }
-                            | _ ->
-                                let now = DateTime.UtcNow.ToString("o")
-
-                                return
-                                    Response.json post
-                                    |> Response.etag etag
-                                    |> Response.cacheControl "public, max-age=60"
-                                    |> Cookie.set "last-visited" $"post-{id}-at-{now}" Cookie.defaults
-                        | None -> return notFoundJson "Post not found"
-                    | _ -> return badRequest "Invalid post id"
-                | _ -> return badRequest "Missing post id"
-            }
-
-    let createPost: Handler =
-        fun req ->
-            task {
-                let! input = req.Json<CreatePost>()
-
-                if String.IsNullOrWhiteSpace input.Title then
-                    return badRequest "Title is required"
-                elif String.IsNullOrWhiteSpace input.Body then
-                    return badRequest "Body is required"
-                else
-                    let id = nextPostId
-                    nextPostId <- nextPostId + 1
-
-                    let post =
-                        { Id = id
-                          Title = input.Title
-                          Body = input.Body
-                          Tags = input.Tags
-                          CreatedAt = DateTime.UtcNow }
-
-                    posts.Add(post)
+                match req.Header "If-None-Match" with
+                | Some clientTag when clientTag = etag ->
+                    return { Status = 304; Headers = []; Body = Empty }
+                | _ ->
+                    let now = DateTime.UtcNow.ToString("o")
 
                     return
                         Response.json post
+                        |> Response.etag etag
+                        |> Response.cacheControl "public, max-age=60"
+                        |> Cookie.set "last-visited" $"post-{id}-at-{now}" Cookie.defaults
+            | None -> return notFoundJson "Post not found"
+        }
+
+    let createPost (input: CreatePost) =
+        task {
+            if String.IsNullOrWhiteSpace input.Title then
+                return badRequest "Title is required"
+            elif String.IsNullOrWhiteSpace input.Body then
+                return badRequest "Body is required"
+            else
+                let id = nextPostId
+                nextPostId <- nextPostId + 1
+
+                let post =
+                    { Id = id
+                      Title = input.Title
+                      Body = input.Body
+                      Tags = input.Tags
+                      CreatedAt = DateTime.UtcNow }
+
+                posts.Add(post)
+
+                return
+                    Response.json post
+                    |> Response.status 201
+                    |> Response.header "Location" $"/api/posts/{id}"
+        }
+
+    let listComments (postId: int) =
+        task {
+            match posts |> Seq.tryFind (fun p -> p.Id = postId) with
+            | Some _ ->
+                let items =
+                    comments |> Seq.filter (fun c -> c.PostId = postId) |> Seq.toList
+
+                return Response.json items
+            | None -> return notFoundJson "Post not found"
+        }
+
+    let createComment (postId: int) (input: CreateComment) =
+        task {
+            match posts |> Seq.tryFind (fun p -> p.Id = postId) with
+            | Some _ ->
+                if String.IsNullOrWhiteSpace input.Author then
+                    return badRequest "Author is required"
+                elif String.IsNullOrWhiteSpace input.Body then
+                    return badRequest "Body is required"
+                else
+                    let id = nextCommentId
+                    nextCommentId <- nextCommentId + 1
+
+                    let comment =
+                        { Id = id
+                          PostId = postId
+                          Author = input.Author
+                          Body = input.Body
+                          CreatedAt = DateTime.UtcNow }
+
+                    comments.Add(comment)
+
+                    return
+                        Response.json comment
                         |> Response.status 201
-                        |> Response.header "Location" $"/api/posts/{id}"
-            }
+                        |> Response.header "Location" $"/api/posts/{postId}/comments/{id}"
+            | None -> return notFoundJson "Post not found"
+        }
 
-    let listComments: Handler =
-        fun req ->
-            task {
-                match req.Params.TryGetValue "postId" with
-                | true, idStr ->
-                    match Int32.TryParse idStr with
-                    | true, postId ->
-                        match posts |> Seq.tryFind (fun p -> p.Id = postId) with
-                        | Some _ ->
-                            let items =
-                                comments |> Seq.filter (fun c -> c.PostId = postId) |> Seq.toList
+    let listTags () =
+        task {
+            let tags =
+                posts
+                |> Seq.collect (fun p -> p.Tags)
+                |> Seq.distinct
+                |> Seq.sort
+                |> Seq.toList
 
-                            return Response.json items
-                        | None -> return notFoundJson "Post not found"
-                    | _ -> return badRequest "Invalid post id"
-                | _ -> return badRequest "Missing post id"
-            }
+            return Response.json tags
+        }
 
-    let createComment: Handler =
-        fun req ->
-            task {
-                match req.Params.TryGetValue "postId" with
-                | true, idStr ->
-                    match Int32.TryParse idStr with
-                    | true, postId ->
-                        match posts |> Seq.tryFind (fun p -> p.Id = postId) with
-                        | Some _ ->
-                            let! input = req.Json<CreateComment>()
-
-                            if String.IsNullOrWhiteSpace input.Author then
-                                return badRequest "Author is required"
-                            elif String.IsNullOrWhiteSpace input.Body then
-                                return badRequest "Body is required"
-                            else
-                                let id = nextCommentId
-                                nextCommentId <- nextCommentId + 1
-
-                                let comment =
-                                    { Id = id
-                                      PostId = postId
-                                      Author = input.Author
-                                      Body = input.Body
-                                      CreatedAt = DateTime.UtcNow }
-
-                                comments.Add(comment)
-
-                                return
-                                    Response.json comment
-                                    |> Response.status 201
-                                    |> Response.header "Location" $"/api/posts/{postId}/comments/{id}"
-                        | None -> return notFoundJson "Post not found"
-                    | _ -> return badRequest "Invalid post id"
-                | _ -> return badRequest "Missing post id"
-            }
-
-    let listTags: Handler =
-        fun _req ->
-            task {
-                let tags =
-                    posts
-                    |> Seq.collect (fun p -> p.Tags)
-                    |> Seq.distinct
-                    |> Seq.sort
-                    |> Seq.toList
-
-                return Response.json tags
-            }
-
-    let feedRedirect: Handler =
-        fun _req ->
-            task {
-                return Response.ok |> Response.redirect "/api/posts" 302
-            }
+    let feedRedirect () =
+        task {
+            return Response.ok |> Response.redirect "/api/posts" 302
+        }
 
     let errorHandler (ex: exn) (_req: Request) =
         task {
@@ -262,11 +234,9 @@ let create () =
                 postsGroup
                 |> Route.get "" listPosts
                 |> Route.post "" createPost
-                |> Route.get "/:postId" getPost
-                |> Route.group "/:postId/comments" (fun commentsGroup ->
-                    commentsGroup
-                    |> Route.get "" listComments
-                    |> Route.post "" createComment))
+                |> Route.get "/%i" getPost
+                |> Route.get "/%i/comments" listComments
+                |> Route.post "/%i/comments" createComment)
             |> Route.get "/tags" listTags)
         |> Route.get "/feed" feedRedirect
 

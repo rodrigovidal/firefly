@@ -187,25 +187,33 @@ module HandlerFactory =
 
                 let h : Handler = fun req -> task {
                     let args = ResizeArray<obj>()
+                    let mutable conversionError = false
                     for (paramType, kind, name) in paramBindings do
-                        match kind with
-                        | "di" ->
-                            args.Add(req.Raw.RequestServices.GetRequiredService(paramType))
-                        | "route" ->
-                            let value = req.Params.[name]
-                            args.Add(convertValue paramType value)
-                        | "body" ->
-                            let body = req.Raw.Request.Body
-                            let! deserialized = JsonSerializer.DeserializeAsync(body, paramType)
-                            args.Add(deserialized)
-                        | "request" ->
-                            args.Add(box req)
-                        | "request-obj" ->
-                            // Erased generic — pass Request boxed as obj
-                            args.Add(box req)
-                        | _ -> ()
-                    let result = invoker (args.ToArray())
-                    return! awaitResponse result
+                        if not conversionError then
+                            match kind with
+                            | "di" ->
+                                args.Add(req.Raw.RequestServices.GetRequiredService(paramType))
+                            | "route" ->
+                                let value = req.Params.[name]
+                                try
+                                    args.Add(convertValue paramType value)
+                                with :? FormatException ->
+                                    conversionError <- true
+                            | "body" ->
+                                let body = req.Raw.Request.Body
+                                let! deserialized = JsonSerializer.DeserializeAsync(body, paramType)
+                                args.Add(deserialized)
+                            | "request" ->
+                                args.Add(box req)
+                            | "request-obj" ->
+                                // Erased generic — pass Request boxed as obj
+                                args.Add(box req)
+                            | _ -> ()
+                    if conversionError then
+                        return { Status = 400; Headers = []; Body = Empty }
+                    else
+                        let result = invoker (args.ToArray())
+                        return! awaitResponse result
                 }
 
                 (triePattern, h)
