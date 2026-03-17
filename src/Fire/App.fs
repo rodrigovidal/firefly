@@ -54,10 +54,13 @@ module App =
         match response.Body with
         | Empty -> ()
         | Text s ->
+            let bytes = System.Text.Encoding.UTF8.GetBytes(s)
             ctx.Response.ContentType <- "text/plain; charset=utf-8"
-            do! ctx.Response.WriteAsync(s)
+            ctx.Response.ContentLength <- System.Nullable(int64 bytes.Length)
+            do! ctx.Response.Body.WriteAsync(System.ReadOnlyMemory(bytes))
         | Json bytes ->
             ctx.Response.ContentType <- "application/json; charset=utf-8"
+            ctx.Response.ContentLength <- System.Nullable(int64 bytes.Length)
             do! ctx.Response.Body.WriteAsync(System.ReadOnlyMemory(bytes))
         | Stream stream ->
             use stream = stream

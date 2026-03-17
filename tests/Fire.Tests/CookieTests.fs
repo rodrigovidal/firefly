@@ -5,6 +5,38 @@ open FsUnit.Xunit
 open Fire
 
 [<Fact>]
+let ``Request.Cookie reads cookie from request`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/me" (fun req -> task {
+            let session = req.Cookie "session" |> Option.defaultValue "none"
+            return Response.text session
+        })
+    let client =
+        TestClient.create routes
+        |> TestClient.withHeader "Cookie" "session=abc123"
+    let! r = client |> TestClient.get "/me"
+    r.Status |> should equal 200
+    r.Body |> should equal "abc123"
+}
+
+[<Fact>]
+let ``Request.Cookie returns None when cookie missing`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/me" (fun req -> task {
+            let session = req.Cookie "session"
+            match session with
+            | Some _ -> return Response.text "found"
+            | None -> return Response.text "missing"
+        })
+    let client = TestClient.create routes
+    let! r = client |> TestClient.get "/me"
+    r.Status |> should equal 200
+    r.Body |> should equal "missing"
+}
+
+[<Fact>]
 let ``Response.cookie sets bare Set-Cookie header`` () =
     let r = Response.ok |> Response.cookie "session" "abc123"
     r.Headers |> should contain ("Set-Cookie", "session=abc123")

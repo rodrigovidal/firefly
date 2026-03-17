@@ -28,11 +28,14 @@ module Static =
         | false, _ -> "application/octet-stream"
 
     let serve (rootDir: string) : Handler =
-        let absRoot = Path.GetFullPath(rootDir)
+        let absRoot =
+            let p = Path.GetFullPath(rootDir)
+            if p.EndsWith(Path.DirectorySeparatorChar) then p
+            else p + string Path.DirectorySeparatorChar
         fun req -> task {
             let filePath = req.Params.["path"]
             let fullPath = Path.GetFullPath(Path.Combine(absRoot, filePath))
-            if not (fullPath.StartsWith(absRoot)) then
+            if not (fullPath.StartsWith(absRoot, System.StringComparison.OrdinalIgnoreCase)) then
                 return Response.notFound
             elif File.Exists(fullPath) then
                 let stream = File.OpenRead(fullPath)

@@ -36,10 +36,13 @@ module Validate =
 
     let body<'T> (validator: Validator<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
         fun req -> task {
-            let! value = req.Json<'T>()
-            match validator value with
-            | Ok validated -> return! handler validated
-            | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
+            try
+                let! value = req.Json<'T>()
+                match validator value with
+                | Ok validated -> return! handler validated
+                | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
+            with ex ->
+                return Response.json {| errors = [$"Invalid request body: {ex.Message}"] |} |> Response.status 400
         }
 
     // --- String-level rules (for query/params/headers) ---

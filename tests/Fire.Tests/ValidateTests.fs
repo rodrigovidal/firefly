@@ -106,6 +106,23 @@ let ``Validate.body calls handler on valid body`` () = task {
     r.Body |> should haveSubstring "Alice"
 }
 
+[<Fact>]
+let ``Validate.body returns 400 on malformed JSON`` () = task {
+    let routes =
+        Route.start
+        |> Route.post "/users" (
+            Validate.body
+                (Validate.required "name" (fun (u: CreateUser) -> u.Name))
+                (fun user -> task {
+                    return Response.json {| name = user.Name |} |> Response.status 201
+                })
+        )
+    let client = TestClient.create routes
+    let! r = client |> TestClient.post "/users" """not valid json{{{"""
+    r.Status |> should equal 400
+    r.Body |> should haveSubstring "Invalid request body"
+}
+
 // --- Query/param/header validation tests ---
 
 [<Fact>]

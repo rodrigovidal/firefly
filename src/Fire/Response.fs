@@ -32,6 +32,8 @@ module Response =
 
     let notFound = { ok with Status = 404 }
     let unauthorized = { ok with Status = 401 }
+    let created = { ok with Status = 201 }
+    let noContent = { ok with Status = 204 }
 
     let redirect url code r =
         { r with Status = code; Headers = ("Location", url) :: r.Headers }

@@ -72,4 +72,9 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
         | null | "" -> None
         | ct -> Some ct
 
+    member _.Cookie (name: string) : string option =
+        match ctx.Request.Cookies.TryGetValue(name) with
+        | true, value -> Some value
+        | false, _ -> None
+
     member _.Raw = ctx
