@@ -151,3 +151,20 @@ let ``Trie pre-composes middleware chain`` () =
     let (h, _) = (Trie.lookup "GET" "/test" trie).Value
     h (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously |> ignore
     callOrder |> should equal ["mw1"; "mw2"; "handler"]
+
+// --- Coverage: ParamChild reuse (line 50) ---
+
+[<Fact>]
+let ``Trie reuses existing param child node`` () =
+    let trie =
+        Trie.empty
+        |> Trie.add "GET" "/items/:id" [] (fun _ -> task { return Response.text "get" })
+        |> Trie.add "POST" "/items/:id" [] (fun _ -> task { return Response.text "post" })
+    let (hGet, ps1) = (Trie.lookup "GET" "/items/42" trie).Value
+    let (hPost, ps2) = (Trie.lookup "POST" "/items/42" trie).Value
+    ps1.["id"] |> should equal "42"
+    ps2.["id"] |> should equal "42"
+    let rGet = hGet (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
+    let rPost = hPost (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
+    rGet.Body |> should equal (Text "get")
+    rPost.Body |> should equal (Text "post")

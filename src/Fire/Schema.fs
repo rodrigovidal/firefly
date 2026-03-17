@@ -57,6 +57,9 @@ module SchemaCompiler =
     /// Registry for nested schema compiled info, keyed by parser delegate identity
     let internal nestedRegistry = ConcurrentDictionary<obj, FieldType>()
 
+    /// Registry for nested schema field specs, keyed by parser delegate identity
+    let internal nestedSpecRegistry = ConcurrentDictionary<obj, FieldSpec list>()
+
     let rec readValue (fieldType: FieldType) (reader: byref<Utf8JsonReader>) : obj =
         match fieldType with
         | FString -> box (reader.GetString())
@@ -346,6 +349,7 @@ module Schema =
             | Error errs -> Error (errs |> String.concat "; ")
         // Register the compiled field type for this specific parser closure
         SchemaCompiler.nestedRegistry.TryAdd(box parser, fieldType) |> ignore
+        SchemaCompiler.nestedSpecRegistry.TryAdd(box parser, nestedSchema.Fields) |> ignore
         parser
 
     // --- Infer compiled FieldType from CLR type, checking nested registry ---
@@ -359,11 +363,24 @@ module Schema =
             elif typeof<'T> = typeof<bool> then SchemaCompiler.FBool
             elif typeof<'T> = typeof<float> then SchemaCompiler.FFloat
             elif typeof<'T> = typeof<string list> then SchemaCompiler.FStringList
+            elif typeof<'T>.IsGenericType && typeof<'T>.GetGenericTypeDefinition() = typedefof<_ option> then
+                let innerType = typeof<'T>.GetGenericArguments().[0]
+                let inner =
+                    if innerType = typeof<string> then SchemaCompiler.FString
+                    elif innerType = typeof<int> then SchemaCompiler.FInt
+                    elif innerType = typeof<bool> then SchemaCompiler.FBool
+                    elif innerType = typeof<float> then SchemaCompiler.FFloat
+                    else SchemaCompiler.FString
+                SchemaCompiler.FNullable inner
             else SchemaCompiler.FString // fallback
 
     // --- Field builders ---
 
     let required (name: string) (parser: JsonElement -> Result<'T, string>) (rules: Rule list) : SchemaField<'T> =
+        let children =
+            match SchemaCompiler.nestedSpecRegistry.TryGetValue(box parser) with
+            | true, specs -> specs
+            | _ -> []
         let spec = {
             Name = name
             Type =
@@ -375,7 +392,7 @@ module Schema =
             Required = true
             Rules = rules |> List.map (fun r -> r.Spec)
             Items = None
-            Children = []
+            Children = children
         }
         {
             Name = name
@@ -400,6 +417,10 @@ module Schema =
         }
 
     let optional (name: string) (parser: JsonElement -> Result<'T, string>) (defaultValue: 'T) (rules: Rule list) : SchemaField<'T> =
+        let children =
+            match SchemaCompiler.nestedSpecRegistry.TryGetValue(box parser) with
+            | true, specs -> specs
+            | _ -> []
         let spec = {
             Name = name
             Type =
@@ -411,7 +432,7 @@ module Schema =
             Required = false
             Rules = rules |> List.map (fun r -> r.Spec)
             Items = None
-            Children = []
+            Children = children
         }
         {
             Name = name

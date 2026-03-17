@@ -103,6 +103,21 @@ let ``Static.serve returns octet-stream for unknown extension`` () = task {
         Directory.Delete(dir, true)
 }
 
+// --- Coverage: Static.fs line 39 — traversal via direct TestClient ---
+
+[<Fact>]
+let ``Static.serve prevents traversal via TestClient`` () = task {
+    let dir = setupTestDir ()
+    try
+        let routes = Route.start |> Route.get "/static/*path" (Static.serve dir)
+        let client = TestClient.create routes
+        // Send a traversal path directly — TestClient doesn't normalize URLs
+        let! response = client |> TestClient.get "/static/../../../etc/passwd"
+        response.Status |> should equal 404
+    finally
+        Directory.Delete(dir, true)
+}
+
 [<Fact>]
 let ``Static.serve handles nested directories`` () = task {
     let dir = setupTestDir ()

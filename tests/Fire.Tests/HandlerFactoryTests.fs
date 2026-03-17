@@ -292,3 +292,49 @@ let ``awaitResponse unwraps Task of Response`` () = task {
 let ``getParamTypes returns empty for non-function type`` () =
     let types = HandlerFactory.getParamTypes typeof<string>
     types |> should haveLength 0
+
+// --- Coverage: DI + explicit Request param (lines 148, 189) ---
+
+[<Fact>]
+let ``DI service + explicit Request param`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun (counter: ICounter) (req: Request) -> task {
+            let n = counter.Next()
+            return Response.text $"{req.Path} #{n}"
+        })
+    let config =
+        App.defaults |> App.port 0
+        |> App.dependencyInjection (fun s -> s.AddSingleton<ICounter, Counter>() |> ignore)
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    let! r = client.GetAsync($"http://127.0.0.1:{port}/test")
+    let! body = r.Content.ReadAsStringAsync()
+    body |> should equal "/test #1"
+    do! stop()
+}
+
+// --- Coverage: awaitResponse fallback path (lines 105-107) — Task<obj> not Task<Response> ---
+
+[<Fact>]
+let ``awaitResponse unwraps Task of obj containing Response`` () = task {
+    let t = System.Threading.Tasks.Task.FromResult(box Response.ok)
+    let! result = HandlerFactory.awaitResponse (t :> obj)
+    result.Status |> should equal 200
+}
+
+// --- Coverage: findFSharpFuncType with closure subclass (line 69) ---
+
+[<Fact>]
+let ``getParamTypes works with closure capturing variable`` () =
+    let mutable captured = 0
+    let handler = fun (x: int) -> task {
+        captured <- x
+        return Response.ok
+    }
+    let types = HandlerFactory.getParamTypes (handler.GetType())
+    types |> List.length |> should be (greaterThanOrEqualTo 1)
+    types.[0] |> should equal typeof<int>
+
+// --- Coverage: classification fallback — primitive without format spec (lines 161-163) ---
+// Uses HandlerFactory.create directly to test the fallback classification path.

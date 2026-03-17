@@ -995,3 +995,220 @@ let ``Schema.toJsonSchema includes nested object properties`` () =
     let props = doc.RootElement.GetProperty("properties")
     let addressProp = props.GetProperty("address")
     addressProp.GetProperty("type").GetString() |> should equal "object"
+
+// --- Coverage: buildNestedFieldType with int/bool/float fields (Schema.fs lines 317-320) ---
+
+let nestedWithTypes = schema {
+    let! count = Schema.required "count" Schema.int []
+    let! active = Schema.required "active" Schema.bool []
+    let! score = Schema.optional "score" Schema.float 0.0 []
+    return {| Count = count; Active = active; Score = score |}
+}
+
+let parentWithTypedNested = schema {
+    let! name = Schema.required "name" Schema.string []
+    let! data = Schema.required "data" (Schema.nest nestedWithTypes) []
+    return {| Name = name; Data = data |}
+}
+
+[<Fact>]
+let ``Buffer parses nested schema with int/bool/float fields`` () =
+    let json = """{"name":"test","data":{"count":5,"active":true,"score":9.5}}"""
+    match Schema.parseString parentWithTypedNested json with
+    | Ok r ->
+        r.Name |> should equal "test"
+        r.Data.Count |> should equal 5
+        r.Data.Active |> should equal true
+        r.Data.Score |> should (equalWithin 0.01) 9.5
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Buffer parses nested schema with default optional float`` () =
+    let json = """{"name":"test","data":{"count":5,"active":true}}"""
+    match Schema.parseString parentWithTypedNested json with
+    | Ok r ->
+        r.Data.Count |> should equal 5
+        r.Data.Active |> should equal true
+        r.Data.Score |> should (equalWithin 0.01) 0.0
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Coverage: nest parser error path (Schema.fs line 345) ---
+
+[<Fact>]
+let ``Nested schema returns error for invalid nested data`` () =
+    let json = """{"name":"test","data":{"count":"notint","active":true}}"""
+    match Schema.parseString parentWithTypedNested json with
+    | Error _ -> ()
+    | Ok _ -> failwith "expected Error"
+
+// --- Coverage: Nullable via buffer (SchemaCompiler lines 74-88) ---
+
+let nullableBufferSchema = schema {
+    let! name = Schema.required "name" Schema.string []
+    let! nickname = Schema.optional "nickname" (Schema.nullable Schema.string) None []
+    return {| Name = name; Nickname = nickname |}
+}
+
+[<Fact>]
+let ``Buffer parses nullable field with value`` () =
+    let json = """{"name":"Alice","nickname":"Ali"}"""
+    match Schema.parseString nullableBufferSchema json with
+    | Ok r ->
+        r.Name |> should equal "Alice"
+        r.Nickname |> should equal (Some "Ali")
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Buffer parses nullable field with null`` () =
+    let json = """{"name":"Alice","nickname":null}"""
+    match Schema.parseString nullableBufferSchema json with
+    | Ok r ->
+        r.Name |> should equal "Alice"
+        r.Nickname |> should equal None
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Buffer parses nullable field missing`` () =
+    let json = """{"name":"Alice"}"""
+    match Schema.parseString nullableBufferSchema json with
+    | Ok r ->
+        r.Name |> should equal "Alice"
+        r.Nickname |> should equal None
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Coverage: toJsonSchema with nested children populated (lines 510-518) ---
+
+[<Fact>]
+let ``toJsonSchema includes nested object children with properties`` () =
+    let jsonSchema = Schema.toJsonSchema parentWithTypedNested
+    let doc = System.Text.Json.JsonDocument.Parse(jsonSchema)
+    let props = doc.RootElement.GetProperty("properties")
+    let data = props.GetProperty("data")
+    data.GetProperty("type").GetString() |> should equal "object"
+    // Should have nested properties from children
+    let nestedProps = data.GetProperty("properties")
+    nestedProps.TryGetProperty("count") |> fst |> should be True
+    nestedProps.TryGetProperty("active") |> fst |> should be True
+    // Should have nested required array
+    let nestedRequired = data.GetProperty("required")
+    nestedRequired.GetArrayLength() |> should be (greaterThanOrEqualTo 2)
+
+// --- Coverage: SchemaCompiler nested object via buffer (line 97), skip unknown in nested (line 111-112), default optional nested (line 116) ---
+
+[<Fact>]
+let ``Buffer parses nested schema skipping unknown nested properties`` () =
+    let json = """{"name":"test","data":{"count":1,"active":false,"score":2.5,"extraField":"ignored"}}"""
+    match Schema.parseString parentWithTypedNested json with
+    | Ok r ->
+        r.Data.Count |> should equal 1
+        r.Data.Active |> should equal false
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Coverage: Schema.nest Ok path via JsonElement (line 348) ---
+
+[<Fact>]
+let ``Schema.nest Ok path via JsonElement`` () =
+    let json = """{"name":"Alice","email":"alice@test.com","address":{"street":"Main","city":"NY","zip":"12345"}}"""
+    use doc = System.Text.Json.JsonDocument.Parse(json)
+    match Schema.parseJson createUserSchema doc.RootElement with
+    | Ok user ->
+        user.Name |> should equal "Alice"
+        user.Address.Street |> should equal "Main"
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+// --- Coverage: buildNestedFieldType fallback for nested-nested (line 323) ---
+
+let innerSchema = schema {
+    let! tag = Schema.required "tag" Schema.string []
+    return {| Tag = tag |}
+}
+
+let middleSchema = schema {
+    let! label = Schema.required "label" Schema.string []
+    let! inner = Schema.required "inner" (Schema.nest innerSchema) []
+    return {| Label = label; Inner = inner |}
+}
+
+let outerSchema = schema {
+    let! title = Schema.required "title" Schema.string []
+    let! middle = Schema.required "middle" (Schema.nest middleSchema) []
+    return {| Title = title; Middle = middle |}
+}
+
+[<Fact>]
+let ``Nested-nested schema hits buildNestedFieldType fallback for object type`` () =
+    let json = """{"title":"top","middle":{"label":"mid","inner":{"tag":"deep"}}}"""
+    use doc = System.Text.Json.JsonDocument.Parse(json)
+    match Schema.parseJson outerSchema doc.RootElement with
+    | Ok r ->
+        r.Title |> should equal "top"
+        r.Middle.Label |> should equal "mid"
+        r.Middle.Inner.Tag |> should equal "deep"
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Coverage: optional field children lookup (line 422) ---
+
+let optionalNestedSchema = schema {
+    let! title = Schema.required "title" Schema.string []
+    let! extra = Schema.optional "extra" (Schema.nest innerSchema) {| Tag = "default" |} []
+    return {| Title = title; Extra = extra |}
+}
+
+[<Fact>]
+let ``Optional nested field uses default when missing`` () =
+    let json = """{"title":"test"}"""
+    match Schema.parseString optionalNestedSchema json with
+    | Ok r ->
+        r.Title |> should equal "test"
+        r.Extra.Tag |> should equal "default"
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Coverage: FNullable with int/bool/float inner types via buffer (lines 84-88) ---
+
+let nullableIntSchema = schema {
+    let! name = Schema.required "name" Schema.string []
+    let! count = Schema.optional "count" (Schema.nullable Schema.int) None []
+    return {| Name = name; Count = count |}
+}
+
+[<Fact>]
+let ``Buffer parses nullable int field with value`` () =
+    let json = """{"name":"test","count":42}"""
+    match Schema.parseString nullableIntSchema json with
+    | Ok r ->
+        r.Name |> should equal "test"
+        r.Count |> should equal (Some 42)
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Buffer parses nullable int field with null`` () =
+    let json = """{"name":"test","count":null}"""
+    match Schema.parseString nullableIntSchema json with
+    | Ok r -> r.Count |> should equal None
+    | Error e -> failwith $"expected Ok, got {e}"
+
+let nullableBoolSchema = schema {
+    let! name = Schema.required "name" Schema.string []
+    let! active = Schema.optional "active" (Schema.nullable Schema.bool) None []
+    return {| Name = name; Active = active |}
+}
+
+[<Fact>]
+let ``Buffer parses nullable bool field with value`` () =
+    let json = """{"name":"test","active":true}"""
+    match Schema.parseString nullableBoolSchema json with
+    | Ok r -> r.Active |> should equal (Some true)
+    | Error e -> failwith $"expected Ok, got {e}"
+
+let nullableFloatSchema = schema {
+    let! name = Schema.required "name" Schema.string []
+    let! score = Schema.optional "score" (Schema.nullable Schema.float) None []
+    return {| Name = name; Score = score |}
+}
+
+[<Fact>]
+let ``Buffer parses nullable float field with value`` () =
+    let json = """{"name":"test","score":3.14}"""
+    match Schema.parseString nullableFloatSchema json with
+    | Ok r -> r.Score |> should equal (Some 3.14)
+    | Error e -> failwith $"expected Ok, got {e}"

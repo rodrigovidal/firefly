@@ -328,3 +328,29 @@ let ``App.dependencyInjection registers and resolves services`` () = task {
 
     do! stop ()
 }
+
+// --- Coverage: App.run starts and stops server (lines 127-135) ---
+
+[<Fact>]
+let ``App.run starts and stops server`` () = task {
+    let routes = Route.start |> Route.get "/test" (fun _ -> task { return Response.text "ok" })
+    let config = App.defaults |> App.port 0 |> App.host "127.0.0.1"
+    use cts = new CancellationTokenSource()
+    let serverTask = App.run routes config cts.Token
+    do! System.Threading.Tasks.Task.Delay(500)
+    cts.Cancel()
+    try do! serverTask with :? System.OperationCanceledException -> ()
+}
+
+// --- Coverage: resolveHost else branch with IP "0.0.0.0" (line 111-112) ---
+
+[<Fact>]
+let ``App.run with host 0.0.0.0 starts correctly`` () = task {
+    let routes = Route.start |> Route.get "/test" (fun _ -> task { return Response.text "ok" })
+    let config = App.defaults |> App.port 0 |> App.host "0.0.0.0"
+    use cts = new CancellationTokenSource()
+    let serverTask = App.run routes config cts.Token
+    do! System.Threading.Tasks.Task.Delay(500)
+    cts.Cancel()
+    try do! serverTask with :? System.OperationCanceledException -> ()
+}
