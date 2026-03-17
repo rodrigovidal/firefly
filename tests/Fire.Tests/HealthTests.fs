@@ -70,3 +70,16 @@ let ``Health.handler returns check names in response`` () = task {
     response.Body |> should haveSubstring "ping"
     response.Body |> should haveSubstring "redis"
 }
+
+[<Fact>]
+let ``Health.handler catches raw check exceptions`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/health" (Health.handler [
+            ("explodes", fun () -> task { return failwith "raw boom" })
+        ])
+    let client = TestClient.create routes
+    let! response = client |> TestClient.get "/health"
+    response.Status |> should equal 503
+    response.Body |> should haveSubstring "raw boom"
+}

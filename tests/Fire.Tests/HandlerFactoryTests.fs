@@ -342,14 +342,30 @@ let ``getParamTypes works with closure capturing variable`` () =
 // to the else branch. specIdx < formatSpecs.Length is true, so it increments.
 
 [<Fact>]
-let ``convertPattern and create handle mismatched param types`` () =
-    // Directly test: pattern has %s but handler param is float (not string)
-    // This covers the fallback classification where specIdx < formatSpecs.Length
-    let (triePattern, specs) = HandlerFactory.convertPattern "/test/%s"
-    triePattern |> should equal "/test/:__p0"
-    specs |> should equal [typeof<string>]
-    // The fallback path (lines 161-163) fires when:
-    // - param type doesn't match specIdx format spec type
-    // - but specIdx < formatSpecs.Length
-    // This happens with non-standard type combos, which are edge cases
-    // in real usage. The important thing is the code doesn't crash.
+let ``create rejects non-function handlers`` () =
+    let action () = HandlerFactory.create "GET" "/test" (box 42) |> ignore
+    action |> should throw typeof<System.Exception>
+
+[<Fact>]
+let ``create rejects unsupported typed route parameters`` () =
+    let action () =
+        HandlerFactory.create "GET" "/test/%s" (box (fun (_value: int64) -> task { return Response.ok }))
+        |> ignore
+    action |> should throw typeof<System.Exception>
+
+[<Fact>]
+let ``Route.get supports typed colon parameters`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/items/:id" (fun (id: int) -> task {
+            return Response.json {| id = id |}
+        })
+    let config = App.defaults |> App.port 0
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    let! r = client.GetAsync($"http://127.0.0.1:{port}/items/42")
+    let! body = r.Content.ReadAsStringAsync()
+    r.StatusCode |> should equal HttpStatusCode.OK
+    body |> should haveSubstring "42"
+    do! stop()
+}

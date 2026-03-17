@@ -109,3 +109,88 @@ let ``Compress.auto passes through when no encoding accepted`` () = task {
     response.Status |> should equal 200
     response.Body |> should equal "hello"
 }
+
+[<Fact>]
+let ``Compress.gzip preserves explicit text content type`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task {
+            return Response.text "<html></html>" |> Response.header "Content-Type" "text/html; charset=utf-8"
+        })
+    let config = App.defaults |> App.middleware Compress.gzip
+    let client = TestClient.createWith routes config
+                 |> TestClient.withHeader "Accept-Encoding" "gzip"
+    let! response = client |> TestClient.get "/test"
+    response.Headers |> List.exists (fun (k, v) -> k = "Content-Type" && v = "text/html; charset=utf-8") |> should equal true
+}
+
+[<Fact>]
+let ``Compress.gzip passes through stream responses`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task {
+            let bytes = System.Text.Encoding.UTF8.GetBytes("stream body")
+            return Response.stream (new MemoryStream(bytes))
+        })
+    let config = App.defaults |> App.middleware Compress.gzip
+    let client = TestClient.createWith routes config
+                 |> TestClient.withHeader "Accept-Encoding" "gzip"
+    let! response = client |> TestClient.get "/test"
+    response.Body |> should equal "stream body"
+    response.Headers |> List.exists (fun (k, _) -> k = "Content-Encoding") |> should equal false
+}
+
+[<Fact>]
+let ``Compress.brotli passes through stream responses`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task {
+            let bytes = System.Text.Encoding.UTF8.GetBytes("stream body")
+            return Response.stream (new MemoryStream(bytes))
+        })
+    let config = App.defaults |> App.middleware Compress.brotli
+    let client = TestClient.createWith routes config
+                 |> TestClient.withHeader "Accept-Encoding" "br"
+    let! response = client |> TestClient.get "/test"
+    response.Body |> should equal "stream body"
+    response.Headers |> List.exists (fun (k, _) -> k = "Content-Encoding") |> should equal false
+}
+
+[<Fact>]
+let ``Compress.brotli passes through when no brotli accepted`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.text "hello world" })
+    let config = App.defaults |> App.middleware Compress.brotli
+    let client = TestClient.createWith routes config
+                 |> TestClient.withHeader "Accept-Encoding" "gzip"
+    let! response = client |> TestClient.get "/test"
+    response.Body |> should equal "hello world"
+    response.Headers |> List.exists (fun (k, _) -> k = "Content-Encoding") |> should equal false
+}
+
+[<Fact>]
+let ``Compress.auto ignores disabled encodings`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.text "hello world" })
+    let config = App.defaults |> App.middleware Compress.auto
+    let client = TestClient.createWith routes config
+                 |> TestClient.withHeader "Accept-Encoding" "br;q=0, gzip;q=0"
+    let! response = client |> TestClient.get "/test"
+    response.Body |> should equal "hello world"
+    response.Headers |> List.exists (fun (k, _) -> k = "Content-Encoding") |> should equal false
+}
+
+[<Fact>]
+let ``Compress ignores invalid quality values`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.text "hello world" })
+    let config = App.defaults |> App.middleware Compress.gzip
+    let client = TestClient.createWith routes config
+                 |> TestClient.withHeader "Accept-Encoding" "gzip;q=abc"
+    let! response = client |> TestClient.get "/test"
+    response.Body |> should equal "hello world"
+    response.Headers |> List.exists (fun (k, _) -> k = "Content-Encoding") |> should equal false
+}

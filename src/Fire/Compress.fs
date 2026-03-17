@@ -6,12 +6,37 @@ open System.IO.Compression
 [<RequireQualifiedAccess>]
 module Compress =
 
+    let private parseWeightedTokens (header: string) =
+        header.Split(',', System.StringSplitOptions.RemoveEmptyEntries)
+        |> Array.toList
+        |> List.choose (fun part ->
+            let segments = part.Split(';', System.StringSplitOptions.RemoveEmptyEntries ||| System.StringSplitOptions.TrimEntries)
+            let token = segments.[0].Trim().ToLowerInvariant()
+            let quality =
+                segments
+                |> Array.skip 1
+                |> Array.tryPick (fun segment ->
+                    if segment.StartsWith("q=", System.StringComparison.OrdinalIgnoreCase) then
+                        match System.Double.TryParse(segment.Substring(2), System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture) with
+                        | true, value -> Some value
+                        | false, _ -> Some 0.0
+                    else
+                        None)
+                |> Option.defaultValue 1.0
+            Some (token, quality))
+
+    let private acceptsEncoding (header: string) (encoding: string) =
+        let normalized = encoding.ToLowerInvariant()
+        parseWeightedTokens header
+        |> List.exists (fun (token, quality) ->
+            quality > 0.0 && (token = normalized || token = "*"))
+
     /// Middleware that compresses response bodies using gzip if client accepts it.
     let gzip : Middleware =
         fun next req -> task {
             let! response = next req
             let acceptEncoding = req.Header "Accept-Encoding" |> Option.defaultValue ""
-            if acceptEncoding.Contains("gzip") then
+            if acceptsEncoding acceptEncoding "gzip" then
                 match response.Body with
                 | Text s ->
                     use ms = new MemoryStream()
@@ -45,7 +70,7 @@ module Compress =
         fun next req -> task {
             let! response = next req
             let acceptEncoding = req.Header "Accept-Encoding" |> Option.defaultValue ""
-            if acceptEncoding.Contains("br") then
+            if acceptsEncoding acceptEncoding "br" then
                 match response.Body with
                 | Text s ->
                     use ms = new MemoryStream()
@@ -78,9 +103,9 @@ module Compress =
     let auto : Middleware =
         fun next req -> task {
             let acceptEncoding = req.Header "Accept-Encoding" |> Option.defaultValue ""
-            if acceptEncoding.Contains("br") then
+            if acceptsEncoding acceptEncoding "br" then
                 return! brotli next req
-            elif acceptEncoding.Contains("gzip") then
+            elif acceptsEncoding acceptEncoding "gzip" then
                 return! gzip next req
             else
                 return! next req

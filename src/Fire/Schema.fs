@@ -125,9 +125,6 @@ module SchemaCompiler =
         let values = ArrayPool<obj>.Shared.Rent(fields.Length)
         let found = Array.zeroCreate<bool> fields.Length
         try
-            if reader.TokenType <> JsonTokenType.StartObject then
-                reader.Read() |> ignore
-
             while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
                 if reader.TokenType = JsonTokenType.PropertyName then
                     let propName = reader.GetString()
@@ -520,20 +517,21 @@ module Schema =
     let parseBuffer (schema: Schema<'T>) (buffer: ReadOnlySequence<byte>) : Result<'T, string list> =
         schema.ParseBuffer buffer
 
-    let parsePipe (schema: Schema<'T>) (pipeReader: PipeReader) : System.Threading.Tasks.Task<Result<'T, string list>> = task {
-        let mutable buffer = ReadOnlySequence<byte>.Empty
+    let private readPipeToBuffer (pipeReader: PipeReader) : System.Threading.Tasks.Task<ReadOnlySequence<byte>> = task {
+        use stream = new MemoryStream()
         let mutable isDone = false
         while not isDone do
             let! readResult = pipeReader.ReadAsync()
-            buffer <- readResult.Buffer
-            if readResult.IsCompleted then
-                isDone <- true
-            else
-                // Need more data - examine what we have but don't consume
-                pipeReader.AdvanceTo(buffer.Start, buffer.End)
-        let result = schema.ParseBuffer buffer
-        pipeReader.AdvanceTo(buffer.End)
-        return result
+            let chunk = readResult.Buffer.ToArray()
+            stream.Write(chunk, 0, chunk.Length)
+            pipeReader.AdvanceTo(readResult.Buffer.End)
+            isDone <- readResult.IsCompleted
+        return ReadOnlySequence<byte>(stream.ToArray())
+    }
+
+    let parsePipe (schema: Schema<'T>) (pipeReader: PipeReader) : System.Threading.Tasks.Task<Result<'T, string list>> = task {
+        let! buffer = readPipeToBuffer pipeReader
+        return schema.ParseBuffer buffer
     }
 
     let parseStream (schema: Schema<'T>) (stream: Stream) : System.Threading.Tasks.Task<Result<'T, string list>> =
@@ -551,18 +549,8 @@ module Schema =
     let validated (schema: Schema<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
         fun req -> task {
             try
-                let reader = req.Raw.Request.BodyReader
-                let mutable buffer = ReadOnlySequence<byte>.Empty
-                let mutable isDone = false
-                while not isDone do
-                    let! readResult = reader.ReadAsync()
-                    buffer <- readResult.Buffer
-                    if readResult.IsCompleted then
-                        isDone <- true
-                    else
-                        reader.AdvanceTo(buffer.Start, buffer.End)
+                let! buffer = readPipeToBuffer req.Raw.Request.BodyReader
                 let result = schema.ParseBuffer buffer
-                reader.AdvanceTo(buffer.End)
                 match result with
                 | Ok value -> return! handler value
                 | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
@@ -579,19 +567,8 @@ module Schema =
     /// })
     let parseRequest (schema: Schema<'T>) (req: Request) : System.Threading.Tasks.Task<Result<'T, string list>> = task {
         try
-            let reader = req.Raw.Request.BodyReader
-            let mutable buffer = Buffers.ReadOnlySequence<byte>.Empty
-            let mutable isDone = false
-            while not isDone do
-                let! readResult = reader.ReadAsync()
-                buffer <- readResult.Buffer
-                if readResult.IsCompleted then
-                    isDone <- true
-                else
-                    reader.AdvanceTo(buffer.Start, buffer.End)
-            let result = schema.ParseBuffer buffer
-            reader.AdvanceTo(buffer.End)
-            return result
+            let! buffer = readPipeToBuffer req.Raw.Request.BodyReader
+            return schema.ParseBuffer buffer
         with ex ->
             return Error [$"invalid JSON: {ex.Message}"]
     }
@@ -649,109 +626,137 @@ module Schema =
 
     // --- Auto-generate schema from F# record type ---
 
-    let inline fromType<'T> () : Schema<'T> =
+    let private buildOptionValue (optionType: Type) (value: obj) =
+        let someCase = FSharp.Reflection.FSharpType.GetUnionCases(optionType) |> Array.find (fun c -> c.Name = "Some")
+        FSharp.Reflection.FSharpValue.MakeUnion(someCase, [| value |])
+
+    let rec private parseElementValue (targetType: Type) (prop: JsonElement) : obj =
+        if targetType = typeof<string> then
+            box (prop.GetString())
+        elif targetType = typeof<int> then
+            if prop.ValueKind = JsonValueKind.Number then
+                box (prop.GetInt32())
+            elif prop.ValueKind = JsonValueKind.String then
+                match System.Int32.TryParse(prop.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
+                | true, n -> box n
+                | false, _ -> failwith "expected integer"
+            else
+                failwith "expected integer"
+        elif targetType = typeof<bool> then
+            if prop.ValueKind = JsonValueKind.True || prop.ValueKind = JsonValueKind.False then
+                box (prop.GetBoolean())
+            elif prop.ValueKind = JsonValueKind.String then
+                match System.Boolean.TryParse(prop.GetString()) with
+                | true, b -> box b
+                | false, _ -> failwith "expected boolean"
+            else
+                failwith "expected boolean"
+        elif targetType = typeof<float> then
+            if prop.ValueKind = JsonValueKind.Number then
+                box (prop.GetDouble())
+            elif prop.ValueKind = JsonValueKind.String then
+                match System.Double.TryParse(prop.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
+                | true, n -> box n
+                | false, _ -> failwith "expected number"
+            else
+                failwith "expected number"
+        elif targetType = typeof<string list> then
+            if prop.ValueKind <> JsonValueKind.Array then
+                failwith "expected array"
+            box (prop.EnumerateArray() |> Seq.map (fun item -> item.GetString()) |> Seq.toList)
+        elif targetType.IsGenericType && targetType.GetGenericTypeDefinition() = typedefof<_ option> then
+            if prop.ValueKind = JsonValueKind.Null then
+                box None
+            else
+                let innerType = targetType.GetGenericArguments().[0]
+                let innerValue = parseElementValue innerType prop
+                buildOptionValue targetType innerValue
+        elif targetType = typeof<obj> then
+            match prop.ValueKind with
+            | JsonValueKind.String -> box (prop.GetString())
+            | JsonValueKind.Number -> box (prop.GetDouble())
+            | JsonValueKind.True
+            | JsonValueKind.False -> box (prop.GetBoolean())
+            | JsonValueKind.Null -> null
+            | _ -> box (prop.GetRawText())
+        else
+            failwith $"unsupported type {targetType.Name}"
+
+    let rec private compiledFieldTypeOf (propType: Type) =
+        if propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option> then
+            let innerType = propType.GetGenericArguments().[0]
+            SchemaCompiler.FNullable (compiledFieldTypeOf innerType)
+        elif propType = typeof<string> then
+            SchemaCompiler.FString
+        elif propType = typeof<int> then
+            SchemaCompiler.FInt
+        elif propType = typeof<bool> then
+            SchemaCompiler.FBool
+        elif propType = typeof<float> then
+            SchemaCompiler.FFloat
+        elif propType = typeof<string list> then
+            SchemaCompiler.FStringList
+        else
+            SchemaCompiler.FString
+
+    let rec private schemaTypeNameOf (propType: Type) =
+        if propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option> then
+            schemaTypeNameOf (propType.GetGenericArguments().[0])
+        elif propType = typeof<string> || propType = typeof<obj> then
+            "string"
+        elif propType = typeof<int> then
+            "integer"
+        elif propType = typeof<bool> then
+            "boolean"
+        elif propType = typeof<float> then
+            "number"
+        elif propType = typeof<string list> then
+            "array"
+        else
+            "string"
+
+    let fromType<'T> () : Schema<'T> =
         let t = typeof<'T>
         let fields = FSharp.Reflection.FSharpType.GetRecordFields(t)
         let ctor = FSharp.Reflection.FSharpValue.PreComputeRecordConstructor(t)
 
-        // Build compiled fields
-        let compiledFields = fields |> Array.map (fun prop ->
-            let fieldType, isRequired, defaultVal =
+        let compiledFields =
+            fields
+            |> Array.map (fun prop ->
                 let propType = prop.PropertyType
-                if propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option> then
-                    let innerType = propType.GetGenericArguments().[0]
-                    let ft =
-                        if innerType = typeof<string> then SchemaCompiler.FString
-                        elif innerType = typeof<int> then SchemaCompiler.FInt
-                        elif innerType = typeof<bool> then SchemaCompiler.FBool
-                        elif innerType = typeof<float> then SchemaCompiler.FFloat
-                        else SchemaCompiler.FString
-                    SchemaCompiler.FNullable ft, false, (box None)
-                else
-                    let ft =
-                        if propType = typeof<string> then SchemaCompiler.FString
-                        elif propType = typeof<int> then SchemaCompiler.FInt
-                        elif propType = typeof<bool> then SchemaCompiler.FBool
-                        elif propType = typeof<float> then SchemaCompiler.FFloat
-                        elif propType = typeof<string list> then SchemaCompiler.FStringList
-                        else SchemaCompiler.FString
-                    ft, true, null
-            {
-                SchemaCompiler.CompiledField.Name = prop.Name
-                SchemaCompiler.CompiledField.Type = fieldType
-                SchemaCompiler.CompiledField.Required = isRequired
-                SchemaCompiler.CompiledField.DefaultValue = defaultVal
-                SchemaCompiler.CompiledField.Rules = []
-            }
-        )
+                let isOptional = propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option>
+                {
+                    SchemaCompiler.CompiledField.Name = prop.Name
+                    SchemaCompiler.CompiledField.Type = compiledFieldTypeOf propType
+                    SchemaCompiler.CompiledField.Required = not isOptional
+                    SchemaCompiler.CompiledField.DefaultValue = if isOptional then box None else null
+                    SchemaCompiler.CompiledField.Rules = []
+                })
 
-        // Build field index for O(1) lookup
         let fieldIndex = Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         for i in 0..compiledFields.Length-1 do
             fieldIndex.[compiledFields.[i].Name] <- i
 
-        // Build param mapping (record constructor param order)
         let ctorParams = t.GetConstructors().[0].GetParameters()
-        let paramMapping = ctorParams |> Array.map (fun p ->
-            compiledFields |> Array.findIndex (fun f ->
-                String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+        let paramMapping =
+            ctorParams
+            |> Array.map (fun p ->
+                compiledFields
+                |> Array.findIndex (fun f -> String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
 
         let construct (values: obj[]) =
             let args = paramMapping |> Array.map (fun idx -> values.[idx])
             ctor args :?> 'T
 
-        // Build JsonElement parser for compat
         let parseElement (el: JsonElement) : Result<'T, string list> =
             let errors = ResizeArray<string>()
             let values = Array.zeroCreate compiledFields.Length
             for i in 0..compiledFields.Length-1 do
                 let field = compiledFields.[i]
                 match el.TryGetProperty(field.Name) with
-                | true, prop when prop.ValueKind <> JsonValueKind.Null ->
+                | true, prop ->
                     try
-                        values.[i] <-
-                            match field.Type with
-                            | SchemaCompiler.FString -> box (prop.GetString())
-                            | SchemaCompiler.FInt ->
-                                if prop.ValueKind = JsonValueKind.Number then box (prop.GetInt32())
-                                elif prop.ValueKind = JsonValueKind.String then
-                                    match System.Int32.TryParse(prop.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
-                                    | true, n -> box n
-                                    | false, _ -> failwith "expected integer"
-                                else failwith "expected integer"
-                            | SchemaCompiler.FBool ->
-                                if prop.ValueKind = JsonValueKind.True || prop.ValueKind = JsonValueKind.False then box (prop.GetBoolean())
-                                elif prop.ValueKind = JsonValueKind.String then
-                                    match System.Boolean.TryParse(prop.GetString()) with
-                                    | true, b -> box b
-                                    | false, _ -> failwith "expected boolean"
-                                else failwith "expected boolean"
-                            | SchemaCompiler.FFloat ->
-                                if prop.ValueKind = JsonValueKind.Number then box (prop.GetDouble())
-                                elif prop.ValueKind = JsonValueKind.String then
-                                    match System.Double.TryParse(prop.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
-                                    | true, n -> box n
-                                    | false, _ -> failwith "expected number"
-                                else failwith "expected number"
-                            | SchemaCompiler.FStringList ->
-                                box (prop.EnumerateArray() |> Seq.map (fun e -> e.GetString()) |> Seq.toList)
-                            | SchemaCompiler.FNullable inner ->
-                                let v = match inner with
-                                        | SchemaCompiler.FString -> box (prop.GetString())
-                                        | SchemaCompiler.FInt -> box (prop.GetInt32())
-                                        | SchemaCompiler.FBool -> box (prop.GetBoolean())
-                                        | SchemaCompiler.FFloat -> box (prop.GetDouble())
-                                        | _ -> box (prop.GetString())
-                                let innerType = match inner with
-                                                | SchemaCompiler.FString -> typeof<string>
-                                                | SchemaCompiler.FInt -> typeof<int>
-                                                | SchemaCompiler.FBool -> typeof<bool>
-                                                | SchemaCompiler.FFloat -> typeof<float>
-                                                | _ -> typeof<string>
-                                let optionType = typedefof<_ option>.MakeGenericType(innerType)
-                                let someCase = FSharp.Reflection.FSharpType.GetUnionCases(optionType).[1]
-                                FSharp.Reflection.FSharpValue.MakeUnion(someCase, [| v |])
-                            | _ -> box (prop.GetString())
+                        values.[i] <- parseElementValue fields.[i].PropertyType prop
                     with ex ->
                         errors.Add($"{field.Name}: {ex.Message}")
                 | _ ->
@@ -760,29 +765,13 @@ module Schema =
             if errors.Count > 0 then Error (errors |> Seq.toList)
             else Ok (construct values)
 
-        // Build FieldSpecs for JSON Schema generation
-        let fieldTypeToString (ft: SchemaCompiler.FieldType) =
-            match ft with
-            | SchemaCompiler.FString -> "string"
-            | SchemaCompiler.FInt -> "integer"
-            | SchemaCompiler.FBool -> "boolean"
-            | SchemaCompiler.FFloat -> "number"
-            | SchemaCompiler.FStringList -> "array"
-            | SchemaCompiler.FNullable inner ->
-                match inner with
-                | SchemaCompiler.FString -> "string"
-                | SchemaCompiler.FInt -> "integer"
-                | SchemaCompiler.FBool -> "boolean"
-                | SchemaCompiler.FFloat -> "number"
-                | _ -> "string"
-            | _ -> "string"
-
         let fieldSpecs =
-            compiledFields |> Array.map (fun f ->
+            fields |> Array.map (fun prop ->
+                let isOptional = prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() = typedefof<_ option>
                 {
-                    FieldSpec.Name = f.Name
-                    FieldSpec.Type = fieldTypeToString f.Type
-                    FieldSpec.Required = f.Required
+                    FieldSpec.Name = prop.Name
+                    FieldSpec.Type = schemaTypeNameOf prop.PropertyType
+                    FieldSpec.Required = not isOptional
                     FieldSpec.Rules = []
                     FieldSpec.Items = None
                     FieldSpec.Children = []

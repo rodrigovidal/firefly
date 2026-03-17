@@ -87,6 +87,57 @@ let ``404 for non-existent todo`` () = task {
 }
 
 [<Fact>]
+let ``PUT /api/todos/:id returns 404 for unknown todo`` () = task {
+    let (routes, config, dbPath) = createTestApp ()
+    try
+        let! client = TestClient.start routes config
+        let! r = client |> TestClient.put "/api/todos/999" """{"title":"Missing","completed":true}"""
+        r.Status |> should equal 404
+        do! TestClient.stop client
+    finally
+        if File.Exists(dbPath) then File.Delete(dbPath)
+}
+
+[<Fact>]
+let ``PUT /api/todos/:id validates request body`` () = task {
+    let (routes, config, dbPath) = createTestApp ()
+    try
+        let! client = TestClient.start routes config
+        let! created = client |> TestClient.post "/api/todos" """{"title":"seed"}"""
+        created.Status |> should equal 201
+        let! r = client |> TestClient.put "/api/todos/1" """{"title":""}"""
+        r.Status |> should equal 400
+        do! TestClient.stop client
+    finally
+        if File.Exists(dbPath) then File.Delete(dbPath)
+}
+
+[<Fact>]
+let ``DELETE /api/todos/:id returns 404 for unknown todo`` () = task {
+    let (routes, config, dbPath) = createTestApp ()
+    try
+        let! client = TestClient.start routes config
+        let! r = client |> TestClient.delete "/api/todos/999"
+        r.Status |> should equal 404
+        do! TestClient.stop client
+    finally
+        if File.Exists(dbPath) then File.Delete(dbPath)
+}
+
+[<Fact>]
+let ``TodoApiDb custom 404 handler returns JSON body`` () = task {
+    let (routes, config, dbPath) = createTestApp ()
+    try
+        let! client = TestClient.start routes config
+        let! r = client |> TestClient.get "/missing"
+        r.Status |> should equal 404
+        r.Body |> should haveSubstring "not found"
+        do! TestClient.stop client
+    finally
+        if File.Exists(dbPath) then File.Delete(dbPath)
+}
+
+[<Fact>]
 let ``Title max length validation`` () = task {
     let (routes, config, dbPath) = createTestApp ()
     try

@@ -64,13 +64,16 @@ module TestClient =
         ctx.Response.StatusCode <- response.Status
         for (key, value) in response.Headers do
             ctx.Response.Headers.Append(key, value)
+        let hasContentType = ctx.Response.Headers.ContainsKey("Content-Type")
         match response.Body with
         | Empty -> ()
         | Text s ->
-            ctx.Response.ContentType <- "text/plain; charset=utf-8"
+            if not hasContentType then
+                ctx.Response.ContentType <- "text/plain; charset=utf-8"
             do! ctx.Response.WriteAsync(s)
         | Json bytes ->
-            ctx.Response.ContentType <- "application/json; charset=utf-8"
+            if not hasContentType then
+                ctx.Response.ContentType <- "application/json; charset=utf-8"
             do! ctx.Response.Body.WriteAsync(ReadOnlyMemory(bytes))
         | Stream stream ->
             use stream = stream

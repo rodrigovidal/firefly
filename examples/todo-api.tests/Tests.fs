@@ -46,6 +46,16 @@ let ``POST /api/todos requires authentication`` () = task {
 }
 
 [<Fact>]
+let ``POST /auth/token issues a JWT`` () = task {
+    let (routes, config) = App.create ()
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.post "/auth/token" """{"userId":"tester"}"""
+    r.Status |> should equal 200
+    r.Body |> should haveSubstring "\"token\""
+    do! TestClient.stop client
+}
+
+[<Fact>]
 let ``Full CRUD lifecycle`` () = task {
     let (routes, config) = App.create ()
     let! client = TestClient.start routes config
@@ -104,6 +114,7 @@ let ``Unknown route returns 404`` () = task {
     let! client = TestClient.start routes config
     let! r = client |> TestClient.get "/nope"
     r.Status |> should equal 404
+    r.Body |> should haveSubstring "\"path\":\"/nope\""
     do! TestClient.stop client
 }
 
@@ -162,6 +173,17 @@ type FailingStore() =
         member _.Delete(_) = task { return failwith "database connection lost" }
 
 [<Fact>]
+let ``InMemoryTodoStore supports direct CRUD`` () = task {
+    let store = App.InMemoryTodoStore() :> App.ITodoStore
+    let! created = store.Create("hello")
+    created.Title |> should equal "hello"
+    let! loaded = store.GetById(created.Id)
+    loaded.IsSome |> should equal true
+    let! deleted = store.Delete(created.Id)
+    deleted |> should equal true
+}
+
+[<Fact>]
 let ``With preloaded store: returns seeded todos`` () = task {
     let store = PreloadedStore([
         { Id = 1; Title = "Already here"; Completed = true }
@@ -190,6 +212,30 @@ let ``With preloaded store: get by id`` () = task {
 }
 
 [<Fact>]
+let ``Missing update returns 404`` () = task {
+    let (routes, config) = App.create ()
+    let! client = TestClient.start routes config
+    let token = App.generateToken "test-user"
+    let authed = client |> TestClient.withHeader "Authorization" $"Bearer {token}"
+    let! r = authed |> TestClient.put "/api/todos/999" """{"Title":"Missing","Completed":false}"""
+    r.Status |> should equal 404
+    r.Body |> should haveSubstring "todo not found"
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``Missing delete returns 404`` () = task {
+    let (routes, config) = App.create ()
+    let! client = TestClient.start routes config
+    let token = App.generateToken "test-user"
+    let authed = client |> TestClient.withHeader "Authorization" $"Bearer {token}"
+    let! r = authed |> TestClient.delete "/api/todos/999"
+    r.Status |> should equal 404
+    r.Body |> should haveSubstring "todo not found"
+    do! TestClient.stop client
+}
+
+[<Fact>]
 let ``With failing store: GET returns 500`` () = task {
     let (routes, config) = App.createWith (FailingStore())
     let config = config |> App.onError (fun ex _ -> task {
@@ -199,5 +245,16 @@ let ``With failing store: GET returns 500`` () = task {
     let! r = client |> TestClient.get "/api/todos"
     r.Status |> should equal 500
     r.Body |> should haveSubstring "database connection lost"
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``createWith custom not found handler includes path`` () = task {
+    let store = PreloadedStore([])
+    let (routes, config) = App.createWith store
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.get "/missing"
+    r.Status |> should equal 404
+    r.Body |> should haveSubstring "\"path\":\"/missing\""
     do! TestClient.stop client
 }

@@ -108,13 +108,7 @@ module HandlerFactory =
                     Expression.Convert(argAccess, paramType) :> Expression
             expr <- Expression.Call(expr, method, convertedArg) :> Expression
 
-        // Box the result to obj
-        let boxedResult =
-            if expr.Type.IsValueType then
-                Expression.Convert(expr, typeof<obj>) :> Expression
-            else
-                expr
-
+        let boxedResult = Expression.Convert(expr, typeof<obj>) :> Expression
         let lambda = Expression.Lambda<Func<obj[], obj>>(boxedResult, argsParam)
         let compiled = lambda.Compile()
 
@@ -144,6 +138,9 @@ module HandlerFactory =
         elif targetType = typeof<float> then box (Double.Parse(value, CultureInfo.InvariantCulture))
         else failwith $"cannot convert to {targetType.Name}"
 
+    let private isSupportedRouteParamType (t: Type) =
+        t = typeof<int> || t = typeof<string> || t = typeof<bool> || t = typeof<float>
+
     /// Check if a type is assignable to Handler (FSharpFunc<Request, Task<Response>>)
     let private isHandler (t: Type) : bool =
         typeof<Handler>.IsAssignableFrom(t)
@@ -151,6 +148,13 @@ module HandlerFactory =
     /// Build a Handler from any F# function
     let create (httpMethod: string) (pattern: string) (handler: obj) : string * Handler =
         let triePattern, formatSpecs = convertPattern pattern
+        let routeParamNames =
+            triePattern.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            |> Array.choose (fun segment ->
+                if segment.StartsWith(":", StringComparison.Ordinal) then
+                    Some (segment.Substring(1))
+                else
+                    None)
         let handlerType = handler.GetType()
 
         // Fast path: if the handler IS already a Handler (Request -> Task<Response>),
@@ -184,15 +188,14 @@ module HandlerFactory =
                             (t, "request-obj")
                         elif t.IsInterface || t.IsAbstract then
                             (t, "di")
-                        elif specIdx < formatSpecs.Length && (t = typeof<int> || t = typeof<string> || t = typeof<bool> || t = typeof<float>) then
+                        elif specIdx < formatSpecs.Length && isSupportedRouteParamType t then
                             specIdx <- specIdx + 1
                             (t, "route")
                         elif isBodyMethod && (FSharpType.IsRecord t || (t.IsClass && t <> typeof<string> && not (t.FullName.StartsWith("Microsoft.FSharp.Core.FSharpFunc")))) then
                             (t, "body")
                         else
-                            // Primitive without format spec: still treat as route param if we have specs remaining
                             if specIdx < formatSpecs.Length then
-                                specIdx <- specIdx + 1
+                                failwith $"Route format parameters support int, string, bool, and float, got {t.Name}"
                             (t, "route")
                     )
 
@@ -200,7 +203,7 @@ module HandlerFactory =
                 let paramBindings = classified |> List.map (fun (t, kind) ->
                     match kind with
                     | "route" ->
-                        let name = $"__p{routeParamIdx}"
+                        let name = routeParamNames.[routeParamIdx]
                         routeParamIdx <- routeParamIdx + 1
                         (t, "route", name)
                     | _ -> (t, kind, ""))

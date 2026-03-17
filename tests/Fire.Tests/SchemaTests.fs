@@ -1,5 +1,6 @@
 module Fire.Tests.SchemaTests
 
+open System
 open System.Buffers
 open System.Text.Json
 open Xunit
@@ -1452,3 +1453,373 @@ let ``Schema transforms run before validation`` () =
     match Schema.parseString s json with
     | Ok r -> r.Name |> should equal "Hello"
     | Error e -> failwith $"expected Ok, got {e}"
+
+type NullableScalarRecord = {
+    Count: int option
+    Active: bool option
+    Score: float option
+}
+
+type GeneratedCollectionRecord = {
+    Tags: string list
+    Notes: string option
+}
+
+type GeneratedObjectRecord = {
+    Metadata: obj
+}
+
+type GeneratedScalarRecord = {
+    Name: string
+    Count: int
+    Active: bool
+    Score: float
+    Tags: string list
+}
+
+type UnsupportedGeneratedRecord = {
+    Value: Guid
+}
+
+type ThrowingReadStream() =
+    inherit System.IO.Stream()
+
+    override _.CanRead = true
+    override _.CanSeek = false
+    override _.CanWrite = false
+    override _.Length = 0L
+    override _.Position with get () = 0L and set _ = ()
+    override _.Flush() = ()
+    override _.Read(_, _, _) = raise (System.InvalidOperationException("stream exploded"))
+    override _.Seek(_, _) = raise (System.NotSupportedException())
+    override _.SetLength(_) = raise (System.NotSupportedException())
+    override _.Write(_, _, _) = raise (System.NotSupportedException())
+    override _.ReadAsync(buffer: Memory<byte>, _cancellationToken) =
+        System.Threading.Tasks.ValueTask<int>(System.Threading.Tasks.Task.FromException<int>(System.InvalidOperationException("stream exploded")))
+
+[<Fact>]
+let ``Schema.int rejects non-scalar JsonElement`` () =
+    let s = schema {
+        let! age = Schema.required "age" Schema.int []
+        return {| Age = age |}
+    }
+    use doc = JsonDocument.Parse("""{"age":{}}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs -> errs |> should contain "age: expected integer"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.int coerces string JsonElement`` () =
+    let s = schema {
+        let! age = Schema.required "age" Schema.int []
+        return {| Age = age |}
+    }
+    use doc = JsonDocument.Parse("""{"age":"42"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok r -> r.Age |> should equal 42
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema.int rejects overflowing JsonElement number`` () =
+    let s = schema {
+        let! age = Schema.required "age" Schema.int []
+        return {| Age = age |}
+    }
+    use doc = JsonDocument.Parse("""{"age":999999999999}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs -> errs |> should contain "age: expected integer"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.bool coerces string via JsonElement`` () =
+    let s = schema {
+        let! flag = Schema.required "flag" Schema.bool []
+        return {| Flag = flag |}
+    }
+    use doc = JsonDocument.Parse("""{"flag":"true"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok r -> r.Flag |> should equal true
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema.bool rejects invalid string JsonElement`` () =
+    let s = schema {
+        let! flag = Schema.required "flag" Schema.bool []
+        return {| Flag = flag |}
+    }
+    use doc = JsonDocument.Parse("""{"flag":"maybe"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs -> errs |> should contain "flag: expected boolean"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.bool rejects object JsonElement`` () =
+    let s = schema {
+        let! flag = Schema.required "flag" Schema.bool []
+        return {| Flag = flag |}
+    }
+    use doc = JsonDocument.Parse("""{"flag":{}}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs -> errs |> should contain "flag: expected boolean"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.float coerces string via JsonElement`` () =
+    let s = schema {
+        let! score = Schema.required "score" Schema.float []
+        return {| Score = score |}
+    }
+    use doc = JsonDocument.Parse("""{"score":"3.14"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok r -> r.Score |> should (equalWithin 0.01) 3.14
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema.float rejects invalid string JsonElement`` () =
+    let s = schema {
+        let! score = Schema.required "score" Schema.float []
+        return {| Score = score |}
+    }
+    use doc = JsonDocument.Parse("""{"score":"nan?"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs -> errs |> should contain "score: expected number"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.float rejects object JsonElement`` () =
+    let s = schema {
+        let! score = Schema.required "score" Schema.float []
+        return {| Score = score |}
+    }
+    use doc = JsonDocument.Parse("""{"score":{}}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs -> errs |> should contain "score: expected number"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema buffer parser rejects numeric booleans`` () =
+    let s = schema {
+        let! flag = Schema.required "flag" Schema.bool []
+        return {| Flag = flag |}
+    }
+    match Schema.parseString s """{"flag":1}""" with
+    | Error errs -> errs |> should contain "flag: expected boolean"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema buffer parser rejects boolean integers`` () =
+    let s = schema {
+        let! age = Schema.required "age" Schema.int []
+        return {| Age = age |}
+    }
+    match Schema.parseString s """{"age":true}""" with
+    | Error errs -> errs |> should contain "age: expected integer"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema buffer parser rejects boolean floats`` () =
+    let s = schema {
+        let! score = Schema.required "score" Schema.float []
+        return {| Score = score |}
+    }
+    match Schema.parseString s """{"score":true}""" with
+    | Error errs -> errs |> should contain "score: expected number"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema nullable custom parser uses fallback field type`` () =
+    let rawObject (el: JsonElement) : Result<obj, string> = Ok (box (el.GetRawText()))
+    let s = schema {
+        let! payload = Schema.optional "payload" (Schema.nullable rawObject) None []
+        return {| Payload = payload |}
+    }
+    use doc = JsonDocument.Parse("""{"payload":{"a":1}}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok r ->
+        r.Payload |> should equal (Some (box """{"a":1}"""))
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema.parseRequest returns invalid JSON when body reader throws`` () = task {
+    let ctx = Microsoft.AspNetCore.Http.DefaultHttpContext()
+    ctx.Request.Body <- new ThrowingReadStream()
+    let req = Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
+    let! result = Schema.parseRequest createTodoSchema req
+    match result with
+    | Error errs -> errs |> should contain "invalid JSON: stream exploded"
+    | Ok _ -> failwith "expected Error"
+}
+
+[<Fact>]
+let ``Schema.validated returns 400 when body reader throws`` () = task {
+    let ctx = Microsoft.AspNetCore.Http.DefaultHttpContext()
+    ctx.Request.Body <- new ThrowingReadStream()
+    let req = Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
+    let handler = Schema.validated createTodoSchema (fun _ -> task { return Response.ok })
+    let! response = handler req
+    response.Status |> should equal 400
+    match response.Body with
+    | Json body -> System.Text.Encoding.UTF8.GetString(body) |> should haveSubstring "stream exploded"
+    | _ -> failwith "expected JSON response"
+}
+
+[<Fact>]
+let ``fromType coerces nullable scalar strings via parseJson`` () =
+    let s = Schema.fromType<NullableScalarRecord> ()
+    use doc = JsonDocument.Parse("""{"Count":"42","Active":"true","Score":"3.5"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value ->
+        value.Count |> should equal (Some 42)
+        value.Active |> should equal (Some true)
+        value.Score |> should equal (Some 3.5)
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType parses collections and optional fields`` () =
+    let s = Schema.fromType<GeneratedCollectionRecord> ()
+    match Schema.parseString s """{"Tags":["a","b"],"Notes":"hi"}""" with
+    | Ok value ->
+        value.Tags |> should equal ["a"; "b"]
+        value.Notes |> should equal (Some "hi")
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType parses object fallback values`` () =
+    let s = Schema.fromType<GeneratedObjectRecord> ()
+    use doc = JsonDocument.Parse("""{"Metadata":123}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value -> value.Metadata |> should equal (box 123.0)
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType parses object string values`` () =
+    let s = Schema.fromType<GeneratedObjectRecord> ()
+    use doc = JsonDocument.Parse("""{"Metadata":"hello"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value -> value.Metadata |> should equal (box "hello")
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType parses object boolean values`` () =
+    let s = Schema.fromType<GeneratedObjectRecord> ()
+    use doc = JsonDocument.Parse("""{"Metadata":true}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value -> value.Metadata |> should equal (box true)
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType parses object null values`` () =
+    let s = Schema.fromType<GeneratedObjectRecord> ()
+    use doc = JsonDocument.Parse("""{"Metadata":null}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value -> value.Metadata |> should equal null
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType parses object raw JSON values`` () =
+    let s = Schema.fromType<GeneratedObjectRecord> ()
+    use doc = JsonDocument.Parse("""{"Metadata":{"nested":1}}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value -> value.Metadata |> should equal (box """{"nested":1}""")
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType parses required scalar values via JsonElement`` () =
+    let s = Schema.fromType<GeneratedScalarRecord> ()
+    use doc = JsonDocument.Parse("""{"Name":"test","Count":1,"Active":true,"Score":2.5,"Tags":["a","b"]}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value ->
+        value.Name |> should equal "test"
+        value.Count |> should equal 1
+        value.Active |> should equal true
+        value.Score |> should equal 2.5
+        value.Tags |> should equal ["a"; "b"]
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType reports parse errors for invalid scalar values`` () =
+    let s = Schema.fromType<GeneratedScalarRecord> ()
+    use doc = JsonDocument.Parse("""{"Name":"test","Count":"oops","Active":"maybe","Score":"nan?","Tags":"bad"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs ->
+        errs |> List.exists (fun e -> e.Contains("Count")) |> should be True
+        errs |> List.exists (fun e -> e.Contains("Active")) |> should be True
+        errs |> List.exists (fun e -> e.Contains("Score")) |> should be True
+        errs |> List.exists (fun e -> e.Contains("Tags")) |> should be True
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``fromType rejects non-scalar numeric and boolean values`` () =
+    let s = Schema.fromType<GeneratedScalarRecord> ()
+    use doc = JsonDocument.Parse("""{"Name":"test","Count":{},"Active":{},"Score":{},"Tags":["a"]}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs ->
+        errs |> List.exists (fun e -> e.Contains("Count")) |> should be True
+        errs |> List.exists (fun e -> e.Contains("Active")) |> should be True
+        errs |> List.exists (fun e -> e.Contains("Score")) |> should be True
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``fromType uses defaults for missing optional fields via JsonElement`` () =
+    let s = Schema.fromType<GeneratedCollectionRecord> ()
+    use doc = JsonDocument.Parse("""{"Tags":["a"]}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value -> value.Notes |> should equal None
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType treats explicit null option fields as None`` () =
+    let s = Schema.fromType<GeneratedCollectionRecord> ()
+    use doc = JsonDocument.Parse("""{"Tags":["a"],"Notes":null}""")
+    match Schema.parseJson s doc.RootElement with
+    | Ok value -> value.Notes |> should equal None
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``fromType fallback types still generate JSON schema`` () =
+    let s = Schema.fromType<UnsupportedGeneratedRecord> ()
+    let jsonSchema = Schema.toJsonSchema s
+    jsonSchema |> should haveSubstring "\"Value\""
+    jsonSchema |> should haveSubstring "\"string\""
+
+[<Fact>]
+let ``fromType reports unsupported type parse errors`` () =
+    let s = Schema.fromType<UnsupportedGeneratedRecord> ()
+    use doc = JsonDocument.Parse("""{"Value":"nope"}""")
+    match Schema.parseJson s doc.RootElement with
+    | Error errs -> errs |> List.exists (fun e -> e.Contains("unsupported type Guid")) |> should be True
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.bool handles disposed JsonElement`` () =
+    let element =
+        let doc = JsonDocument.Parse("""true""")
+        let value = doc.RootElement
+        doc.Dispose()
+        value
+    match Schema.bool element with
+    | Error err -> err |> should equal "expected boolean"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.float handles disposed JsonElement`` () =
+    let element =
+        let doc = JsonDocument.Parse("""1.5""")
+        let value = doc.RootElement
+        doc.Dispose()
+        value
+    match Schema.float element with
+    | Error err -> err |> should equal "expected number"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``SchemaCompiler handles nullable nested values`` () =
+    let ctor (_: obj[]) = box "nested"
+    let json = """{"child":{}}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let mutable reader = Utf8JsonReader(ReadOnlySequence<byte>(bytes))
+    reader.Read() |> ignore
+    reader.Read() |> ignore
+    reader.Read() |> ignore
+    let value = SchemaCompiler.readValue (SchemaCompiler.FNullable (SchemaCompiler.FNested([||], [||], ctor))) &reader
+    (value :?> string option) |> should equal (Some "nested")

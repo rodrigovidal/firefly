@@ -54,15 +54,18 @@ module App =
         ctx.Response.StatusCode <- response.Status
         for (key, value) in response.Headers do
             ctx.Response.Headers.Append(key, value)
+        let hasContentType = ctx.Response.Headers.ContainsKey("Content-Type")
         match response.Body with
         | Empty -> ()
         | Text s ->
             let bytes = System.Text.Encoding.UTF8.GetBytes(s)
-            ctx.Response.ContentType <- "text/plain; charset=utf-8"
+            if not hasContentType then
+                ctx.Response.ContentType <- "text/plain; charset=utf-8"
             ctx.Response.ContentLength <- System.Nullable(int64 bytes.Length)
             do! ctx.Response.Body.WriteAsync(System.ReadOnlyMemory(bytes))
         | Json bytes ->
-            ctx.Response.ContentType <- "application/json; charset=utf-8"
+            if not hasContentType then
+                ctx.Response.ContentType <- "application/json; charset=utf-8"
             ctx.Response.ContentLength <- System.Nullable(int64 bytes.Length)
             do! ctx.Response.Body.WriteAsync(System.ReadOnlyMemory(bytes))
         | Stream stream ->

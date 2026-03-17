@@ -38,9 +38,8 @@ let routes =
         match! Schema.parseRequest createTodoSchema req with
         | Ok input ->
             use conn = openDb req
-            match Db.create conn input.Title with
-            | Some todo -> return Response.json todo |> Response.status 201
-            | None -> return Response.json {| error = "failed to create" |} |> Response.status 500
+            let todo = Db.create conn input.Title
+            return Response.json todo |> Response.status 201
         | Error errors ->
             return Response.json {| errors = errors |} |> Response.status 400
     })

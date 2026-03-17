@@ -36,6 +36,7 @@ let ``GET /api/posts content negotiation returns text/plain`` () = task {
     let! r = textClient |> TestClient.get "/api/posts"
     r.Status |> should equal 200
     r.Body |> should haveSubstring "[1] Getting Started with F#"
+    r.Headers |> List.exists (fun (k, v) -> k = "Content-Type" && v = "text/plain; charset=utf-8") |> should be True
     do! TestClient.stop client
 }
 
@@ -47,6 +48,21 @@ let ``GET /api/posts/:id returns ETag and Cache-Control`` () = task {
     r.Status |> should equal 200
     r.Headers |> List.exists (fun (k, _) -> k = "ETag") |> should be True
     r.Headers |> List.exists (fun (k, v) -> k = "Cache-Control" && v.Contains("max-age")) |> should be True
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``GET /api/posts/:id returns 304 for matching ETag`` () = task {
+    let (routes, config) = App.create ()
+    let! client = TestClient.start routes config
+    let! first = client |> TestClient.get "/api/posts/1"
+    let etag =
+        first.Headers
+        |> List.find (fun (k, _) -> k = "ETag")
+        |> snd
+    let cachedClient = client |> TestClient.withHeader "If-None-Match" etag
+    let! second = cachedClient |> TestClient.get "/api/posts/1"
+    second.Status |> should equal 304
     do! TestClient.stop client
 }
 
@@ -123,6 +139,36 @@ let ``POST /api/posts/:postId/comments validates author`` () = task {
 }
 
 [<Fact>]
+let ``GET /api/posts/:postId/comments returns 404 for unknown post`` () = task {
+    let (routes, config) = App.create ()
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.get "/api/posts/999/comments"
+    r.Status |> should equal 404
+    r.Body |> should haveSubstring "Post not found"
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``POST /api/posts/:postId/comments validates body`` () = task {
+    let (routes, config) = App.create ()
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.post "/api/posts/1/comments" """{"Author":"Charlie","Body":""}"""
+    r.Status |> should equal 400
+    r.Body |> should haveSubstring "Body is required"
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``POST /api/posts/:postId/comments returns 404 for unknown post`` () = task {
+    let (routes, config) = App.create ()
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.post "/api/posts/999/comments" """{"Author":"Charlie","Body":"hello"}"""
+    r.Status |> should equal 404
+    r.Body |> should haveSubstring "Post not found"
+    do! TestClient.stop client
+}
+
+[<Fact>]
 let ``GET /api/tags returns unique sorted tags`` () = task {
     let (routes, config) = App.create ()
     let! client = TestClient.start routes config
@@ -150,5 +196,18 @@ let ``GET /api/posts/999 returns 404`` () = task {
     let! r = client |> TestClient.get "/api/posts/999"
     r.Status |> should equal 404
     r.Body |> should haveSubstring "Post not found"
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``Blog app custom error handler returns 500 JSON`` () = task {
+    let (baseRoutes, config) = App.create ()
+    let routes =
+        baseRoutes
+        |> Route.get "/boom" (fun _ -> task { return failwith "boom" })
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.get "/boom"
+    r.Status |> should equal 500
+    r.Body |> should haveSubstring "Internal server error"
     do! TestClient.stop client
 }

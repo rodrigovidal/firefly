@@ -37,7 +37,7 @@ let create (conn: IDbConnection) (title: string) =
     let id = conn.ExecuteScalar<int64>(
         "INSERT INTO Todos (Title) VALUES (@Title); SELECT last_insert_rowid()",
         {| Title = title |})
-    getById conn (int id)
+    getById conn (int id) |> Option.get
 
 let update (conn: IDbConnection) (id: int) (title: string) (completed: bool) =
     let rows = conn.Execute(
