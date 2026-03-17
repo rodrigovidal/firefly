@@ -132,6 +132,8 @@ App.defaults
 | `Timeout` | `Timeout.after timespan` |
 | `RateLimit` | `RateLimit.fixedWindow maxReqs window keyFn` |
 | `Jwt` | `Jwt.defaults key \|> Jwt.issuer "..." \|> Jwt.validate` |
+| `RequestId` | `RequestId.middleware` |
+| `CorrelationId` | `CorrelationId.middleware` |
 
 **Custom middleware:**
 

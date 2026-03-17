@@ -48,6 +48,7 @@
 - [x] Content negotiation middleware — `Negotiate.middleware` returns 406 for unsupported types
 - [x] Response compression — `Compress.gzip` / `Compress.brotli` / `Compress.auto`
 - [x] Request ID middleware — `RequestId.middleware` adds X-Request-Id
+- [x] Correlation ID middleware — `CorrelationId.middleware` adds X-Correlation-Id
 - [x] Health checks — `Health.handler` with customizable checks, 200/503
 
 ## Tier 7: Schema Enhancements

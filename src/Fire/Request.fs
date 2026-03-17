@@ -7,6 +7,16 @@ open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 
+module internal RequestKeys =
+    [<Literal>]
+    let QueryCacheItemKey = "fire.query.cache"
+
+    [<Literal>]
+    let RequestIdItemKey = "fire.request-id"
+
+    [<Literal>]
+    let CorrelationIdItemKey = "fire.correlation-id"
+
 [<Struct>]
 type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>) =
 
@@ -15,8 +25,7 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
     member _.Params = routeParams
 
     member _.Query : IReadOnlyDictionary<string, string> =
-        let key = "fire.query.cache"
-        match ctx.Items.TryGetValue(key) with
+        match ctx.Items.TryGetValue(RequestKeys.QueryCacheItemKey) with
         | true, cached -> cached :?> IReadOnlyDictionary<string, string>
         | false, _ ->
             let q = ctx.Request.Query
@@ -24,7 +33,7 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
             for kvp in q do
                 d.[kvp.Key] <- kvp.Value.ToString()
             let result = d :> IReadOnlyDictionary<_, _>
-            ctx.Items.[key] <- result
+            ctx.Items.[RequestKeys.QueryCacheItemKey] <- result
             result
 
     member _.Header (name: string) : string option =
@@ -82,5 +91,21 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
         match ctx.Request.Cookies.TryGetValue(name) with
         | true, value -> Some value
         | false, _ -> None
+
+    member _.RequestId : string option =
+        match ctx.Items.TryGetValue(RequestKeys.RequestIdItemKey) with
+        | true, requestId -> Some (requestId :?> string)
+        | false, _ ->
+            match ctx.Request.Headers.TryGetValue("X-Request-Id") with
+            | true, values -> Some (values.ToString())
+            | false, _ -> None
+
+    member _.CorrelationId : string option =
+        match ctx.Items.TryGetValue(RequestKeys.CorrelationIdItemKey) with
+        | true, correlationId -> Some (correlationId :?> string)
+        | false, _ ->
+            match ctx.Request.Headers.TryGetValue("X-Correlation-Id") with
+            | true, values -> Some (values.ToString())
+            | false, _ -> None
 
     member _.Raw = ctx

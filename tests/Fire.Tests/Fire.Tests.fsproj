@@ -44,6 +44,7 @@
     <Compile Include="NegotiateTests.fs" />
     <Compile Include="CompressTests.fs" />
     <Compile Include="RequestIdTests.fs" />
+    <Compile Include="CorrelationIdTests.fs" />
     <Compile Include="HealthTests.fs" />
 <Compile Include="Tier4SmokeTests.fs" />
   </ItemGroup>

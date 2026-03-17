@@ -45,3 +45,18 @@ let ``RequestId generates unique IDs for different requests`` () = task {
     let id2 = response2.Headers |> List.find (fun (k, _) -> k = "X-Request-Id") |> snd
     id1 |> should not' (equal id2)
 }
+
+[<Fact>]
+let ``RequestId makes generated id available to handlers`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun (req: Request) -> task {
+            return Response.text (req.RequestId |> Option.defaultValue "missing")
+        })
+    let config = App.defaults |> App.middleware RequestId.middleware
+    let client = TestClient.createWith routes config
+    let! response = client |> TestClient.get "/test"
+    response.Status |> should equal 200
+    let requestIdHeader = response.Headers |> List.find (fun (k, _) -> k = "X-Request-Id") |> snd
+    response.Body |> should equal requestIdHeader
+}
