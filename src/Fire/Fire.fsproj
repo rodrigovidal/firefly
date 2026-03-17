@@ -26,6 +26,7 @@
     <Compile Include="OpenApi.fs" />
     <Compile Include="Cors.fs" />
     <Compile Include="App.fs" />
+    <Compile Include="TestClient.fs" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
