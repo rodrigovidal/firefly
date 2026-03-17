@@ -26,6 +26,7 @@
     <Compile Include="AppTests.fs" />
     <Compile Include="ShutdownTests.fs" />
     <Compile Include="TimeoutTests.fs" />
+    <Compile Include="RateLimitTests.fs" />
     <Compile Include="CorsTests.fs" />
     <Compile Include="LogTests.fs" />
     <Compile Include="StaticTests.fs" />

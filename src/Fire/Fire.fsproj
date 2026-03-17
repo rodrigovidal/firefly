@@ -14,6 +14,7 @@
     <Compile Include="Log.fs" />
     <Compile Include="Static.fs" />
     <Compile Include="Timeout.fs" />
+    <Compile Include="RateLimit.fs" />
     <Compile Include="Cors.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
