@@ -36,6 +36,7 @@
     <Compile Include="Tier2SmokeTests.fs" />
     <Compile Include="Tier3SmokeTests.fs" />
     <Compile Include="TestClientTests.fs" />
+    <Compile Include="ValidateTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
