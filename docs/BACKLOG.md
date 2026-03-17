@@ -18,11 +18,11 @@
 
 ## Tier 3: Production readiness
 
-- [ ] Graceful shutdown — drain in-flight requests on SIGTERM
-- [ ] Request timeout middleware — per-route or global timeout
-- [ ] Rate limiting middleware
-- [ ] WebSocket support — ergonomic helpers over the `Raw` escape hatch
-- [ ] OpenAPI generation — auto-generate spec from route definitions
+- [x] Graceful shutdown — `App.shutdownTimeout` with Kestrel drain
+- [x] Request timeout middleware — `Timeout.after`, returns 504
+- [x] Rate limiting middleware — `RateLimit.fixedWindow` with `byIp` helper
+- [ ] WebSocket support — deferred
+- [x] OpenAPI generation — `OpenApi.generate` / `OpenApi.handler` from RouteTable
 
 ## Tier 4: Ecosystem
 
