@@ -85,6 +85,51 @@ let ``Trie static segment takes priority over param`` () =
     rMe.Body |> should equal (Text "me")
     rParam.Body |> should equal (Text "param")
 
+// --- Coverage: tryWildcard with wrong method (line 101) ---
+
+[<Fact>]
+let ``Trie wildcard returns None for wrong method`` () =
+    let trie =
+        Trie.empty
+        |> Trie.add "GET" "/files/*path" [] (fun _ -> task { return Response.ok })
+    let result = Trie.lookup "POST" "/files/a/b/c" trie
+    result |> Option.isNone |> should be True
+
+// --- Coverage: tryParam falls through to tryWildcard (line 89) ---
+
+[<Fact>]
+let ``Trie param child falls through to wildcard when param path has no handler`` () =
+    let trie =
+        Trie.empty
+        |> Trie.add "GET" "/:id/details" [] (fun _ -> task { return Response.text "details" })
+        |> Trie.add "GET" "/*path" [] (fun _ -> task { return Response.text "wildcard" })
+    // "/something" does not match "/:id/details" (too short), should fallback to wildcard
+    let result = Trie.lookup "GET" "/something" trie
+    result |> Option.isSome |> should be True
+
+// --- Coverage: Trie root path no method match (line 109) ---
+
+[<Fact>]
+let ``Trie root path returns None for unmatched method`` () =
+    let trie =
+        Trie.empty
+        |> Trie.add "GET" "/" [] (fun _ -> task { return Response.ok })
+    let result = Trie.lookup "POST" "/" trie
+    result |> Option.isNone |> should be True
+
+// --- Coverage: Trie.add with existing wildcard child (line 50) ---
+
+[<Fact>]
+let ``Trie add wildcard with existing wildcard adds method`` () =
+    let trie =
+        Trie.empty
+        |> Trie.add "GET" "/files/*path" [] (fun _ -> task { return Response.text "get" })
+        |> Trie.add "POST" "/files/*path" [] (fun _ -> task { return Response.text "post" })
+    let getResult = Trie.lookup "GET" "/files/a/b" trie
+    let postResult = Trie.lookup "POST" "/files/a/b" trie
+    getResult |> Option.isSome |> should be True
+    postResult |> Option.isSome |> should be True
+
 [<Fact>]
 let ``Trie pre-composes middleware chain`` () =
     let mutable callOrder = []

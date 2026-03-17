@@ -70,6 +70,72 @@ let ``Cors.build rejects non-matching origin`` () = task {
     do! stop()
 }
 
+// --- Coverage: Cors.build with custom methods (line 41) ---
+
+[<Fact>]
+let ``Cors.build with custom methods on preflight`` () = task {
+    let cors = Cors.defaults |> Cors.methods ["GET"; "POST"] |> Cors.build
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.ok })
+    let config = App.defaults |> App.port 0 |> App.middleware cors
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    let request = new HttpRequestMessage(HttpMethod.Options, $"http://127.0.0.1:{port}/test")
+    request.Headers.Add("Origin", "http://example.com")
+    request.Headers.Add("Access-Control-Request-Method", "POST")
+    let! response = client.SendAsync(request)
+    response.StatusCode |> should equal HttpStatusCode.NoContent
+    let methodsHeader = response.Headers.GetValues("Access-Control-Allow-Methods") |> Seq.head
+    methodsHeader |> should haveSubstring "GET"
+    methodsHeader |> should haveSubstring "POST"
+    do! stop()
+}
+
+// --- Coverage: Cors.build with custom headers (line 45) ---
+
+[<Fact>]
+let ``Cors.build with custom headers on preflight`` () = task {
+    let cors = Cors.defaults |> Cors.headers ["X-Custom"; "Authorization"] |> Cors.build
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.ok })
+    let config = App.defaults |> App.port 0 |> App.middleware cors
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    let request = new HttpRequestMessage(HttpMethod.Options, $"http://127.0.0.1:{port}/test")
+    request.Headers.Add("Origin", "http://example.com")
+    request.Headers.Add("Access-Control-Request-Headers", "X-Custom")
+    let! response = client.SendAsync(request)
+    response.StatusCode |> should equal HttpStatusCode.NoContent
+    let headersVal = response.Headers.GetValues("Access-Control-Allow-Headers") |> Seq.head
+    headersVal |> should haveSubstring "X-Custom"
+    headersVal |> should haveSubstring "Authorization"
+    do! stop()
+}
+
+// --- Coverage: Cors with specific origins and no Origin header (line 14-15) ---
+
+[<Fact>]
+let ``Cors.build with specific origins passes through when no Origin header`` () = task {
+    let cors = Cors.defaults |> Cors.origins ["http://allowed.com"] |> Cors.build
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.text "ok" })
+    let config = App.defaults |> App.port 0 |> App.middleware cors
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    // Request without Origin header
+    let! response = client.GetAsync($"http://127.0.0.1:{port}/test")
+    let! body = response.Content.ReadAsStringAsync()
+    // Should still get the response (non-CORS request passes through)
+    response.StatusCode |> should equal HttpStatusCode.OK
+    body |> should equal "ok"
+    // But no CORS header added
+    response.Headers.Contains("Access-Control-Allow-Origin") |> should be False
+    do! stop()
+}
+
 [<Fact>]
 let ``Cors.build with maxAge sets Max-Age on preflight`` () = task {
     let cors = Cors.defaults |> Cors.maxAge 3600 |> Cors.build

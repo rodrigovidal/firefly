@@ -46,6 +46,36 @@ let ``Validate.pattern fails on non-match`` () =
     | Error errs -> errs |> should equal ["email has invalid format"]
     | Ok _ -> failwith "expected error"
 
+// --- Coverage: Validate.pattern passes on match (line 23) ---
+
+[<Fact>]
+let ``Validate.pattern passes on match`` () =
+    let v = Validate.pattern "email" @"^.+@.+\..+$" (fun (u: CreateUser) -> u.Email)
+    let result = v { Name = "Alice"; Email = "alice@test.com" }
+    match result with
+    | Ok u -> u.Email |> should equal "alice@test.com"
+    | Error _ -> failwith "expected ok"
+
+// --- Coverage: Validate.minLength passes ---
+
+[<Fact>]
+let ``Validate.minLength passes when long enough`` () =
+    let v = Validate.minLength "name" 3 (fun (u: CreateUser) -> u.Name)
+    let result = v { Name = "Alice"; Email = "a@b.com" }
+    match result with
+    | Ok u -> u.Name |> should equal "Alice"
+    | Error _ -> failwith "expected ok"
+
+// --- Coverage: Validate.maxLength passes ---
+
+[<Fact>]
+let ``Validate.maxLength passes when short enough`` () =
+    let v = Validate.maxLength "name" 10 (fun (u: CreateUser) -> u.Name)
+    let result = v { Name = "Alice"; Email = "a@b.com" }
+    match result with
+    | Ok u -> u.Name |> should equal "Alice"
+    | Error _ -> failwith "expected ok"
+
 [<Fact>]
 let ``Validate.combine collects all errors`` () =
     let v = Validate.combine [

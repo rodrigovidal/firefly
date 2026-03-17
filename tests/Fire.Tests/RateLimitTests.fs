@@ -57,6 +57,45 @@ let ``RateLimit returns Retry-After header on 429`` () = task {
 }
 
 [<Fact>]
+let ``RateLimit resets window after expiry`` () = task {
+    let routes =
+        Route.start
+        |> Route.middleware (RateLimit.fixedWindow 1 (TimeSpan.FromMilliseconds 200.0) (fun _ -> "rtest-reset"))
+        |> Route.get "/api" (fun _ -> task { return Response.ok })
+    let config = App.defaults |> App.port 0
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    // Exhaust the limit
+    let! r1 = client.GetAsync($"http://127.0.0.1:{port}/api")
+    r1.StatusCode |> should equal HttpStatusCode.OK
+    let! r2 = client.GetAsync($"http://127.0.0.1:{port}/api")
+    r2.StatusCode |> should equal HttpStatusCode.TooManyRequests
+    // Wait for window to expire
+    do! System.Threading.Tasks.Task.Delay(300)
+    // Should be allowed again
+    let! r3 = client.GetAsync($"http://127.0.0.1:{port}/api")
+    r3.StatusCode |> should equal HttpStatusCode.OK
+    do! stop()
+}
+
+[<Fact>]
+let ``RateLimit.byIp returns unknown for null IP`` () =
+    // Test the byIp function with a request that has no remote IP
+    let ctx = Microsoft.AspNetCore.Http.DefaultHttpContext()
+    ctx.Connection.RemoteIpAddress <- null
+    let req = Fire.Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
+    let key = RateLimit.byIp req
+    key |> should equal "unknown"
+
+[<Fact>]
+let ``RateLimit.byIp returns IP string for set IP`` () =
+    let ctx = Microsoft.AspNetCore.Http.DefaultHttpContext()
+    ctx.Connection.RemoteIpAddress <- System.Net.IPAddress.Loopback
+    let req = Fire.Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
+    let key = RateLimit.byIp req
+    key |> should equal "127.0.0.1"
+
+[<Fact>]
 let ``RateLimit isolates keys`` () = task {
     let routes =
         Route.start

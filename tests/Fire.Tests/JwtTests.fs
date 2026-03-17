@@ -88,6 +88,75 @@ let ``Jwt.validate with issuer rejects wrong issuer`` () = task {
     r.Status |> should equal 401
 }
 
+// --- Coverage: Jwt.audience (line 26) and Jwt.encryptionKey (line 24, 42) ---
+
+[<Fact>]
+let ``Jwt.validate with audience rejects wrong audience`` () = task {
+    let handler = JsonWebTokenHandler()
+    let key = SymmetricSecurityKey(Encoding.UTF8.GetBytes(testSecret))
+    let descriptor = SecurityTokenDescriptor(
+        SigningCredentials = SigningCredentials(key, SecurityAlgorithms.HmacSha256),
+        Audience = "wrong-audience",
+        Expires = DateTime.UtcNow.AddHours(1.0)
+    )
+    let token = handler.CreateToken(descriptor)
+    let jwtMw = Jwt.defaults testSecret |> Jwt.audience "my-app" |> Jwt.validate
+    let routes =
+        Route.start
+        |> Route.middleware jwtMw
+        |> Route.get "/me" (fun _ -> task { return Response.ok })
+    let client = TestClient.create routes |> TestClient.withHeader "Authorization" $"Bearer {token}"
+    let! r = client |> TestClient.get "/me"
+    r.Status |> should equal 401
+}
+
+[<Fact>]
+let ``Jwt.validate with audience accepts correct audience`` () = task {
+    let handler = JsonWebTokenHandler()
+    let key = SymmetricSecurityKey(Encoding.UTF8.GetBytes(testSecret))
+    let descriptor = SecurityTokenDescriptor(
+        SigningCredentials = SigningCredentials(key, SecurityAlgorithms.HmacSha256),
+        Audience = "my-app",
+        Expires = DateTime.UtcNow.AddHours(1.0)
+    )
+    let identity = System.Security.Claims.ClaimsIdentity()
+    identity.AddClaim(System.Security.Claims.Claim("sub", "user-1"))
+    descriptor.Subject <- identity
+    let token = handler.CreateToken(descriptor)
+    let jwtMw = Jwt.defaults testSecret |> Jwt.audience "my-app" |> Jwt.validate
+    let routes =
+        Route.start
+        |> Route.middleware jwtMw
+        |> Route.get "/me" (fun (req: Request) -> task {
+            let claims = Jwt.claims req
+            return Response.text (claims.Value.["sub"])
+        })
+    let client = TestClient.create routes |> TestClient.withHeader "Authorization" $"Bearer {token}"
+    let! r = client |> TestClient.get "/me"
+    r.Status |> should equal 200
+    r.Body |> should equal "user-1"
+}
+
+[<Fact>]
+let ``Jwt.validate with encryptionKey config still validates signed tokens`` () = task {
+    // Tests that Jwt.encryptionKey setter works (line 24, 42 coverage)
+    // A normal signed token should still validate even when encryption key is configured
+    let encKey = "12345678901234567890123456789012" // exactly 32 chars
+    let token = generateToken testSecret ["sub", "user-enc"]
+    let jwtMw = Jwt.defaults testSecret |> Jwt.encryptionKey encKey |> Jwt.validate
+    let routes =
+        Route.start
+        |> Route.middleware jwtMw
+        |> Route.get "/me" (fun (req: Request) -> task {
+            let claims = Jwt.claims req
+            return Response.text (claims.Value.["sub"])
+        })
+    let client = TestClient.create routes |> TestClient.withHeader "Authorization" $"Bearer {token}"
+    let! r = client |> TestClient.get "/me"
+    r.Status |> should equal 200
+    r.Body |> should equal "user-enc"
+}
+
 [<Fact>]
 let ``Jwt.claims returns None when no JWT validated`` () = task {
     let routes =

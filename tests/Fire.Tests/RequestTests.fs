@@ -77,3 +77,23 @@ let ``Request.Raw returns underlying HttpContext`` () =
     let ctx = makeHttpContext "GET" "/" "" [] None
     let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
     req.Raw |> should be (sameAs ctx)
+
+[<Fact>]
+let ``Request.Headers returns list for existing header`` () =
+    let ctx = makeHttpContext "GET" "/" "" ["Accept", "text/html"] None
+    let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
+    let headers = req.Headers "Accept"
+    headers |> List.isEmpty |> should be False
+
+[<Fact>]
+let ``Request.Headers returns empty list for missing header`` () =
+    let ctx = makeHttpContext "GET" "/" "" [] None
+    let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
+    let headers = req.Headers "X-Missing"
+    headers |> List.length |> should equal 0
+
+[<Fact>]
+let ``Request.Body returns request body stream`` () =
+    let ctx = makeHttpContext "POST" "/" "" [] (Some "hello")
+    let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
+    req.Body |> should not' (be Null)

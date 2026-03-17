@@ -83,6 +83,26 @@ let ``Static.serve prevents directory traversal`` () = task {
         Directory.Delete(dir, true)
 }
 
+// --- Coverage: getContentType unknown extension (line 28) ---
+
+[<Fact>]
+let ``Static.serve returns octet-stream for unknown extension`` () = task {
+    let dir = setupTestDir ()
+    try
+        // Create a file with unknown extension
+        File.WriteAllText(Path.Combine(dir, "data.xyz"), "binary content")
+        let routes = Route.start |> Route.get "/static/*path" (Static.serve dir)
+        let config = App.defaults |> App.port 0
+        let! (port, stop) = App.runTest routes config CancellationToken.None
+        use client = new HttpClient()
+        let! response = client.GetAsync($"http://127.0.0.1:{port}/static/data.xyz")
+        response.StatusCode |> should equal HttpStatusCode.OK
+        response.Content.Headers.ContentType.MediaType |> should equal "application/octet-stream"
+        do! stop()
+    finally
+        Directory.Delete(dir, true)
+}
+
 [<Fact>]
 let ``Static.serve handles nested directories`` () = task {
     let dir = setupTestDir ()

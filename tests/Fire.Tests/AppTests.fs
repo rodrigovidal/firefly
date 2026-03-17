@@ -186,6 +186,122 @@ type Greeter() =
     interface IGreeter with
         member _.Greet name = $"Hello, {name}!"
 
+// --- Coverage: writeResponse Stream body (line 68-70 in App.fs) ---
+
+[<Fact>]
+let ``App serves Stream response`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/stream" (fun _ -> task {
+            let bytes = System.Text.Encoding.UTF8.GetBytes("streamed")
+            let ms = new System.IO.MemoryStream(bytes) :> System.IO.Stream
+            return Response.stream ms
+        })
+
+    let config = App.defaults |> App.port 0
+    use cts = new CancellationTokenSource()
+    let! (port, stop) = App.runTest routes config cts.Token
+
+    use client = new HttpClient()
+    let! resp = client.GetAsync($"http://127.0.0.1:{port}/stream")
+    let! body = resp.Content.ReadAsStringAsync()
+    body |> should equal "streamed"
+
+    do! stop ()
+}
+
+// --- Coverage: App error handler that throws (lines 104-105 in App.fs) ---
+
+[<Fact>]
+let ``App error handler that throws returns 500`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/boom" (fun _ -> task {
+            return failwith "kaboom"
+        })
+
+    let config =
+        App.defaults
+        |> App.port 0
+        |> App.onError (fun _ex _req -> task {
+            return failwith "error handler also fails"
+        })
+
+    use cts = new CancellationTokenSource()
+    let! (port, stop) = App.runTest routes config cts.Token
+
+    use client = new HttpClient()
+    let! resp = client.GetAsync($"http://127.0.0.1:{port}/boom")
+    resp.StatusCode |> should equal System.Net.HttpStatusCode.InternalServerError
+
+    do! stop ()
+}
+
+// --- Coverage: App no error handler returns 500 (line 107 in App.fs) ---
+
+[<Fact>]
+let ``App unhandled exception without error handler returns 500`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/boom" (fun _ -> task {
+            return failwith "kaboom"
+        })
+
+    let config = App.defaults |> App.port 0
+    use cts = new CancellationTokenSource()
+    let! (port, stop) = App.runTest routes config cts.Token
+
+    use client = new HttpClient()
+    let! resp = client.GetAsync($"http://127.0.0.1:{port}/boom")
+    resp.StatusCode |> should equal System.Net.HttpStatusCode.InternalServerError
+
+    do! stop ()
+}
+
+// --- Coverage: App.host with IP address (line 112 in App.fs) ---
+
+[<Fact>]
+let ``App.host with 127.0.0.1 starts correctly`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.text "ok" })
+
+    let config = App.defaults |> App.port 0 |> App.host "127.0.0.1"
+    use cts = new CancellationTokenSource()
+    let! (port, stop) = App.runTest routes config cts.Token
+
+    use client = new HttpClient()
+    let! resp = client.GetAsync($"http://127.0.0.1:{port}/test")
+    let! body = resp.Content.ReadAsStringAsync()
+    body |> should equal "ok"
+
+    do! stop ()
+}
+
+// --- Coverage: App.shutdownTimeout (lines 116-119 in App.fs) ---
+
+[<Fact>]
+let ``App.shutdownTimeout configures shutdown`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.text "ok" })
+
+    let config =
+        App.defaults
+        |> App.port 0
+        |> App.shutdownTimeout (System.TimeSpan.FromSeconds 5.0)
+
+    use cts = new CancellationTokenSource()
+    let! (port, stop) = App.runTest routes config cts.Token
+
+    use client = new HttpClient()
+    let! resp = client.GetAsync($"http://127.0.0.1:{port}/test")
+    let! body = resp.Content.ReadAsStringAsync()
+    body |> should equal "ok"
+
+    do! stop ()
+}
+
 [<Fact>]
 let ``App.dependencyInjection registers and resolves services`` () = task {
     let routes =

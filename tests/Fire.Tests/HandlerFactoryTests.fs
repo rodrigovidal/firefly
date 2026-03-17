@@ -269,3 +269,26 @@ let ``getParamTypes extracts types from handler function`` () =
     let types = HandlerFactory.getParamTypes (handler.GetType())
     types |> List.length |> should be (greaterThanOrEqualTo 1)
     types.[0] |> should equal typeof<int>
+
+// --- Coverage: convertValue with unsupported type (line 116) ---
+
+[<Fact>]
+let ``convertValue throws for unsupported type`` () =
+    let action () = HandlerFactory.convertValue typeof<System.DateTime> "2024-01-01" |> ignore
+    action |> should throw typeof<System.Exception>
+
+// --- Coverage: awaitResponse with non-Task<Response> (lines 105-107) ---
+
+[<Fact>]
+let ``awaitResponse unwraps Task of Response`` () = task {
+    let t = System.Threading.Tasks.Task.FromResult(Response.ok)
+    let! result = HandlerFactory.awaitResponse (t :> obj)
+    result.Status |> should equal 200
+}
+
+// --- Coverage: findFSharpFuncType fallback (line 69) and getParamTypes with non-func ---
+
+[<Fact>]
+let ``getParamTypes returns empty for non-function type`` () =
+    let types = HandlerFactory.getParamTypes typeof<string>
+    types |> should haveLength 0
