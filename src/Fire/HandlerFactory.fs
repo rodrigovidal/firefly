@@ -2,6 +2,7 @@ namespace Fire
 
 open System
 open System.Globalization
+open System.Linq.Expressions
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.Extensions.DependencyInjection
@@ -78,7 +79,9 @@ module HandlerFactory =
             | None -> []
         walk t
 
-    /// Build a fast invoker that caches MethodInfo at registration time
+    /// Build a compiled invoker using Expression trees.
+    /// At registration: builds and compiles an expression that chains Invoke calls.
+    /// At request time: direct delegate call — no reflection, no boxing overhead from MethodInfo.Invoke.
     let private buildInvoker (handler: obj) (paramCount: int) : (obj[] -> obj) =
         // Walk the FSharpFunc chain to collect MethodInfo for each Invoke
         let methods = Array.zeroCreate paramCount
@@ -87,15 +90,35 @@ module HandlerFactory =
             methods.[i] <-
                 currentType.GetMethods()
                 |> Array.find (fun m -> m.Name = "Invoke" && m.GetParameters().Length = 1)
-            // Get the return type for the next step
-            let returnType = methods.[i].ReturnType
-            currentType <- returnType
-        // Return a fast invoker that uses cached MethodInfo
-        fun (args: obj[]) ->
-            let mutable current = handler
-            for i in 0..args.Length-1 do
-                current <- methods.[i].Invoke(current, [| args.[i] |])
-            current
+            currentType <- methods.[i].ReturnType
+
+        // Build expression tree: (args) => handler.Invoke(args[0]).Invoke(args[1])...
+        let argsParam = Expression.Parameter(typeof<obj[]>, "args")
+        let handlerConst = Expression.Constant(handler)
+
+        let mutable expr : Expression = Expression.Convert(handlerConst, handler.GetType()) :> Expression
+        for i in 0..paramCount-1 do
+            let method = methods.[i]
+            let paramType = method.GetParameters().[0].ParameterType
+            let argAccess = Expression.ArrayIndex(argsParam, Expression.Constant(i))
+            let convertedArg =
+                if paramType.IsValueType then
+                    Expression.Unbox(argAccess, paramType) :> Expression
+                else
+                    Expression.Convert(argAccess, paramType) :> Expression
+            expr <- Expression.Call(expr, method, convertedArg) :> Expression
+
+        // Box the result to obj
+        let boxedResult =
+            if expr.Type.IsValueType then
+                Expression.Convert(expr, typeof<obj>) :> Expression
+            else
+                expr
+
+        let lambda = Expression.Lambda<Func<obj[], obj>>(boxedResult, argsParam)
+        let compiled = lambda.Compile()
+
+        fun args -> compiled.Invoke(args)
 
     /// Await a Task-like object and extract the Response.
     /// Handles both Task<Response> (concrete) and Task<obj> (erased generic).
