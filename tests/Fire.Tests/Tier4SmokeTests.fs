@@ -27,6 +27,11 @@ let makeToken (sub: string) =
 let ``Tier 4 integration smoke test`` () = task {
     let jwtMw = Jwt.defaults secret |> Jwt.validate
 
+    let validateUser = Validate.combine [
+        Validate.required "name" (fun (u: NewUser) -> u.Name)
+        Validate.minLength "email" 5 (fun (u: NewUser) -> u.Email)
+    ]
+
     let routes =
         Route.start
         |> Route.get("/public", fun _ -> task { return Response.text "open" })
@@ -37,19 +42,16 @@ let ``Tier 4 integration smoke test`` () = task {
                 let claims = Jwt.claims req
                 return Response.json {| sub = claims.Value.["sub"] |}
             })
-            |> Route.post("/users",
-                Validate.body
-                    (Validate.combine [
-                        Validate.required "name" (fun (u: NewUser) -> u.Name)
-                        Validate.minLength "email" 5 (fun (u: NewUser) -> u.Email)
-                    ])
-                    (fun user -> task {
-                        return Response.json {| name = user.Name |} |> Response.status 201
-                    })
-            )
+            |> Route.post("/users", fun (req: Request) -> task {
+                let! body = req.Json<NewUser>()
+                match validateUser body with
+                | Ok user ->
+                    return Response.json {| name = user.Name |} |> Response.status 201
+                | Error errors ->
+                    return Response.json {| errors = errors |} |> Response.status 400
+            })
         )
 
-    // Direct test client
     let client = TestClient.create routes
 
     // Public route — no auth needed
