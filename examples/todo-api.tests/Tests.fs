@@ -78,14 +78,14 @@ let ``Full CRUD lifecycle`` () = task {
 }
 
 [<Fact>]
-let ``Validation rejects empty title`` () = task {
+let ``Validation rejects missing title`` () = task {
     let (routes, config) = App.create ()
     let! client = TestClient.start routes config
     let token = makeToken ()
     let authed = client |> TestClient.withHeader "Authorization" $"Bearer {token}"
-    let! r = authed |> TestClient.post "/api/todos" """{"Title":""}"""
+    let! r = authed |> TestClient.post "/api/todos" """{}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "title is required"
+    r.Body |> should haveSubstring "Title is required"
     do! TestClient.stop client
 }
 

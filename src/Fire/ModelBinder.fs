@@ -17,7 +17,10 @@ module ModelBinder =
                 targetType, false
 
         match value with
-        | None | Some "" ->
+        | None ->
+            if isOption then Ok null  // None
+            else Error $"{name} is required"
+        | Some "" ->
             if isOption then Ok null  // None
             elif targetType = typeof<string> then Ok (box "")
             else Error $"{name} is required"
@@ -85,18 +88,28 @@ module ModelBinder =
                 let name = binder.ParamNames.[i]
                 let typ = binder.ParamTypes.[i]
 
-                let value =
-                    match routeParams.TryGetValue(name) with
+                // Case-insensitive lookup across all sources
+                let tryFind (dict: IReadOnlyDictionary<string, string>) (key: string) =
+                    match dict.TryGetValue(key) with
                     | true, v -> Some v
                     | false, _ ->
+                        // Fallback: case-insensitive search
+                        dict |> Seq.tryFind (fun kvp ->
+                            String.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase))
+                        |> Option.map (fun kvp -> kvp.Value)
+
+                let value =
+                    match tryFind routeParams name with
+                    | Some _ as v -> v
+                    | None ->
                         if binder.IsBodyMethod then
-                            match body.TryGetValue(name) with
-                            | true, v -> Some v
-                            | false, _ -> None
+                            match tryFind body name with
+                            | Some _ as v -> v
+                            | None -> None
                         else
-                            match queryParams.TryGetValue(name) with
-                            | true, v -> Some v
-                            | false, _ -> None
+                            match tryFind queryParams name with
+                            | Some _ as v -> v
+                            | None -> None
 
                 match tryConvert typ name value with
                 | Ok v -> values.[i] <- v

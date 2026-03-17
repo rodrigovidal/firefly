@@ -85,7 +85,7 @@ let generateToken (userId: string) =
             Expires = DateTime.UtcNow.AddHours(24.0))
     handler.CreateToken(descriptor)
 
-// --- Routes (handlers resolve ITodoStore via DI) ---
+// --- Routes using auto-DI + model binding ---
 
 let routes =
     let jwtAuth = Jwt.defaults jwtSecret |> Jwt.validate
@@ -98,46 +98,38 @@ let routes =
     })
     |> Route.group("/api/todos", fun group ->
         group
-        |> Route.get("", fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            let! items = store.GetAll()
+        // List all todos — deps only
+        |> Route.get("", Func<{| Store: ITodoStore |}, Task<Response>>(fun deps -> task {
+            let! items = deps.Store.GetAll()
             return Response.json {| todos = items |}
-        })
-        |> Route.get("/:id",
-            Validate.param ["id", Validate.isInt] (fun (req: Request) -> task {
-                let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-                let id = int req.Params.["id"]
-                let! todo = store.GetById(id)
-                match todo with
-                | Some t -> return Response.json t
-                | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
-            }))
+        }))
+        // Get by id — deps + model binding (id from route param)
+        |> Route.get("/:id", Func<{| Store: ITodoStore |}, {| Id: int |}, Task<Response>>(fun deps input -> task {
+            let! todo = deps.Store.GetById(input.Id)
+            match todo with
+            | Some t -> return Response.json t
+            | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
+        }))
+        // Protected routes
         |> Route.middleware(jwtAuth)
-        |> Route.post("", fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            let! body = req.Json<CreateTodo>()
-            if String.IsNullOrWhiteSpace body.Title then
-                return Response.json {| errors = ["title is required"] |} |> Response.status 400
-            else
-                let! todo = store.Create(body.Title)
-                return Response.json todo |> Response.status 201
-        })
-        |> Route.put("/:id", fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            let id = int req.Params.["id"]
-            let! body = req.Json<UpdateTodo>()
-            let! result = store.Update(id, body)
+        // Create — deps + model binding (title from body)
+        |> Route.post("", Func<{| Store: ITodoStore |}, {| Title: string |}, Task<Response>>(fun deps input -> task {
+            let! todo = deps.Store.Create(input.Title)
+            return Response.json todo |> Response.status 201
+        }))
+        // Update — deps + model binding (id from route, title+completed from body)
+        |> Route.put("/:id", Func<{| Store: ITodoStore |}, {| Id: int; Title: string; Completed: bool |}, Task<Response>>(fun deps input -> task {
+            let! result = deps.Store.Update(input.Id, { Title = input.Title; Completed = input.Completed })
             match result with
             | Some updated -> return Response.json updated
             | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
-        })
-        |> Route.delete("/:id", fun (req: Request) -> task {
-            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
-            let id = int req.Params.["id"]
-            let! deleted = store.Delete(id)
+        }))
+        // Delete — deps + model binding (id from route)
+        |> Route.delete("/:id", Func<{| Store: ITodoStore |}, {| Id: int |}, Task<Response>>(fun deps input -> task {
+            let! deleted = deps.Store.Delete(input.Id)
             if deleted then return Response.noContent
             else return Response.json {| error = "todo not found" |} |> Response.status 404
-        })
+        }))
     )
 
 let allRoutes =
@@ -146,7 +138,6 @@ let allRoutes =
 
 // --- App factory ---
 
-/// Create app with default InMemoryTodoStore
 let create () =
     let config =
         App.defaults
@@ -161,7 +152,6 @@ let create () =
         })
     (allRoutes, config)
 
-/// Create app with a custom ITodoStore — for testing
 let createWith (store: ITodoStore) =
     let config =
         App.defaults
