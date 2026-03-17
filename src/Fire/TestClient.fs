@@ -44,7 +44,8 @@ module TestClient =
     let start (routes: RouteTable) (config: FireConfig) : Task<TestClient> = task {
         let cts = new CancellationTokenSource()
         let! (port, stopFn) = App.runTest routes config cts.Token
-        let client = new HttpClient()
+        let handler = new HttpClientHandler(AllowAutoRedirect = false)
+        let client = new HttpClient(handler)
         client.BaseAddress <- Uri($"http://127.0.0.1:{port}")
         let stopAll () : Task =
             task {
@@ -159,7 +160,11 @@ module TestClient =
             msg.Headers.TryAddWithoutValidation(key, value) |> ignore
         match bodyOpt with
         | Some body ->
-            msg.Content <- new StringContent(body, Encoding.UTF8, "text/plain")
+            let contentType =
+                headers |> List.tryFind (fun (k, _) -> k.Equals("Content-Type", System.StringComparison.OrdinalIgnoreCase))
+                |> Option.map snd
+                |> Option.defaultValue "application/json"
+            msg.Content <- new StringContent(body, Encoding.UTF8, contentType)
         | None -> ()
 
         let! resp = client.SendAsync(msg)
