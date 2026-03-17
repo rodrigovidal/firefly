@@ -3,12 +3,15 @@ module TodoApi.Tests
 open System
 open System.Security.Claims
 open System.Text
+open System.Threading.Tasks
 open Microsoft.IdentityModel.JsonWebTokens
 open Microsoft.IdentityModel.Tokens
 open Xunit
 open FsUnit.Xunit
 open Fire
 open TodoApi
+
+// --- Helpers ---
 
 let makeToken () =
     let handler = JsonWebTokenHandler()
@@ -18,6 +21,10 @@ let makeToken () =
         Subject = ClaimsIdentity([| Claim("sub", "test-user") |]),
         Expires = DateTime.UtcNow.AddHours(1.0))
     handler.CreateToken(descriptor)
+
+// ==========================================================================
+// Tests using the default in-memory store (App.create)
+// ==========================================================================
 
 [<Fact>]
 let ``GET /api/todos returns empty list initially`` () = task {
@@ -106,5 +113,89 @@ let ``CORS headers are present`` () = task {
     let! client = TestClient.start routes config
     let! r = client |> TestClient.get "/api/todos"
     r.Headers |> List.exists (fun (k, _) -> k = "Access-Control-Allow-Origin") |> should be True
+    do! TestClient.stop client
+}
+
+// ==========================================================================
+// Tests with a FAKE store — shows how to swap dependencies without DI
+//
+// This is the pattern Fire users follow:
+//   1. Define a record of functions (TodoStore) instead of an interface
+//   2. App.createWith(store) takes the dependency as a parameter
+//   3. Tests pass a fake store to control behavior
+// ==========================================================================
+
+/// A fake store that always fails on GetAll — simulates a database error
+let failingStore : App.TodoStore = {
+    GetAll = fun () -> task { return failwith "database connection lost" }
+    GetById = fun _ -> task { return None }
+    Create = fun _ -> task { return failwith "database connection lost" }
+    Update = fun _ _ -> task { return None }
+    Delete = fun _ -> task { return false }
+}
+
+/// A fake store pre-loaded with data — no mutation needed
+let preloadedStore (items: App.Todo list) : App.TodoStore =
+    let mutable data = items
+    { GetAll = fun () -> task { return data }
+      GetById = fun id -> task { return data |> List.tryFind (fun t -> t.Id = id) }
+      Create = fun title -> task {
+        let todo : App.Todo = { Id = data.Length + 1; Title = title; Completed = false }
+        data <- data @ [todo]
+        return todo
+      }
+      Update = fun id update -> task {
+        match data |> List.tryFind (fun t -> t.Id = id) with
+        | Some _ ->
+            let updated : App.Todo = { Id = id; Title = update.Title; Completed = update.Completed }
+            data <- data |> List.map (fun t -> if t.Id = id then updated else t)
+            return Some updated
+        | None -> return None
+      }
+      Delete = fun id -> task {
+        let before = data.Length
+        data <- data |> List.filter (fun t -> t.Id <> id)
+        return data.Length < before
+      }
+    }
+
+[<Fact>]
+let ``With preloaded store: returns seeded todos`` () = task {
+    let store = preloadedStore [
+        { Id = 1; Title = "Already here"; Completed = true }
+        { Id = 2; Title = "Also here"; Completed = false }
+    ]
+    let (routes, config) = App.createWith store
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.get "/api/todos"
+    r.Status |> should equal 200
+    r.Body |> should haveSubstring "Already here"
+    r.Body |> should haveSubstring "Also here"
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``With preloaded store: get by id`` () = task {
+    let store = preloadedStore [
+        { Id = 42; Title = "Specific todo"; Completed = false }
+    ]
+    let (routes, config) = App.createWith store
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.get "/api/todos/42"
+    r.Status |> should equal 200
+    r.Body |> should haveSubstring "Specific todo"
+    do! TestClient.stop client
+}
+
+[<Fact>]
+let ``With failing store: GET returns 500 when store throws`` () = task {
+    let (routes, config) = App.createWith failingStore
+    let config = config |> App.onError (fun ex _ -> task {
+        return Response.json {| error = ex.Message |} |> Response.status 500
+    })
+    let! client = TestClient.start routes config
+    let! r = client |> TestClient.get "/api/todos"
+    r.Status |> should equal 500
+    r.Body |> should haveSubstring "database connection lost"
     do! TestClient.stop client
 }
