@@ -24,6 +24,7 @@
     <Compile Include="TrieTests.fs" />
     <Compile Include="WildcardTests.fs" />
     <Compile Include="RouteTests.fs" />
+    <Compile Include="HandlerFactoryTests.fs" />
     <Compile Include="AppTests.fs" />
     <Compile Include="ShutdownTests.fs" />
     <Compile Include="TimeoutTests.fs" />

@@ -81,7 +81,13 @@ module HandlerFactory =
     let invokeCurried (fn: obj) (args: obj[]) : obj =
         let mutable current = fn
         for arg in args do
-            let invokeMethod = current.GetType().GetMethod("Invoke")
+            let t = current.GetType()
+            // F# closures may have multiple Invoke overloads (curried + tuple).
+            // Pick the one with exactly one parameter.
+            let invokeMethod =
+                t.GetMethods()
+                |> Array.find (fun m ->
+                    m.Name = "Invoke" && m.GetParameters().Length = 1)
             current <- invokeMethod.Invoke(current, [| arg |])
         current
 

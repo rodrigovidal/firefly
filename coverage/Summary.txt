@@ -1,0 +1,41 @@
+Summary
+  Generated on: 17/03/2026 - 14:09:12
+  Coverage date: 17/03/2026 - 13:15:37 - 17/03/2026 - 14:09:12
+  Parser: MultiReport (3x Cobertura)
+  Assemblies: 1
+  Classes: 19
+  Files: 17
+  Line coverage: 85%
+  Covered lines: 892
+  Uncovered lines: 157
+  Coverable lines: 1049
+  Total lines: 1884
+  Branch coverage: 56.4% (721 of 1278)
+  Covered branches: 721
+  Total branches: 1278
+  Method coverage: 90% (191 of 212)
+  Full method coverage: 72.6% (154 of 212)
+  Covered methods: 191
+  Fully covered methods: 154
+  Total methods: 212
+
+Fire                        85%
+  Fire.App                82.1%
+  Fire.Cookie              100%
+  Fire.Cors                 87%
+  Fire.HandlerFactory     95.3%
+  Fire.Jwt                92.5%
+  Fire.Log                 100%
+  Fire.OpenApi             100%
+  Fire.RateLimit          83.3%
+  Fire.Request            88.2%
+  Fire.ResponseModule      100%
+  Fire.Route               100%
+  Fire.Schema             70.3%
+  Fire.SchemaBuilder        87%
+  Fire.SchemaCompiler     74.7%
+  Fire.Static             88.2%
+  Fire.TestClientModule   85.5%
+  Fire.Timeout             100%
+  Fire.Trie               93.7%
+  Fire.Validate             90%

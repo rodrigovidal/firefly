@@ -3,9 +3,19 @@ module Fire.Tests.LogTests
 open System
 open System.Net.Http
 open System.Threading
+open Microsoft.Extensions.Logging
 open Xunit
 open FsUnit.Xunit
 open Fire
+
+type FakeLogger() =
+    let mutable lastMessage = ""
+    member _.LastMessage = lastMessage
+    interface ILogger with
+        member _.BeginScope(_) = { new IDisposable with member _.Dispose() = () }
+        member _.IsEnabled(_) = true
+        member _.Log(_, _, state, _, formatter) =
+            lastMessage <- formatter.Invoke(state, null)
 
 [<Fact>]
 let ``Log.withOutput calls output function with correct entry`` () = task {
@@ -51,5 +61,19 @@ let ``Log.toConsole does not throw`` () = task {
     use client = new HttpClient()
     let! response = client.GetAsync($"http://127.0.0.1:{port}/ok")
     response.StatusCode |> should equal System.Net.HttpStatusCode.OK
+    do! stop()
+}
+
+[<Fact>]
+let ``Log.toLogger calls ILogger`` () = task {
+    let logger = FakeLogger()
+    let routes =
+        Route.start
+        |> Route.get "/test" (fun _ -> task { return Response.ok })
+    let config = App.defaults |> App.port 0 |> App.middleware (Log.toLogger logger)
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    let! _ = client.GetAsync($"http://127.0.0.1:{port}/test")
+    logger.LastMessage |> should not' (equal "")
     do! stop()
 }

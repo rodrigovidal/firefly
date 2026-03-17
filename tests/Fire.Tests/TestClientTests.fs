@@ -14,6 +14,13 @@ let routes =
         let! body = req.Text()
         return Response.text body
     })
+    |> Route.put "/echo" (fun (req: Request) -> task {
+        let! body = req.Text()
+        return Response.text $"updated: {body}"
+    })
+    |> Route.delete "/items/:id" (fun (req: Request) -> task {
+        return Response.noContent
+    })
     |> Route.get "/header-check" (fun (req: Request) -> task {
         let v = req.Header "X-Custom" |> Option.defaultValue "none"
         return Response.text v
@@ -85,4 +92,19 @@ let ``Integration: POST with body`` () = task {
     r.Status |> should equal 200
     r.Body |> should equal "hello fire"
     do! TestClient.stop client
+}
+
+[<Fact>]
+let ``Direct: PUT with body`` () = task {
+    let client = TestClient.create routes
+    let! r = client |> TestClient.put "/echo" "hello"
+    r.Status |> should equal 200
+    r.Body |> should equal "updated: hello"
+}
+
+[<Fact>]
+let ``Direct: DELETE returns correct status`` () = task {
+    let client = TestClient.create routes
+    let! r = client |> TestClient.delete "/items/42"
+    r.Status |> should equal 204
 }
