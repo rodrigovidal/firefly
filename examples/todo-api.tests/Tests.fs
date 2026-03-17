@@ -23,7 +23,7 @@ let makeToken () =
     handler.CreateToken(descriptor)
 
 // ==========================================================================
-// Tests using the default in-memory store (App.create)
+// Tests using the default InMemoryTodoStore (App.create)
 // ==========================================================================
 
 [<Fact>]
@@ -117,54 +117,56 @@ let ``CORS headers are present`` () = task {
 }
 
 // ==========================================================================
-// Tests with a FAKE store — shows how to swap dependencies without DI
+// Tests with a FAKE store — swap via DI, no function records needed
 //
-// This is the pattern Fire users follow:
-//   1. Define a record of functions (TodoStore) instead of an interface
-//   2. App.createWith(store) takes the dependency as a parameter
-//   3. Tests pass a fake store to control behavior
+// Pattern:
+//   1. Define ITodoStore interface (in App.fs)
+//   2. App.createWith(store) registers the instance in DI
+//   3. Handlers resolve via req.Service<ITodoStore>()
+//   4. Tests pass any ITodoStore implementation
 // ==========================================================================
 
-/// A fake store that always fails on GetAll — simulates a database error
-let failingStore : App.TodoStore = {
-    GetAll = fun () -> task { return failwith "database connection lost" }
-    GetById = fun _ -> task { return None }
-    Create = fun _ -> task { return failwith "database connection lost" }
-    Update = fun _ _ -> task { return None }
-    Delete = fun _ -> task { return false }
-}
-
-/// A fake store pre-loaded with data — no mutation needed
-let preloadedStore (items: App.Todo list) : App.TodoStore =
+/// A fake store pre-loaded with data
+type PreloadedStore(items: App.Todo list) =
     let mutable data = items
-    { GetAll = fun () -> task { return data }
-      GetById = fun id -> task { return data |> List.tryFind (fun t -> t.Id = id) }
-      Create = fun title -> task {
-        let todo : App.Todo = { Id = data.Length + 1; Title = title; Completed = false }
-        data <- data @ [todo]
-        return todo
-      }
-      Update = fun id update -> task {
-        match data |> List.tryFind (fun t -> t.Id = id) with
-        | Some _ ->
-            let updated : App.Todo = { Id = id; Title = update.Title; Completed = update.Completed }
-            data <- data |> List.map (fun t -> if t.Id = id then updated else t)
-            return Some updated
-        | None -> return None
-      }
-      Delete = fun id -> task {
-        let before = data.Length
-        data <- data |> List.filter (fun t -> t.Id <> id)
-        return data.Length < before
-      }
-    }
+
+    interface App.ITodoStore with
+        member _.GetAll() = task { return data }
+        member _.GetById(id) = task { return data |> List.tryFind (fun t -> t.Id = id) }
+        member _.Create(title) = task {
+            let todo : App.Todo = { Id = data.Length + 1; Title = title; Completed = false }
+            data <- data @ [todo]
+            return todo
+        }
+        member _.Update(id, update) = task {
+            match data |> List.tryFind (fun t -> t.Id = id) with
+            | Some _ ->
+                let updated : App.Todo = { Id = id; Title = update.Title; Completed = update.Completed }
+                data <- data |> List.map (fun t -> if t.Id = id then updated else t)
+                return Some updated
+            | None -> return None
+        }
+        member _.Delete(id) = task {
+            let before = data.Length
+            data <- data |> List.filter (fun t -> t.Id <> id)
+            return data.Length < before
+        }
+
+/// A fake store that always fails — simulates database errors
+type FailingStore() =
+    interface App.ITodoStore with
+        member _.GetAll() = task { return failwith "database connection lost" }
+        member _.GetById(_) = task { return failwith "database connection lost" }
+        member _.Create(_) = task { return failwith "database connection lost" }
+        member _.Update(_, _) = task { return failwith "database connection lost" }
+        member _.Delete(_) = task { return failwith "database connection lost" }
 
 [<Fact>]
 let ``With preloaded store: returns seeded todos`` () = task {
-    let store = preloadedStore [
+    let store = PreloadedStore([
         { Id = 1; Title = "Already here"; Completed = true }
         { Id = 2; Title = "Also here"; Completed = false }
-    ]
+    ])
     let (routes, config) = App.createWith store
     let! client = TestClient.start routes config
     let! r = client |> TestClient.get "/api/todos"
@@ -176,9 +178,9 @@ let ``With preloaded store: returns seeded todos`` () = task {
 
 [<Fact>]
 let ``With preloaded store: get by id`` () = task {
-    let store = preloadedStore [
+    let store = PreloadedStore([
         { Id = 42; Title = "Specific todo"; Completed = false }
-    ]
+    ])
     let (routes, config) = App.createWith store
     let! client = TestClient.start routes config
     let! r = client |> TestClient.get "/api/todos/42"
@@ -188,8 +190,8 @@ let ``With preloaded store: get by id`` () = task {
 }
 
 [<Fact>]
-let ``With failing store: GET returns 500 when store throws`` () = task {
-    let (routes, config) = App.createWith failingStore
+let ``With failing store: GET returns 500`` () = task {
+    let (routes, config) = App.createWith (FailingStore())
     let config = config |> App.onError (fun ex _ -> task {
         return Response.json {| error = ex.Message |} |> Response.status 500
     })
