@@ -26,8 +26,8 @@
 
 ## Tier 4: Ecosystem
 
-- [ ] NuGet packaging — publish as `Fire` on NuGet
-- [ ] `dotnet new fire` template — project template for quick starts
-- [ ] Validation middleware — composable request validation
-- [ ] JWT auth middleware
-- [ ] Testing helpers — `TestClient` that calls handlers directly without HTTP (like Hono's `app.request()`)
+- [x] NuGet packaging — package metadata, LICENSE, README (not published yet)
+- [ ] `dotnet new fire` template — deferred
+- [x] Validation middleware — `Validate.body`, `Validate.query`, `Validate.param`, `Validate.headerValues` with composable rules
+- [x] JWT auth middleware — `Jwt.validate` with JWS + JWE support via `Microsoft.IdentityModel.JsonWebTokens`
+- [x] Testing helpers — `TestClient.create` (direct) + `TestClient.start` (HTTP integration)
