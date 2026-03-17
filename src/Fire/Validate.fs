@@ -7,8 +7,6 @@ type Validator<'T> = 'T -> Result<'T, string list>
 [<RequireQualifiedAccess>]
 module Validate =
 
-    // --- Record-level validators (for body validation) ---
-
     let required (field: string) (getter: 'T -> string) : Validator<'T> =
         fun value ->
             if System.String.IsNullOrWhiteSpace(getter value) then Error [$"{field} is required"]
@@ -45,8 +43,6 @@ module Validate =
                 return Response.json {| errors = [$"Invalid request body: {ex.Message}"] |} |> Response.status 400
         }
 
-    // --- String-level rules (for query/params/headers) ---
-
     type Rule = string -> string option -> string list
 
     let isRequired : Rule = fun field value ->
@@ -62,8 +58,6 @@ module Validate =
 
     let isMaxLength (len: int) : Rule = fun field value ->
         match value with None -> [] | Some v when v.Length > len -> [$"{field} must be at most {len} characters"] | _ -> []
-
-    // --- Source-specific handlers ---
 
     let query (rules: (string * Rule) list) (handler: Request -> System.Threading.Tasks.Task<Response>) : Handler =
         fun req -> task {

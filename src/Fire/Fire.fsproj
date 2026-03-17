@@ -17,6 +17,8 @@
     <Compile Include="Response.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="DepsResolver.fs" />
+    <Compile Include="ModelBinder.fs" />
     <Compile Include="Trie.fs" />
     <Compile Include="Route.fs" />
     <Compile Include="Log.fs" />
@@ -26,7 +28,6 @@
     <Compile Include="OpenApi.fs" />
     <Compile Include="Validate.fs" />
     <Compile Include="Jwt.fs" />
-    <Compile Include="Inject.fs" />
     <Compile Include="Cors.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />

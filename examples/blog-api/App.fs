@@ -256,19 +256,19 @@ let create () =
 
     let routes =
         Route.start
-        |> Route.group "/api" (fun api ->
+        |> Route.group("/api", fun api ->
             api
-            |> Route.group "/posts" (fun postsGroup ->
+            |> Route.group("/posts", fun postsGroup ->
                 postsGroup
-                |> Route.get "" listPosts
-                |> Route.post "" createPost
-                |> Route.get "/:postId" getPost
-                |> Route.group "/:postId/comments" (fun commentsGroup ->
+                |> Route.get("", listPosts)
+                |> Route.post("", createPost)
+                |> Route.get("/:postId", getPost)
+                |> Route.group("/:postId/comments", fun commentsGroup ->
                     commentsGroup
-                    |> Route.get "" listComments
-                    |> Route.post "" createComment))
-            |> Route.get "/tags" listTags)
-        |> Route.get "/feed" feedRedirect
+                    |> Route.get("", listComments)
+                    |> Route.post("", createComment)))
+            |> Route.get("/tags", listTags))
+        |> Route.get("/feed", feedRedirect)
 
     let config =
         App.defaults

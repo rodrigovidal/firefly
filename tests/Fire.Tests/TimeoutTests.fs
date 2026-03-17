@@ -13,8 +13,8 @@ open Fire
 let ``Timeout.after returns 504 when handler exceeds timeout`` () = task {
     let routes =
         Route.start
-        |> Route.middleware (Timeout.after (TimeSpan.FromMilliseconds 100.0))
-        |> Route.get "/slow" (fun _ -> task {
+        |> Route.middleware(Timeout.after (TimeSpan.FromMilliseconds 100.0))
+        |> Route.get("/slow", fun _ -> task {
             do! Task.Delay(5000)
             return Response.text "done"
         })
@@ -30,8 +30,8 @@ let ``Timeout.after returns 504 when handler exceeds timeout`` () = task {
 let ``Timeout.after passes through when handler completes in time`` () = task {
     let routes =
         Route.start
-        |> Route.middleware (Timeout.after (TimeSpan.FromSeconds 5.0))
-        |> Route.get "/fast" (fun _ -> task { return Response.text "quick" })
+        |> Route.middleware(Timeout.after (TimeSpan.FromSeconds 5.0))
+        |> Route.get("/fast", fun _ -> task { return Response.text "quick" })
     let config = App.defaults |> App.port 0
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()

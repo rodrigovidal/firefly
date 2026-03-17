@@ -21,7 +21,7 @@ let setupTestDir () =
 let ``Static.serve returns file content`` () = task {
     let dir = setupTestDir ()
     try
-        let routes = Route.start |> Route.get "/static/*path" (Static.serve dir)
+        let routes = Route.start |> Route.get("/static/*path", Static.serve dir)
         let config = App.defaults |> App.port 0
         let! (port, stop) = App.runTest routes config CancellationToken.None
         use client = new HttpClient()
@@ -38,7 +38,7 @@ let ``Static.serve returns file content`` () = task {
 let ``Static.serve sets correct content type`` () = task {
     let dir = setupTestDir ()
     try
-        let routes = Route.start |> Route.get "/static/*path" (Static.serve dir)
+        let routes = Route.start |> Route.get("/static/*path", Static.serve dir)
         let config = App.defaults |> App.port 0
         let! (port, stop) = App.runTest routes config CancellationToken.None
         use client = new HttpClient()
@@ -57,7 +57,7 @@ let ``Static.serve sets correct content type`` () = task {
 let ``Static.serve returns 404 for missing file`` () = task {
     let dir = setupTestDir ()
     try
-        let routes = Route.start |> Route.get "/static/*path" (Static.serve dir)
+        let routes = Route.start |> Route.get("/static/*path", Static.serve dir)
         let config = App.defaults |> App.port 0
         let! (port, stop) = App.runTest routes config CancellationToken.None
         use client = new HttpClient()
@@ -72,7 +72,7 @@ let ``Static.serve returns 404 for missing file`` () = task {
 let ``Static.serve prevents directory traversal`` () = task {
     let dir = setupTestDir ()
     try
-        let routes = Route.start |> Route.get "/static/*path" (Static.serve dir)
+        let routes = Route.start |> Route.get("/static/*path", Static.serve dir)
         let config = App.defaults |> App.port 0
         let! (port, stop) = App.runTest routes config CancellationToken.None
         use client = new HttpClient()
@@ -87,7 +87,7 @@ let ``Static.serve prevents directory traversal`` () = task {
 let ``Static.serve handles nested directories`` () = task {
     let dir = setupTestDir ()
     try
-        let routes = Route.start |> Route.get "/static/*path" (Static.serve dir)
+        let routes = Route.start |> Route.get("/static/*path", Static.serve dir)
         let config = App.defaults |> App.port 0
         let! (port, stop) = App.runTest routes config CancellationToken.None
         use client = new HttpClient()

@@ -6,7 +6,6 @@ open System.Text
 open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
-open Microsoft.Extensions.DependencyInjection
 
 [<Struct>]
 type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>) =
@@ -77,8 +76,5 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
         match ctx.Request.Cookies.TryGetValue(name) with
         | true, value -> Some value
         | false, _ -> None
-
-    member _.Service<'T>() : 'T =
-        ctx.RequestServices.GetRequiredService<'T>()
 
     member _.Raw = ctx

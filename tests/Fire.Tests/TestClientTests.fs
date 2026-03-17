@@ -6,15 +6,15 @@ open Fire
 
 let routes =
     Route.start
-    |> Route.get "/hello" (fun _ -> task { return Response.text "world" })
-    |> Route.get "/users/:id" (fun req -> task {
+    |> Route.get("/hello", fun _ -> task { return Response.text "world" })
+    |> Route.get("/users/:id", fun (req: Request) -> task {
         return Response.json {| id = req.Params.["id"] |}
     })
-    |> Route.post "/echo" (fun req -> task {
+    |> Route.post("/echo", fun (req: Request) -> task {
         let! body = req.Text()
         return Response.text body
     })
-    |> Route.get "/header-check" (fun req -> task {
+    |> Route.get("/header-check", fun (req: Request) -> task {
         let v = req.Header "X-Custom" |> Option.defaultValue "none"
         return Response.text v
     })

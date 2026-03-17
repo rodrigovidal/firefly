@@ -16,14 +16,14 @@ let ``Full API smoke test`` () = task {
 
     let routes =
         Route.start
-        |> Route.get "/" (fun _ -> task { return Response.text "Fire" })
-        |> Route.group "/api" (fun api ->
+        |> Route.get("/", fun _ -> task { return Response.text "Fire" })
+        |> Route.group("/api", fun api ->
             api
-            |> Route.middleware withCors
-            |> Route.get "/health" (fun _ -> task { return Response.ok })
-            |> Route.group "/users" (fun users ->
+            |> Route.middleware(withCors)
+            |> Route.get("/health", fun _ -> task { return Response.ok })
+            |> Route.group("/users", fun users ->
                 users
-                |> Route.get "/:id" (fun req -> task {
+                |> Route.get("/:id", fun (req: Request) -> task {
                     let id = req.Params.["id"]
                     return Response.json {| id = id |}
                 })

@@ -11,7 +11,7 @@ open Fire
 let ``Cors.allowAll adds wildcard origin header`` () = task {
     let routes =
         Route.start
-        |> Route.get "/test" (fun _ -> task { return Response.ok })
+        |> Route.get("/test", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0 |> App.middleware Cors.allowAll
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -24,7 +24,7 @@ let ``Cors.allowAll adds wildcard origin header`` () = task {
 let ``Cors.allowAll handles preflight OPTIONS`` () = task {
     let routes =
         Route.start
-        |> Route.get "/test" (fun _ -> task { return Response.ok })
+        |> Route.get("/test", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0 |> App.middleware Cors.allowAll
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -43,7 +43,7 @@ let ``Cors.build with specific origins echoes matching origin`` () = task {
     let cors = Cors.defaults |> Cors.origins ["http://example.com"; "http://other.com"] |> Cors.build
     let routes =
         Route.start
-        |> Route.get "/test" (fun _ -> task { return Response.ok })
+        |> Route.get("/test", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0 |> App.middleware cors
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -59,7 +59,7 @@ let ``Cors.build rejects non-matching origin`` () = task {
     let cors = Cors.defaults |> Cors.origins ["http://allowed.com"] |> Cors.build
     let routes =
         Route.start
-        |> Route.get "/test" (fun _ -> task { return Response.ok })
+        |> Route.get("/test", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0 |> App.middleware cors
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -75,7 +75,7 @@ let ``Cors.build with maxAge sets Max-Age on preflight`` () = task {
     let cors = Cors.defaults |> Cors.maxAge 3600 |> Cors.build
     let routes =
         Route.start
-        |> Route.get "/test" (fun _ -> task { return Response.ok })
+        |> Route.get("/test", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0 |> App.middleware cors
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()

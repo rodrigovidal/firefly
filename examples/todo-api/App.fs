@@ -85,36 +85,36 @@ let generateToken (userId: string) =
             Expires = DateTime.UtcNow.AddHours(24.0))
     handler.CreateToken(descriptor)
 
-// --- Routes (handlers resolve ITodoStore via req.Service) ---
+// --- Routes (handlers resolve ITodoStore via DI) ---
 
 let routes =
     let jwtAuth = Jwt.defaults jwtSecret |> Jwt.validate
 
     Route.start
-    |> Route.post "/auth/token" (fun req -> task {
+    |> Route.post("/auth/token", fun (req: Request) -> task {
         let! body = req.Json<{| userId: string |}>()
         let token = generateToken body.userId
         return Response.json {| token = token |}
     })
-    |> Route.group "/api/todos" (fun group ->
+    |> Route.group("/api/todos", fun group ->
         group
-        |> Route.get "" (fun req -> task {
-            let store = req.Service<ITodoStore>()
+        |> Route.get("", fun (req: Request) -> task {
+            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
             let! items = store.GetAll()
             return Response.json {| todos = items |}
         })
-        |> Route.get "/:id" (
-            Validate.param ["id", Validate.isInt] (fun req -> task {
-                let store = req.Service<ITodoStore>()
+        |> Route.get("/:id",
+            Validate.param ["id", Validate.isInt] (fun (req: Request) -> task {
+                let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
                 let id = int req.Params.["id"]
                 let! todo = store.GetById(id)
                 match todo with
                 | Some t -> return Response.json t
                 | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
             }))
-        |> Route.middleware jwtAuth
-        |> Route.post "" (fun req -> task {
-            let store = req.Service<ITodoStore>()
+        |> Route.middleware(jwtAuth)
+        |> Route.post("", fun (req: Request) -> task {
+            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
             let! body = req.Json<CreateTodo>()
             if String.IsNullOrWhiteSpace body.Title then
                 return Response.json {| errors = ["title is required"] |} |> Response.status 400
@@ -122,8 +122,8 @@ let routes =
                 let! todo = store.Create(body.Title)
                 return Response.json todo |> Response.status 201
         })
-        |> Route.put "/:id" (fun req -> task {
-            let store = req.Service<ITodoStore>()
+        |> Route.put("/:id", fun (req: Request) -> task {
+            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
             let id = int req.Params.["id"]
             let! body = req.Json<UpdateTodo>()
             let! result = store.Update(id, body)
@@ -131,8 +131,8 @@ let routes =
             | Some updated -> return Response.json updated
             | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
         })
-        |> Route.delete "/:id" (fun req -> task {
-            let store = req.Service<ITodoStore>()
+        |> Route.delete("/:id", fun (req: Request) -> task {
+            let store = req.Raw.RequestServices.GetRequiredService<ITodoStore>()
             let id = int req.Params.["id"]
             let! deleted = store.Delete(id)
             if deleted then return Response.noContent
@@ -142,7 +142,7 @@ let routes =
 
 let allRoutes =
     routes
-    |> Route.get "/openapi.json" (OpenApi.handler "Todo API" "1.0" routes)
+    |> Route.get("/openapi.json", OpenApi.handler "Todo API" "1.0" routes)
 
 // --- App factory ---
 
@@ -156,7 +156,7 @@ let create () =
         |> App.dependencyInjection (fun services ->
             services.AddSingleton<ITodoStore, InMemoryTodoStore>() |> ignore
         )
-        |> App.notFound (fun req -> task {
+        |> App.notFound (fun (req: Request) -> task {
             return Response.json {| error = "not found"; path = req.Path |} |> Response.status 404
         })
     (allRoutes, config)
@@ -171,7 +171,7 @@ let createWith (store: ITodoStore) =
         |> App.dependencyInjection (fun services ->
             services.AddSingleton<ITodoStore>(store) |> ignore
         )
-        |> App.notFound (fun req -> task {
+        |> App.notFound (fun (req: Request) -> task {
             return Response.json {| error = "not found"; path = req.Path |} |> Response.status 404
         })
     (allRoutes, config)

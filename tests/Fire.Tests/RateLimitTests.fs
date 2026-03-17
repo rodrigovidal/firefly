@@ -12,8 +12,8 @@ open Fire
 let ``RateLimit allows requests within limit`` () = task {
     let routes =
         Route.start
-        |> Route.middleware (RateLimit.fixedWindow 5 (TimeSpan.FromMinutes 1.0) (fun _ -> "rtest-1"))
-        |> Route.get "/api" (fun _ -> task { return Response.ok })
+        |> Route.middleware(RateLimit.fixedWindow 5 (TimeSpan.FromMinutes 1.0) (fun _ -> "rtest-1"))
+        |> Route.get("/api", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -27,8 +27,8 @@ let ``RateLimit allows requests within limit`` () = task {
 let ``RateLimit returns 429 when limit exceeded`` () = task {
     let routes =
         Route.start
-        |> Route.middleware (RateLimit.fixedWindow 3 (TimeSpan.FromMinutes 1.0) (fun _ -> "rtest-2"))
-        |> Route.get "/api" (fun _ -> task { return Response.ok })
+        |> Route.middleware(RateLimit.fixedWindow 3 (TimeSpan.FromMinutes 1.0) (fun _ -> "rtest-2"))
+        |> Route.get("/api", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -44,8 +44,8 @@ let ``RateLimit returns 429 when limit exceeded`` () = task {
 let ``RateLimit returns Retry-After header on 429`` () = task {
     let routes =
         Route.start
-        |> Route.middleware (RateLimit.fixedWindow 1 (TimeSpan.FromSeconds 60.0) (fun _ -> "rtest-3"))
-        |> Route.get "/api" (fun _ -> task { return Response.ok })
+        |> Route.middleware(RateLimit.fixedWindow 1 (TimeSpan.FromSeconds 60.0) (fun _ -> "rtest-3"))
+        |> Route.get("/api", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -60,9 +60,9 @@ let ``RateLimit returns Retry-After header on 429`` () = task {
 let ``RateLimit isolates keys`` () = task {
     let routes =
         Route.start
-        |> Route.middleware (RateLimit.fixedWindow 1 (TimeSpan.FromMinutes 1.0)
+        |> Route.middleware(RateLimit.fixedWindow 1 (TimeSpan.FromMinutes 1.0)
             (fun req -> req.Header "X-Key" |> Option.defaultValue "default"))
-        |> Route.get "/api" (fun _ -> task { return Response.ok })
+        |> Route.get("/api", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()

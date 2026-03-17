@@ -13,7 +13,7 @@ let ``Log.withOutput calls output function with correct entry`` () = task {
     let logMw = Log.withOutput (fun entry -> captured <- Some entry)
     let routes =
         Route.start
-        |> Route.get "/test" (fun _ -> task { return Response.json {| ok = true |} })
+        |> Route.get("/test", fun _ -> task { return Response.json {| ok = true |} })
     let config = App.defaults |> App.port 0 |> App.middleware logMw
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
@@ -45,7 +45,7 @@ let ``Log.withOutput captures 404 status`` () = task {
 let ``Log.toConsole does not throw`` () = task {
     let routes =
         Route.start
-        |> Route.get "/ok" (fun _ -> task { return Response.ok })
+        |> Route.get("/ok", fun _ -> task { return Response.ok })
     let config = App.defaults |> App.port 0 |> App.middleware Log.toConsole
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()

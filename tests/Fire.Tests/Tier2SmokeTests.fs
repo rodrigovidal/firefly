@@ -20,7 +20,7 @@ let ``Tier 2 integration smoke test`` () = task {
 
         let routes =
             Route.start
-            |> Route.get "/api/data" (fun req -> task {
+            |> Route.get("/api/data", fun (req: Request) -> task {
                 if req.Accepts "application/json" then
                     return
                         Response.json {| items = [1;2;3] |}
@@ -29,10 +29,10 @@ let ``Tier 2 integration smoke test`` () = task {
                 else
                     return Response.text "items: 1, 2, 3"
             })
-            |> Route.get "/go" (fun _ -> task {
+            |> Route.get("/go", fun _ -> task {
                 return Response.ok |> Response.redirect "/api/data" 302
             })
-            |> Route.get "/static/*path" (Static.serve dir)
+            |> Route.get("/static/*path", Static.serve dir)
 
         let config =
             App.defaults

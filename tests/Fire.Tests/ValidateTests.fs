@@ -74,7 +74,7 @@ let ``Validate.combine passes when all valid`` () =
 let ``Validate.body returns 400 with errors on invalid body`` () = task {
     let routes =
         Route.start
-        |> Route.post "/users" (
+        |> Route.post("/users",
             Validate.body
                 (Validate.combine [
                     Validate.required "name" (fun (u: CreateUser) -> u.Name)
@@ -93,7 +93,7 @@ let ``Validate.body returns 400 with errors on invalid body`` () = task {
 let ``Validate.body calls handler on valid body`` () = task {
     let routes =
         Route.start
-        |> Route.post "/users" (
+        |> Route.post("/users",
             Validate.body
                 (Validate.required "name" (fun (u: CreateUser) -> u.Name))
                 (fun user -> task {
@@ -110,7 +110,7 @@ let ``Validate.body calls handler on valid body`` () = task {
 let ``Validate.body returns 400 on malformed JSON`` () = task {
     let routes =
         Route.start
-        |> Route.post "/users" (
+        |> Route.post("/users",
             Validate.body
                 (Validate.required "name" (fun (u: CreateUser) -> u.Name))
                 (fun user -> task {
@@ -129,7 +129,7 @@ let ``Validate.body returns 400 on malformed JSON`` () = task {
 let ``Validate.query returns 400 when required query param missing`` () = task {
     let routes =
         Route.start
-        |> Route.get "/search" (
+        |> Route.get("/search",
             Validate.query ["q", Validate.isRequired] (fun req -> task {
                 return Response.text (req.QueryParam "q" |> Option.defaultValue "")
             })
@@ -144,7 +144,7 @@ let ``Validate.query returns 400 when required query param missing`` () = task {
 let ``Validate.query passes with valid params`` () = task {
     let routes =
         Route.start
-        |> Route.get "/search" (
+        |> Route.get("/search",
             Validate.query ["q", Validate.isRequired] (fun req -> task {
                 return Response.text (req.QueryParam "q" |> Option.defaultValue "")
             })
@@ -159,7 +159,7 @@ let ``Validate.query passes with valid params`` () = task {
 let ``Validate.param validates route params`` () = task {
     let routes =
         Route.start
-        |> Route.get "/users/:id" (
+        |> Route.get("/users/:id",
             Validate.param ["id", Validate.isInt] (fun req -> task {
                 return Response.text req.Params.["id"]
             })
@@ -174,7 +174,7 @@ let ``Validate.param validates route params`` () = task {
 let ``Validate.headerValues validates headers`` () = task {
     let routes =
         Route.start
-        |> Route.get "/api" (
+        |> Route.get("/api",
             Validate.headerValues ["X-API-Key", Validate.isRequired] (fun req -> task {
                 return Response.ok
             })
