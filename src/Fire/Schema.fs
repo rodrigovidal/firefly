@@ -499,6 +499,32 @@ module Schema =
                 return Response.json {| errors = [$"invalid JSON: {ex.Message}"] |} |> Response.status 400
         }
 
+    /// Parse and validate the request body using a schema. Returns Result.
+    /// Use inside handlers with auto-DI:
+    /// Route.post "/todos" (fun (store: ITodoStore) (req: Request) -> task {
+    ///     match! Schema.parseRequest createTodoSchema req with
+    ///     | Ok todo -> ...
+    ///     | Error errors -> ...
+    /// })
+    let parseRequest (schema: Schema<'T>) (req: Request) : System.Threading.Tasks.Task<Result<'T, string list>> = task {
+        try
+            let reader = req.Raw.Request.BodyReader
+            let mutable buffer = Buffers.ReadOnlySequence<byte>.Empty
+            let mutable isDone = false
+            while not isDone do
+                let! readResult = reader.ReadAsync()
+                buffer <- readResult.Buffer
+                if readResult.IsCompleted then
+                    isDone <- true
+                else
+                    reader.AdvanceTo(buffer.Start, buffer.End)
+            let result = schema.ParseBuffer buffer
+            reader.AdvanceTo(buffer.End)
+            return result
+        with ex ->
+            return Error [$"invalid JSON: {ex.Message}"]
+    }
+
     // --- JSON Schema generation ---
 
     let toJsonSchema (schema: Schema<'T>) : string =
