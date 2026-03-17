@@ -4,6 +4,8 @@ open System.Net.Http
 open System.Threading
 open System.Threading.Tasks
 open BenchmarkDotNet.Attributes
+open BenchmarkDotNet.Configs
+open BenchmarkDotNet.Jobs
 open BenchmarkDotNet.Running
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
@@ -12,6 +14,16 @@ open Microsoft.AspNetCore.Hosting.Server.Features
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Fire
+
+[<Sealed>]
+type BenchmarkConfig() as this =
+    inherit ManualConfig()
+
+    do
+        this.AddJob(Job.ShortRun.AsDefault()) |> ignore
+        this.WithOption(ConfigOptions.JoinSummary, true) |> ignore
+        this.WithOption(ConfigOptions.DisableParallelBuild, true) |> ignore
+        this.WithBuildTimeout(TimeSpan.FromMinutes(5.0)) |> ignore
 
 [<MemoryDiagnoser>]
 type PlainTextBenchmark() =
@@ -249,20 +261,25 @@ type MiddlewareBenchmark() =
 
     [<Benchmark(Description = "Fire: middleware + JSON")>]
     member _.FireMiddleware() = task {
-        let! response = client.GetStringAsync($"http://127.0.0.1:{firePort}/api/data")
-        return response
+        use! response = client.GetAsync($"http://127.0.0.1:{firePort}/api/data")
+        if not (response.Headers.Contains("X-Request-Id")) then
+            invalidOp "Fire middleware benchmark expected X-Request-Id header"
+        return! response.Content.ReadAsStringAsync()
     }
 
     [<Benchmark(Description = "ASP.NET Core: middleware + JSON", Baseline = true)>]
     member _.AspNetMiddleware() = task {
-        let! response = client.GetStringAsync($"http://127.0.0.1:{aspnetPort}/api/data")
-        return response
+        use! response = client.GetAsync($"http://127.0.0.1:{aspnetPort}/api/data")
+        if not (response.Headers.Contains("X-Request-Id")) then
+            invalidOp "ASP.NET Core middleware benchmark expected X-Request-Id header"
+        return! response.Content.ReadAsStringAsync()
     }
 
 [<EntryPoint>]
 let main args =
-    BenchmarkRunner.Run<PlainTextBenchmark>() |> ignore
-    BenchmarkRunner.Run<JsonBenchmark>() |> ignore
-    BenchmarkRunner.Run<RouteParamBenchmark>() |> ignore
-    BenchmarkRunner.Run<MiddlewareBenchmark>() |> ignore
+    let config = BenchmarkConfig()
+    BenchmarkSwitcher
+        .FromAssembly(typeof<PlainTextBenchmark>.Assembly)
+        .RunAllJoined(config, args)
+    |> ignore
     0
