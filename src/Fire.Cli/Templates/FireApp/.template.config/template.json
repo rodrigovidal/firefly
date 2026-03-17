@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Rodrigo Vidal",
+  "classifications": [ "Web", "F#", "Fire" ],
+  "name": "Fire App",
+  "identity": "Fire.App",
+  "shortName": "fire",
+  "sourceName": "FireApp",
+  "preferNameDirectory": true,
+  "symbols": {
+    "name": {
+      "type": "parameter",
+      "datatype": "string",
+      "replaces": "FireApp",
+      "defaultValue": "FireApp"
+    }
+  }
+}

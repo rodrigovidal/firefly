@@ -1,0 +1,21 @@
+namespace FireApp.Layouts
+
+module RootLayout =
+
+    let render (title: string) (content: string) =
+        $"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>{title}</title>
+          <link rel="stylesheet" href="/assets/css/app.css" />
+        </head>
+        <body>
+          <main class="shell">
+            {content}
+          </main>
+        </body>
+        </html>
+        """

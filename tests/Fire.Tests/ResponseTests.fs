@@ -18,6 +18,13 @@ let ``Response.text sets Text body`` () =
     r.Body |> should equal (Text "hello")
 
 [<Fact>]
+let ``Response.html sets HTML content type`` () =
+    let r = Response.html "<h1>hello</h1>"
+    r.Status |> should equal 200
+    r.Body |> should equal (Text "<h1>hello</h1>")
+    r.Headers |> should contain ("Content-Type", "text/html; charset=utf-8")
+
+[<Fact>]
 let ``Response.json serializes to UTF-8 bytes`` () =
     let r = Response.json {| name = "fire" |}
     r.Status |> should equal 200

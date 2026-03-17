@@ -13,6 +13,7 @@ open Microsoft.AspNetCore.Hosting.Server
 open Microsoft.AspNetCore.Hosting.Server.Features
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open Fire
 
 [<Sealed>]
@@ -20,11 +21,21 @@ type BenchmarkConfig() as this =
     inherit ManualConfig()
 
     do
-        this.AddJob(Job.ShortRun.AsDefault()) |> ignore
+        let job =
+            Job.ShortRun
+                .AsDefault()
+                .WithMsBuildArguments([| "/p:NuGetAudit=false" |])
+        this.BuildTimeout <- TimeSpan.FromMinutes(5.0)
+        this.AddJob(job) |> ignore
         this.WithOption(ConfigOptions.JoinSummary, true) |> ignore
         this.WithOption(ConfigOptions.DisableParallelBuild, true) |> ignore
-        this.WithBuildTimeout(TimeSpan.FromMinutes(5.0)) |> ignore
 
+let configureAspNetBuilder (builder: WebApplicationBuilder) =
+    builder.Logging.ClearProviders() |> ignore
+    builder.Logging.SetMinimumLevel(LogLevel.None) |> ignore
+    builder
+
+[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type PlainTextBenchmark() =
     let mutable firePort = 0
@@ -47,7 +58,7 @@ type PlainTextBenchmark() =
         fireStop <- stop
 
         // ASP.NET Core minimal API server
-        let builder = WebApplication.CreateBuilder()
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(IPAddress.Loopback, 0)
         ) |> ignore
@@ -80,6 +91,7 @@ type PlainTextBenchmark() =
         return response
     }
 
+[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type JsonBenchmark() =
     let mutable firePort = 0
@@ -104,7 +116,7 @@ type JsonBenchmark() =
         fireStop <- stop
 
         // ASP.NET Core minimal API server
-        let builder = WebApplication.CreateBuilder()
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(IPAddress.Loopback, 0)
         ) |> ignore
@@ -139,6 +151,7 @@ type JsonBenchmark() =
         return response
     }
 
+[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type RouteParamBenchmark() =
     let mutable firePort = 0
@@ -163,7 +176,7 @@ type RouteParamBenchmark() =
         fireStop <- stop
 
         // ASP.NET Core minimal API server
-        let builder = WebApplication.CreateBuilder()
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(IPAddress.Loopback, 0)
         ) |> ignore
@@ -198,6 +211,7 @@ type RouteParamBenchmark() =
         return response
     }
 
+[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type MiddlewareBenchmark() =
     let mutable firePort = 0
@@ -230,7 +244,7 @@ type MiddlewareBenchmark() =
         fireStop <- stop
 
         // ASP.NET Core minimal API with middleware
-        let builder = WebApplication.CreateBuilder()
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(IPAddress.Loopback, 0)
         ) |> ignore

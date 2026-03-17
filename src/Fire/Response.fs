@@ -26,6 +26,7 @@ module Response =
     let stream s = { ok with Body = Stream s }
     let status code r = { r with Status = code }
     let header key value r = { r with Headers = (key, value) :: r.Headers }
+    let html s = text s |> header "Content-Type" "text/html; charset=utf-8"
 
     let cookie name value r =
         r |> header "Set-Cookie" $"{name}={value}"

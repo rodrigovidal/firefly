@@ -151,6 +151,7 @@ let timing : Middleware =
 
 ```fsharp
 Response.text "hello"
+Response.html "<h1>hello</h1>"
 Response.json {| name = "fire" |}
 Response.stream fileStream
 Response.ok |> Response.status 201
@@ -215,6 +216,36 @@ do! TestClient.stop client
 ```
 
 `TestClient.withHeader` adds default headers (e.g., auth tokens) to all requests.
+
+### Developer Experience
+
+Fire now ships the first pieces of an opinionated Phoenix-style dev loop:
+
+```fsharp
+let config =
+    App.defaults
+    |> App.middleware RequestId.middleware
+    |> App.middleware CorrelationId.middleware
+    |> App.onError DevErrorPage.handler
+```
+
+`DevErrorPage.handler` returns a structured HTML error page in development with request metadata, route params, request ID, correlation ID, and stack trace.
+
+The repo also includes `Fire.Cli` with two workflow commands:
+
+```bash
+dotnet run --project src/Fire.Cli/Fire.Cli.fsproj -- new MyApp
+fire dev --project src/MyApp/MyApp.fsproj
+```
+
+`fire new` generates an opinionated app layout with:
+
+- `App.fs`, `Endpoint.fs`, `Router.fs`
+- `Controllers/`, `Views/`, `Components/`, `Layouts/`
+- `Assets/`, `Static/`, `Config/`
+- `tests/<App>.Tests` with fixtures and smoke tests
+
+`fire dev` wraps `dotnet watch run` and the scaffold includes watch items for source, assets, and tests.
 
 ## Examples
 

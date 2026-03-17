@@ -1,5 +1,17 @@
 # Fire — Product Backlog
 
+## Current Priority: Phoenix-Style DX
+
+Fire should move from "minimal API toolkit" toward an opinionated web framework with a golden path. The next milestone after the view layer is a cohesive dev loop that makes local development feel fast, structured, and guided.
+
+Detailed plan: `docs/plans/2026-03-17-phoenix-dev-loop-plan.md`
+
+- [ ] View engine — first-party server-rendered HTML with layouts, views, components, forms, and optional client hydration
+- [ ] App scaffold + generators — ``dotnet new fire`` plus `fire new`, `fire gen html`, `fire gen json`, and shared conventions
+- [ ] Hot reload / live reload — code reload plus browser refresh for templates, static assets, and route changes
+- [x] Dev error page — rich diagnostics in development, safe fallback in production
+- [x] Opinionated app structure — `App.fs`, router scopes/pipelines, `Controllers`, `Views`, `Components`, `Layouts`, `Static`, `Assets`, `Config`, and test fixtures
+
 ## Tier 1: Essential for any real API
 
 - [x] POST/PUT body parsing — `req.Form()`, `req.Text()` beyond just `req.Json<'T>()`
@@ -37,14 +49,16 @@
 
 - [ ] WebSockets — ergonomic helpers over the `Raw` escape hatch
 - [ ] Server-Sent Events (SSE) — one-way streaming for live updates
-- [ ] View engine — server HTML rendering + React client hydration + TanStack Query
+- [ ] View engine — first-party SSR HTML with layouts, views, components, forms, and optional client hydration
 - [ ] Streaming responses — `Response.streamJson` for large datasets, NDJSON
 
 ## Tier 6: Developer Experience
 
-- [ ] `dotnet new fire` template — scaffold a new Fire project
-- [ ] Hot reload / watch mode — `dotnet watch` integration with auto-restart
-- [ ] Dev error page — show stack traces in dev, hide in prod
+- [x] `dotnet new fire` template — scaffold a new Fire project with the opinionated Fire structure
+- [ ] Generators — `fire new`, `fire gen html`, `fire gen json`, shared naming conventions
+- [x] Hot reload / watch mode — `fire dev` wraps `dotnet watch run` with Fire’s scaffolded watch layout
+- [x] Dev error page — show stack traces in dev, hide in prod
+- [x] Opinionated project structure — `App.fs`, router scopes/pipelines, `Controllers`, `Views`, `Components`, `Layouts`, `Static`, `Assets`, `Config`, tests/fixtures
 - [x] Content negotiation middleware — `Negotiate.middleware` returns 406 for unsupported types
 - [x] Response compression — `Compress.gzip` / `Compress.brotli` / `Compress.auto`
 - [x] Request ID middleware — `RequestId.middleware` adds X-Request-Id

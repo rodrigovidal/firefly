@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup>
+    <Watch Include="src\**\*" />
+    <Watch Include="tests\**\*" />
+  </ItemGroup>
+</Project>

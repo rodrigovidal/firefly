@@ -33,6 +33,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "todo-api-db", "examples\tod
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "todo-api-db.tests", "examples\todo-api-db.tests\todo-api-db.tests.fsproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fire.Cli", "src\Fire.Cli\Fire.Cli.fsproj", "{CA68BE80-4811-4F37-A4FE-C18BB068F945}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -175,6 +177,18 @@ Global
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|x64.Build.0 = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|x86.ActiveCfg = Release|Any CPU
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901}.Release|x86.Build.0 = Release|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Debug|x64.Build.0 = Debug|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Debug|x86.Build.0 = Debug|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Release|x64.ActiveCfg = Release|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Release|x64.Build.0 = Release|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Release|x86.ActiveCfg = Release|Any CPU
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -191,5 +205,6 @@ Global
 		{DBB6B13A-5D21-4CE2-853A-82215AE58D6F} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{B2C3D4E5-F6A7-8901-BCDE-F12345678901} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{CA68BE80-4811-4F37-A4FE-C18BB068F945} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
