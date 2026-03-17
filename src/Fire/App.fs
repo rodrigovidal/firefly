@@ -1,5 +1,6 @@
 namespace Fire
 
+open System
 open System.Collections.Generic
 open System.Net
 open System.Threading
@@ -18,6 +19,7 @@ type FireConfig = {
     OnError: (exn -> Request -> Task<Response>) option
     NotFound: (Request -> Task<Response>) option
     Middlewares: Middleware list
+    ShutdownTimeout: TimeSpan option
 }
 
 [<RequireQualifiedAccess>]
@@ -29,6 +31,7 @@ module App =
         OnError = None
         NotFound = None
         Middlewares = []
+        ShutdownTimeout = None
     }
 
     let port p config = { config with Port = p }
@@ -36,6 +39,7 @@ module App =
     let onError handler config = { config with OnError = Some handler }
     let notFound handler config = { config with NotFound = Some handler }
     let middleware mw (config: FireConfig) = { config with Middlewares = config.Middlewares @ [mw] }
+    let shutdownTimeout ts config = { config with ShutdownTimeout = Some ts }
 
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
@@ -108,6 +112,12 @@ module App =
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(resolveHost config.Host, config.Port)
         ) |> ignore
+        match config.ShutdownTimeout with
+        | Some ts ->
+            builder.Services.Configure<HostOptions>(fun (opts: HostOptions) ->
+                opts.ShutdownTimeout <- ts
+            ) |> ignore
+        | None -> ()
         let app = builder.Build()
         (app :> IApplicationBuilder).Run(RequestDelegate(fun ctx -> handleRequest trie config ctx))
         (app :> IHost).RunAsync(ct)
@@ -120,6 +130,12 @@ module App =
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(System.Net.IPAddress.Loopback, 0)
         ) |> ignore
+        match config.ShutdownTimeout with
+        | Some ts ->
+            builder.Services.Configure<HostOptions>(fun (opts: HostOptions) ->
+                opts.ShutdownTimeout <- ts
+            ) |> ignore
+        | None -> ()
         let app = builder.Build()
         (app :> IApplicationBuilder).Run(RequestDelegate(fun ctx -> handleRequest trie config ctx))
         do! app.StartAsync(ct)

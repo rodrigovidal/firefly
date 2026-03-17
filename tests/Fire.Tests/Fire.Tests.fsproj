@@ -24,6 +24,7 @@
     <Compile Include="WildcardTests.fs" />
     <Compile Include="RouteTests.fs" />
     <Compile Include="AppTests.fs" />
+    <Compile Include="ShutdownTests.fs" />
     <Compile Include="CorsTests.fs" />
     <Compile Include="LogTests.fs" />
     <Compile Include="StaticTests.fs" />
