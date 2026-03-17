@@ -8,3 +8,5 @@ obj/
 .vscode/
 *.DotSettings.user
 BenchmarkDotNet.Artifacts/
+coverage/
+TestResults/
