@@ -45,18 +45,18 @@
 - [ ] `dotnet new fire` template — scaffold a new Fire project
 - [ ] Hot reload / watch mode — `dotnet watch` integration with auto-restart
 - [ ] Dev error page — show stack traces in dev, hide in prod
-- [ ] Content negotiation middleware — auto-select JSON/XML/text based on Accept header
-- [ ] Response compression — gzip/brotli middleware
-- [ ] Request ID middleware — `X-Request-Id` for tracing
-- [ ] Health checks — `/health` with customizable checks (db, disk, etc.)
+- [x] Content negotiation middleware — `Negotiate.middleware` returns 406 for unsupported types
+- [x] Response compression — `Compress.gzip` / `Compress.brotli` / `Compress.auto`
+- [x] Request ID middleware — `RequestId.middleware` adds X-Request-Id
+- [x] Health checks — `Health.handler` with customizable checks, 200/503
 
 ## Tier 7: Schema Enhancements
 
-- [ ] `Schema.fromType<'T>` — auto-generate schema from an F# record type
-- [ ] Schema coercion — `"42"` → `42` when field expects int
-- [ ] Schema transforms — `Schema.trim`, `Schema.lowercase` applied during parsing
+- [x] `Schema.fromType<'T>()` — auto-generate schema from F# record type
+- [x] Schema coercion — `"42"` → `42` when field expects int
+- [x] Schema transforms — `Schema.trim`, `Schema.lowercase`, `Schema.uppercase`
 
 ## Tier 8: Performance
 
-- [ ] Object pooling — pool the `obj[]` arrays in schema parser
-- [ ] Source-generated DI — eliminate runtime reflection in HandlerFactory
+- [x] Object pooling — `ArrayPool<obj>` in schema parser
+- [ ] Source-generated DI — requires F# source generator / type provider (future)
