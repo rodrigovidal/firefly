@@ -80,8 +80,18 @@ module App =
         | Some fn -> fn builder.Services
         | None -> ()
 
+    let private isDevelopment () =
+        let env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+        String.Equals(env, "Development", StringComparison.OrdinalIgnoreCase)
+        || String.Equals(env, "dev", StringComparison.OrdinalIgnoreCase)
+
     /// Starts the server. Pass CancellationToken to stop.
+    /// In Development mode, automatically enables live reload (SSE + script injection).
     let run (routes: RouteTable) (config: FireConfig) (ct: CancellationToken) : Task =
+        let devMode = isDevelopment ()
+        let config =
+            if devMode then config |> middleware LiveReload.middleware
+            else config
         let trie = buildTrie routes
         let builder = WebApplication.CreateBuilder()
         builder.WebHost.ConfigureKestrel(fun opts ->
@@ -89,6 +99,9 @@ module App =
         ) |> ignore
         applyConfig builder config
         let app = builder.Build()
+        // In dev mode, register the SSE live reload endpoint
+        if devMode then
+            app.Map("/__fire/livereload", RequestDelegate(LiveReload.endpoint)) |> ignore
         (app :> IApplicationBuilder).Run(RequestDelegate(fun ctx -> handleRequest trie config ctx))
         (app :> IHost).RunAsync(ct)
 

@@ -33,6 +33,7 @@
     <Compile Include="Compress.fs" />
     <Compile Include="RequestId.fs" />
     <Compile Include="CorrelationId.fs" />
+    <Compile Include="LiveReload.fs" />
     <Compile Include="DevErrorPage.fs" />
     <Compile Include="Health.fs" />
     <Compile Include="Cors.fs" />
