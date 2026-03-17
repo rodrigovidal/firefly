@@ -54,4 +54,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.16.0" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Flame\Flame.fsproj" />
+  </ItemGroup>
 </Project>

@@ -58,6 +58,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fire\Fire.fsproj" />
+    <ProjectReference Include="..\..\src\Flame\Flame.fsproj" />
   </ItemGroup>
 
 </Project>
