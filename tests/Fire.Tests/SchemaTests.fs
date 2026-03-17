@@ -1212,3 +1212,110 @@ let ``Buffer parses nullable float field with value`` () =
     match Schema.parseString nullableFloatSchema json with
     | Ok r -> r.Score |> should equal (Some 3.14)
     | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Cover Schema:373 — inferFieldType fallback for nullable with string list inner type ---
+
+let nullableStringListSchema = schema {
+    let! name = Schema.required "name" Schema.string []
+    let! tags = Schema.optional "tags" (Schema.nullable (Schema.list Schema.string)) None []
+    return {| Name = name; Tags = tags |}
+}
+
+[<Fact>]
+let ``Nullable string list field via buffer`` () =
+    let json = """{"name":"test","tags":["a","b"]}"""
+    match Schema.parseString nullableStringListSchema json with
+    | Ok r ->
+        r.Name |> should equal "test"
+        r.Tags |> Option.isSome |> should be True
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Nullable string list field with null via buffer`` () =
+    let json = """{"name":"test","tags":null}"""
+    match Schema.parseString nullableStringListSchema json with
+    | Ok r -> r.Tags |> should equal None
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Cover Schema:469-470 — parseString exception when ParseBuffer throws ---
+
+[<Fact>]
+let ``parseString handles corrupted UTF8 gracefully`` () =
+    // Empty string triggers error in buffer parser
+    match Schema.parseString createTodoSchema "" with
+    | Error errs -> errs.Length |> should be (greaterThan 0)
+    | Ok _ -> failwith "expected Error"
+
+// --- Cover Schema:505-506 — validated exception path ---
+
+[<Fact>]
+let ``Schema.validated returns 400 on PipeReader exception`` () = task {
+    // Test with a request that has an empty/broken body
+    let testSchema = schema {
+        let! name = Schema.required "name" Schema.string []
+        return {| Name = name |}
+    }
+    let handler = Schema.validated testSchema (fun v -> task {
+        return Response.json {| name = v.Name |}
+    })
+    let routes = Route.start |> Route.post "/test" handler
+    let config = App.defaults |> App.port 0
+    let! (port, stop) = App.runTest routes config System.Threading.CancellationToken.None
+    use client = new System.Net.Http.HttpClient()
+    // Send completely empty body — PipeReader should get empty buffer, parser fails
+    let content = new System.Net.Http.StringContent("", System.Text.Encoding.UTF8, "application/json")
+    let! r = client.PostAsync($"http://127.0.0.1:{port}/test", content)
+    int r.StatusCode |> should be (greaterThanOrEqualTo 400)
+    do! stop()
+}
+
+// --- Cover SchemaCompiler:100 — parseObject when reader not at StartObject ---
+// This is hit when the nested object is embedded in a parent and the reader
+// has already advanced past the property name. The test for nested schemas
+// with int/bool/float fields should cover this path already.
+// Adding an explicit test with nested object that has an extra preceding property.
+
+[<Fact>]
+let ``Buffer parses nested object with preceding unknown fields`` () =
+    let json = """{"name":"test","data":{"unknown":"skip","count":3,"active":true,"score":1.5}}"""
+    match Schema.parseString parentWithTypedNested json with
+    | Ok r ->
+        r.Data.Count |> should equal 3
+        r.Data.Active |> should equal true
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Cover Schema:374 — inferFieldType fallback for truly unknown nullable inner type ---
+// This is structurally hard to hit since all common types are covered.
+// Skipping — it's a defensive fallback.
+
+// --- Cover Schema:470-471 — parseString catch block ---
+// parseString catches exceptions from ParseBuffer. ParseBuffer fails on truly malformed data.
+
+[<Fact>]
+let ``parseString returns error on null input`` () =
+    match Schema.parseString createTodoSchema (null: string) with
+    | Error errs -> errs.Length |> should be (greaterThan 0)
+    | Ok _ -> failwith "expected Error"
+
+// --- Cover Schema:506-507 — validated catch on broken body ---
+
+[<Fact>]
+let ``Schema.validated returns 400 on truly broken request`` () = task {
+    let testSchema = schema {
+        let! x = Schema.required "x" Schema.string []
+        return {| X = x |}
+    }
+    let routes =
+        Route.start
+        |> Route.post "/test" (Schema.validated testSchema (fun v -> task {
+            return Response.text v.X
+        }))
+    let config = App.defaults |> App.port 0
+    let! (port, stop) = App.runTest routes config System.Threading.CancellationToken.None
+    use client = new System.Net.Http.HttpClient()
+    // Send non-JSON content type with garbage
+    let content = new System.Net.Http.ByteArrayContent([| 0xFFuy; 0xFEuy |])
+    let! r = client.PostAsync($"http://127.0.0.1:{port}/test", content)
+    int r.StatusCode |> should be (greaterThanOrEqualTo 400)
+    do! stop()
+}

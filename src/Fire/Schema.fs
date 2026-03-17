@@ -370,6 +370,7 @@ module Schema =
                     elif innerType = typeof<int> then SchemaCompiler.FInt
                     elif innerType = typeof<bool> then SchemaCompiler.FBool
                     elif innerType = typeof<float> then SchemaCompiler.FFloat
+                    elif innerType = typeof<string list> then SchemaCompiler.FStringList
                     else SchemaCompiler.FString
                 SchemaCompiler.FNullable inner
             else SchemaCompiler.FString // fallback
