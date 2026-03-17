@@ -32,6 +32,7 @@ jobs:
           dotnet test examples/todo-api.tests --no-build -c Release
           dotnet test examples/blog-api.tests --no-build -c Release
           dotnet test examples/url-shortener.tests --no-build -c Release
+          dotnet test examples/todo-api-db.tests --no-build -c Release
 
       - name: Generate coverage report
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
