@@ -43,6 +43,8 @@ module SchemaCompiler =
         | FInt
         | FBool
         | FFloat
+        | FDateTime
+        | FDateTimeOffset
         | FStringList
         | FNullable of FieldType
         | FNested of CompiledField[] * int[] * (obj[] -> obj)  // fields, paramMapping, constructor
@@ -94,6 +96,18 @@ module SchemaCompiler =
                 | true, n -> box n
                 | false, _ -> failwith "expected number"
             else failwith "expected number"
+        | FDateTime ->
+            if reader.TokenType = JsonTokenType.String then
+                match DateTime.TryParse(reader.GetString()) with
+                | true, dt -> box dt
+                | false, _ -> failwith "expected date/time"
+            else failwith "expected date/time"
+        | FDateTimeOffset ->
+            if reader.TokenType = JsonTokenType.String then
+                match DateTimeOffset.TryParse(reader.GetString()) with
+                | true, dto -> box dto
+                | false, _ -> failwith "expected date/time with offset"
+            else failwith "expected date/time with offset"
         | FStringList ->
             let items = ResizeArray<string>()
             // reader should be at StartArray
@@ -112,6 +126,8 @@ module SchemaCompiler =
                     | FInt -> typeof<int>
                     | FBool -> typeof<bool>
                     | FFloat -> typeof<float>
+                    | FDateTime -> typeof<DateTime>
+                    | FDateTimeOffset -> typeof<DateTimeOffset>
                     | FStringList -> typeof<string list>
                     | _ -> v.GetType()
                 let optionType = typedefof<_ option>.MakeGenericType(innerType)
@@ -167,7 +183,9 @@ module SchemaCompiler =
                                 values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
                                 found.[fieldIdx] <- true
                             with ex ->
-                                errors.Add($"{fields.[fieldIdx].Name}: {ex.Message}")
+                                match fields.[fieldIdx].Type with
+                                | FNested _ -> errors.Add($"{fields.[fieldIdx].Name}.{ex.Message}")
+                                | _ -> errors.Add($"{fields.[fieldIdx].Name}: {ex.Message}")
                         | false, _ ->
                             reader.Read() |> ignore
                             reader.Skip()
@@ -231,21 +249,27 @@ module Schema =
 
     // --- Rules ---
 
-    let minLength (len: int) : Rule = {
-        Apply = fun name v ->
-            let s = v :?> string
-            if s.Length >= len then Ok (box s)
-            else Error $"{name}: must be at least {len} characters"
-        Spec = MinLength len
-    }
+    let private pluralize n word = if n = 1 then word else $"{word}s"
 
-    let maxLength (len: int) : Rule = {
-        Apply = fun name v ->
-            let s = v :?> string
-            if s.Length <= len then Ok (box s)
-            else Error $"{name}: must be at most {len} characters"
-        Spec = MaxLength len
-    }
+    let minLength (len: int) : Rule =
+        let unit = pluralize len "character"
+        {
+            Apply = fun name v ->
+                let s = v :?> string
+                if s.Length >= len then Ok (box s)
+                else Error $"{name}: must be at least {len} {unit}"
+            Spec = MinLength len
+        }
+
+    let maxLength (len: int) : Rule =
+        let unit = pluralize len "character"
+        {
+            Apply = fun name v ->
+                let s = v :?> string
+                if s.Length <= len then Ok (box s)
+                else Error $"{name}: must be at most {len} {unit}"
+            Spec = MaxLength len
+        }
 
     let pattern (regex: string) : Rule = {
         Apply = fun name v ->
@@ -359,6 +383,26 @@ module Schema =
             else Error "expected number"
         with _ -> Error "expected number"
 
+    let dateTime (el: JsonElement) : Result<DateTime, string> =
+        try
+            if el.ValueKind = JsonValueKind.String then
+                match DateTime.TryParse(el.GetString()) with
+                | true, dt -> Ok dt
+                | false, _ -> Error "expected date/time"
+            else
+                Ok (el.GetDateTime())
+        with _ -> Error "expected date/time"
+
+    let dateTimeOffset (el: JsonElement) : Result<DateTimeOffset, string> =
+        try
+            if el.ValueKind = JsonValueKind.String then
+                match DateTimeOffset.TryParse(el.GetString()) with
+                | true, dto -> Ok dto
+                | false, _ -> Error "expected date/time with offset"
+            else
+                Ok (el.GetDateTimeOffset())
+        with _ -> Error "expected date/time with offset"
+
     let list (itemParser: JsonElement -> Result<'T, string>) (el: JsonElement) : Result<'T list, string> =
         try
             let items = el.EnumerateArray() |> Seq.toList
@@ -383,6 +427,9 @@ module Schema =
         let construct (args: obj[]) = ctor.Invoke(args) |> box
         SchemaCompiler.FNested (nestedSchema.CompiledFields, nestedSchema.ParamMapping, construct)
 
+    /// Sentinel prefix used to identify errors from nested schemas
+    let internal nestedErrorSeparator = "\x00NESTED\x00"
+
     /// Creates a nested parser and registers its compiled FieldType for the buffer path.
     /// Usage: Schema.required "address" (Schema.nest addressSchema) []
     let nest (nestedSchema: Schema<'T>) : (JsonElement -> Result<'T, string>) =
@@ -390,7 +437,7 @@ module Schema =
         let parser = fun (el: JsonElement) ->
             match nestedSchema.Parse el with
             | Ok v -> Ok v
-            | Error errs -> Error (errs |> String.concat "; ")
+            | Error errs -> Error (nestedErrorSeparator + (errs |> String.concat nestedErrorSeparator))
         // Register the compiled field type for this specific parser closure
         SchemaCompiler.nestedRegistry.TryAdd(box parser, fieldType) |> ignore
         SchemaCompiler.nestedSpecRegistry.TryAdd(box parser, nestedSchema.Fields) |> ignore
@@ -406,6 +453,8 @@ module Schema =
             elif typeof<'T> = typeof<int> then SchemaCompiler.FInt
             elif typeof<'T> = typeof<bool> then SchemaCompiler.FBool
             elif typeof<'T> = typeof<float> then SchemaCompiler.FFloat
+            elif typeof<'T> = typeof<DateTime> then SchemaCompiler.FDateTime
+            elif typeof<'T> = typeof<DateTimeOffset> then SchemaCompiler.FDateTimeOffset
             elif typeof<'T> = typeof<string list> then SchemaCompiler.FStringList
             elif typeof<'T>.IsGenericType && typeof<'T>.GetGenericTypeDefinition() = typedefof<_ option> then
                 let innerType = typeof<'T>.GetGenericArguments().[0]
@@ -414,12 +463,24 @@ module Schema =
                     elif innerType = typeof<int> then SchemaCompiler.FInt
                     elif innerType = typeof<bool> then SchemaCompiler.FBool
                     elif innerType = typeof<float> then SchemaCompiler.FFloat
+                    elif innerType = typeof<DateTime> then SchemaCompiler.FDateTime
+                    elif innerType = typeof<DateTimeOffset> then SchemaCompiler.FDateTimeOffset
                     elif innerType = typeof<string list> then SchemaCompiler.FStringList
                     else SchemaCompiler.FString
                 SchemaCompiler.FNullable inner
             else SchemaCompiler.FString // fallback
 
     // --- Field builders ---
+
+    /// Converts a parser error string into a list of errors with proper dotted paths for nested schemas.
+    let private formatParserErrors (name: string) (e: string) : string list =
+        if e.StartsWith(nestedErrorSeparator) then
+            // Nested schema errors — split and prefix each with parent name + "."
+            e.Split(nestedErrorSeparator, StringSplitOptions.RemoveEmptyEntries)
+            |> Array.toList
+            |> List.map (fun err -> $"{name}.{err}")
+        else
+            [$"{name}: {e}"]
 
     let required (name: string) (parser: JsonElement -> Result<'T, string>) (rules: Rule list) : SchemaField<'T> =
         let children =
@@ -457,7 +518,7 @@ module Schema =
                         match applyRules name rules (box value) with
                         | Ok transformed -> Ok (transformed :?> 'T)
                         | Error errs -> Error errs
-                    | Error e -> Error [$"{name}: {e}"]
+                    | Error e -> Error (formatParserErrors name e)
                 | _ -> Error [$"{name} is required"]
         }
 
@@ -497,9 +558,17 @@ module Schema =
                         match applyRules name rules (box value) with
                         | Ok transformed -> Ok (transformed :?> 'T)
                         | Error errs -> Error errs
-                    | Error e -> Error [$"{name}: {e}"]
+                    | Error e -> Error (formatParserErrors name e)
                 | _ -> Ok defaultValue
         }
+
+    // --- Shorthand field builders (no rules) ---
+
+    let req (name: string) (parser: JsonElement -> Result<'T, string>) : SchemaField<'T> =
+        required name parser []
+
+    let opt (name: string) (parser: JsonElement -> Result<'T, string>) (defaultValue: 'T) : SchemaField<'T> =
+        optional name parser defaultValue []
 
     // --- Parse from various sources ---
 
@@ -664,6 +733,10 @@ module Schema =
             SchemaCompiler.FBool
         elif propType = typeof<float> then
             SchemaCompiler.FFloat
+        elif propType = typeof<DateTime> then
+            SchemaCompiler.FDateTime
+        elif propType = typeof<DateTimeOffset> then
+            SchemaCompiler.FDateTimeOffset
         elif propType = typeof<string list> then
             SchemaCompiler.FStringList
         else
@@ -680,6 +753,8 @@ module Schema =
             "boolean"
         elif propType = typeof<float> then
             "number"
+        elif propType = typeof<DateTime> || propType = typeof<DateTimeOffset> then
+            "string"
         elif propType = typeof<string list> then
             "array"
         else

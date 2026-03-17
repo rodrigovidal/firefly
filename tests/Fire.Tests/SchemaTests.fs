@@ -1824,3 +1824,52 @@ let ``SchemaCompiler handles nullable nested values`` () =
     reader.Read() |> ignore
     let value = SchemaCompiler.readValue (SchemaCompiler.FNullable (SchemaCompiler.FNested([||], [||], ctor))) &reader
     (value :?> string option) |> should equal (Some "nested")
+
+[<Fact>]
+let ``Fire re-exports Schema.req`` () =
+    let s = schema {
+        let! name = Schema.req "name" Schema.string
+        return {| Name = name |}
+    }
+    match Schema.parseString s """{"name":"test"}""" with
+    | Ok r -> r.Name |> should equal "test"
+    | Error _ -> failwith "expected Ok"
+
+[<Fact>]
+let ``Fire re-exports Schema.opt`` () =
+    let s = schema {
+        let! name = Schema.req "name" Schema.string
+        let! age = Schema.opt "age" Schema.int 0
+        return {| Name = name; Age = age |}
+    }
+    match Schema.parseString s """{"name":"test"}""" with
+    | Ok r -> r.Age |> should equal 0
+    | Error _ -> failwith "expected Ok"
+
+[<Fact>]
+let ``Fire re-exports Schema.dateTime`` () =
+    let s = schema {
+        let! date = Schema.req "date" Schema.dateTime
+        return {| Date = date |}
+    }
+    match Schema.parseString s """{"date":"2026-03-17T12:00:00"}""" with
+    | Ok r -> r.Date.Year |> should equal 2026
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Nested errors have dotted paths via Fire`` () =
+    let address = schema {
+        let! street = Schema.required "street" Schema.string [ Schema.minLength 1 ]
+        let! zip = Schema.required "zip" Schema.string [ Schema.pattern @"^\d{5}$" ]
+        return {| Street = street; Zip = zip |}
+    }
+    let user = schema {
+        let! name = Schema.req "name" Schema.string
+        let! address = Schema.required "address" (Schema.nest address) []
+        return {| Name = name; Address = address |}
+    }
+    use doc = JsonDocument.Parse("""{"name":"Alice","address":{"street":"","zip":"bad"}}""")
+    match Schema.parseJson user doc.RootElement with
+    | Error errs ->
+        errs |> List.exists (fun e -> e.Contains("address.")) |> should be True
+    | Ok _ -> failwith "expected Error"

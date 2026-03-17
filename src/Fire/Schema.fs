@@ -15,10 +15,14 @@ module Schema =
     // Re-export all Flame.Schema functions so Fire users don't need to open Flame
     let required name parser rules = Flame.Schema.required name parser rules
     let optional name parser defaultValue rules = Flame.Schema.optional name parser defaultValue rules
+    let req name parser = Flame.Schema.req name parser
+    let opt name parser defaultValue = Flame.Schema.opt name parser defaultValue
     let string = Flame.Schema.string
     let int = Flame.Schema.int
     let bool = Flame.Schema.bool
     let float = Flame.Schema.float
+    let dateTime = Flame.Schema.dateTime
+    let dateTimeOffset = Flame.Schema.dateTimeOffset
     let list parser = Flame.Schema.list parser
     let nullable parser = Flame.Schema.nullable parser
     let nest schema = Flame.Schema.nest schema
