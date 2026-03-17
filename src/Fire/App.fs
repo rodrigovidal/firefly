@@ -20,6 +20,7 @@ type FireConfig = {
     NotFound: (Request -> Task<Response>) option
     Middlewares: Middleware list
     ShutdownTimeout: TimeSpan option
+    DependencyInjection: (IServiceCollection -> unit) option
 }
 
 [<RequireQualifiedAccess>]
@@ -32,6 +33,7 @@ module App =
         NotFound = None
         Middlewares = []
         ShutdownTimeout = None
+        DependencyInjection = None
     }
 
     let port p config = { config with Port = p }
@@ -40,6 +42,7 @@ module App =
     let notFound handler config = { config with NotFound = Some handler }
     let middleware mw (config: FireConfig) = { config with Middlewares = config.Middlewares @ [mw] }
     let shutdownTimeout ts config = { config with ShutdownTimeout = Some ts }
+    let dependencyInjection fn config = { config with DependencyInjection = Some fn }
 
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
@@ -108,6 +111,17 @@ module App =
         if host = "localhost" then IPAddress.Loopback
         else IPAddress.Parse(host)
 
+    let private applyConfig (builder: WebApplicationBuilder) (config: FireConfig) =
+        match config.ShutdownTimeout with
+        | Some ts ->
+            builder.Services.Configure<HostOptions>(fun (opts: HostOptions) ->
+                opts.ShutdownTimeout <- ts
+            ) |> ignore
+        | None -> ()
+        match config.DependencyInjection with
+        | Some fn -> fn builder.Services
+        | None -> ()
+
     /// Starts the server. Pass CancellationToken to stop.
     let run (routes: RouteTable) (config: FireConfig) (ct: CancellationToken) : Task =
         let trie = buildTrie routes
@@ -115,12 +129,7 @@ module App =
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(resolveHost config.Host, config.Port)
         ) |> ignore
-        match config.ShutdownTimeout with
-        | Some ts ->
-            builder.Services.Configure<HostOptions>(fun (opts: HostOptions) ->
-                opts.ShutdownTimeout <- ts
-            ) |> ignore
-        | None -> ()
+        applyConfig builder config
         let app = builder.Build()
         (app :> IApplicationBuilder).Run(RequestDelegate(fun ctx -> handleRequest trie config ctx))
         (app :> IHost).RunAsync(ct)
@@ -133,12 +142,7 @@ module App =
         builder.WebHost.ConfigureKestrel(fun opts ->
             opts.Listen(System.Net.IPAddress.Loopback, 0)
         ) |> ignore
-        match config.ShutdownTimeout with
-        | Some ts ->
-            builder.Services.Configure<HostOptions>(fun (opts: HostOptions) ->
-                opts.ShutdownTimeout <- ts
-            ) |> ignore
-        | None -> ()
+        applyConfig builder config
         let app = builder.Build()
         (app :> IApplicationBuilder).Run(RequestDelegate(fun ctx -> handleRequest trie config ctx))
         do! app.StartAsync(ct)

@@ -2,6 +2,7 @@ module Fire.Tests.AppTests
 
 open System.Net.Http
 open System.Threading
+open Microsoft.Extensions.DependencyInjection
 open Xunit
 open FsUnit.Xunit
 open Fire
@@ -172,6 +173,42 @@ let ``App calls custom not-found handler`` () = task {
 
     resp.StatusCode |> should equal System.Net.HttpStatusCode.NotFound
     body |> should equal "custom 404"
+
+    do! stop ()
+}
+
+// --- Dependency Injection ---
+
+type IGreeter =
+    abstract Greet: string -> string
+
+type Greeter() =
+    interface IGreeter with
+        member _.Greet name = $"Hello, {name}!"
+
+[<Fact>]
+let ``App.dependencyInjection registers and resolves services`` () = task {
+    let routes =
+        Route.start
+        |> Route.get "/greet/:name" (fun req -> task {
+            let greeter = req.Service<IGreeter>()
+            return Response.text (greeter.Greet(req.Params.["name"]))
+        })
+
+    let config =
+        App.defaults
+        |> App.port 0
+        |> App.dependencyInjection (fun services ->
+            services.AddSingleton<IGreeter, Greeter>() |> ignore
+        )
+
+    let! (port, stop) = App.runTest routes config CancellationToken.None
+    use client = new HttpClient()
+    let! resp = client.GetAsync($"http://127.0.0.1:{port}/greet/Fire")
+    let! body = resp.Content.ReadAsStringAsync()
+
+    resp.StatusCode |> should equal System.Net.HttpStatusCode.OK
+    body |> should equal "Hello, Fire!"
 
     do! stop ()
 }
