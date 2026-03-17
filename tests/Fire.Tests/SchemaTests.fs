@@ -1319,3 +1319,136 @@ let ``Schema.validated returns 400 on truly broken request`` () = task {
     int r.StatusCode |> should be (greaterThanOrEqualTo 400)
     do! stop()
 }
+
+// --- Schema.fromType tests ---
+
+type SimpleTodo = { Title: string; Completed: bool }
+type OptionalTodo = { Title: string; Notes: string option }
+
+[<Fact>]
+let ``fromType creates schema from record`` () =
+    let s = Schema.fromType<SimpleTodo> ()
+    let json = """{"Title":"test","Completed":true}"""
+    match Schema.parseString s json with
+    | Ok todo ->
+        todo.Title |> should equal "test"
+        todo.Completed |> should equal true
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``fromType handles optional fields`` () =
+    let s = Schema.fromType<OptionalTodo> ()
+    let json = """{"Title":"test"}"""
+    match Schema.parseString s json with
+    | Ok todo ->
+        todo.Title |> should equal "test"
+        todo.Notes |> should equal None
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``fromType rejects missing required fields`` () =
+    let s = Schema.fromType<SimpleTodo> ()
+    match Schema.parseString s """{}""" with
+    | Error errs -> errs.Length |> should be (greaterThan 0)
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``fromType generates JSON Schema`` () =
+    let s = Schema.fromType<SimpleTodo> ()
+    let jsonSchema = Schema.toJsonSchema s
+    jsonSchema |> should haveSubstring "Title"
+    jsonSchema |> should haveSubstring "Completed"
+
+// --- Schema coercion tests ---
+
+[<Fact>]
+let ``Schema coerces string to int`` () =
+    let s = schema {
+        let! age = Schema.required "age" Schema.int []
+        return {| Age = age |}
+    }
+    let json = """{"age":"42"}"""
+    match Schema.parseString s json with
+    | Ok r -> r.Age |> should equal 42
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Schema coerces string to bool`` () =
+    let s = schema {
+        let! active = Schema.required "active" Schema.bool []
+        return {| Active = active |}
+    }
+    let json = """{"active":"true"}"""
+    match Schema.parseString s json with
+    | Ok r -> r.Active |> should equal true
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Schema coerces string to float`` () =
+    let s = schema {
+        let! score = Schema.required "score" Schema.float []
+        return {| Score = score |}
+    }
+    let json = """{"score":"3.14"}"""
+    match Schema.parseString s json with
+    | Ok r -> r.Score |> should be (greaterThan 3.0)
+    | Error e -> failwith $"expected Ok, got {e}"
+
+// --- Schema transform tests ---
+
+[<Fact>]
+let ``Schema.trim removes whitespace`` () =
+    let s = schema {
+        let! name = Schema.required "name" Schema.string [ Schema.trim ]
+        return {| Name = name |}
+    }
+    let json = """{"name":"  Alice  "}"""
+    match Schema.parseString s json with
+    | Ok r -> r.Name |> should equal "Alice"
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Schema.lowercase lowercases strings`` () =
+    let s = schema {
+        let! email = Schema.required "email" Schema.string [ Schema.lowercase ]
+        return {| Email = email |}
+    }
+    let json = """{"email":"ALICE@TEST.COM"}"""
+    match Schema.parseString s json with
+    | Ok r -> r.Email |> should equal "alice@test.com"
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Schema.uppercase uppercases strings`` () =
+    let s = schema {
+        let! code = Schema.required "code" Schema.string [ Schema.uppercase ]
+        return {| Code = code |}
+    }
+    let json = """{"code":"abc"}"""
+    match Schema.parseString s json with
+    | Ok r -> r.Code |> should equal "ABC"
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Schema transforms + validation compose`` () =
+    let s = schema {
+        let! name = Schema.required "name" Schema.string [ Schema.trim; Schema.minLength 3 ]
+        return {| Name = name |}
+    }
+    // "  Al  " trims to "Al" which is < 3 chars
+    let json = """{"name":"  Al  "}"""
+    match Schema.parseString s json with
+    | Error errs -> errs |> List.exists (fun e -> e.Contains("at least 3")) |> should be True
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema transforms run before validation`` () =
+    let s = schema {
+        let! name = Schema.required "name" Schema.string [ Schema.trim; Schema.minLength 5 ]
+        return {| Name = name |}
+    }
+    // "  Hello  " trims to "Hello" which is exactly 5 chars
+    let json = """{"name":"  Hello  "}"""
+    match Schema.parseString s json with
+    | Ok r -> r.Name |> should equal "Hello"
+    | Error e -> failwith $"expected Ok, got {e}"

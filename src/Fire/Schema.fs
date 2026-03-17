@@ -28,9 +28,9 @@ type FieldSpec = {
     Children: FieldSpec list     // for nested objects
 }
 
-// A rule validates a parsed value
+// A rule validates (and optionally transforms) a parsed value
 type Rule = {
-    Check: string -> obj -> Result<unit, string>  // fieldName -> value -> result
+    Apply: string -> obj -> Result<obj, string>  // fieldName -> value -> Result<transformedValue, error>
     Spec: RuleSpec
 }
 
@@ -70,9 +70,30 @@ module SchemaCompiler =
     let rec readValue (fieldType: FieldType) (reader: byref<Utf8JsonReader>) : obj =
         match fieldType with
         | FString -> box (reader.GetString())
-        | FInt -> box (reader.GetInt32())
-        | FBool -> box (reader.GetBoolean())
-        | FFloat -> box (reader.GetDouble())
+        | FInt ->
+            if reader.TokenType = JsonTokenType.Number then
+                box (reader.GetInt32())
+            elif reader.TokenType = JsonTokenType.String then
+                match System.Int32.TryParse(reader.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture) with
+                | true, n -> box n
+                | false, _ -> failwith "expected integer"
+            else failwith "expected integer"
+        | FBool ->
+            if reader.TokenType = JsonTokenType.True || reader.TokenType = JsonTokenType.False then
+                box (reader.GetBoolean())
+            elif reader.TokenType = JsonTokenType.String then
+                match System.Boolean.TryParse(reader.GetString()) with
+                | true, b -> box b
+                | false, _ -> failwith "expected boolean"
+            else failwith "expected boolean"
+        | FFloat ->
+            if reader.TokenType = JsonTokenType.Number then
+                box (reader.GetDouble())
+            elif reader.TokenType = JsonTokenType.String then
+                match System.Double.TryParse(reader.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture) with
+                | true, n -> box n
+                | false, _ -> failwith "expected number"
+            else failwith "expected number"
         | FStringList ->
             let items = ResizeArray<string>()
             // reader should be at StartArray
@@ -152,7 +173,7 @@ module SchemaCompiler =
                         reader.Read() |> ignore
                         reader.Skip()
 
-        // Check required + defaults + validate rules
+        // Check required + defaults + validate/transform rules
         for i in 0..fields.Length-1 do
             if not found.[i] then
                 if fields.[i].Required then
@@ -160,10 +181,12 @@ module SchemaCompiler =
                 else
                     values.[i] <- fields.[i].DefaultValue
             else
+                let mutable current = values.[i]
                 for rule in fields.[i].Rules do
-                    match rule.Check fields.[i].Name values.[i] with
-                    | Ok () -> ()
+                    match rule.Apply fields.[i].Name current with
+                    | Ok transformed -> current <- transformed
                     | Error e -> errors.Add(e)
+                values.[i] <- current
 
         if errors.Count > 0 then
             Error (errors |> Seq.toList)
@@ -208,74 +231,97 @@ module Schema =
     // --- Rules ---
 
     let minLength (len: int) : Rule = {
-        Check = fun name v ->
-            if (v :?> string).Length >= len then Ok ()
+        Apply = fun name v ->
+            let s = v :?> string
+            if s.Length >= len then Ok (box s)
             else Error $"{name}: must be at least {len} characters"
         Spec = MinLength len
     }
 
     let maxLength (len: int) : Rule = {
-        Check = fun name v ->
-            if (v :?> string).Length <= len then Ok ()
+        Apply = fun name v ->
+            let s = v :?> string
+            if s.Length <= len then Ok (box s)
             else Error $"{name}: must be at most {len} characters"
         Spec = MaxLength len
     }
 
     let pattern (regex: string) : Rule = {
-        Check = fun name v ->
-            if Text.RegularExpressions.Regex.IsMatch(v :?> string, regex) then Ok ()
+        Apply = fun name v ->
+            let s = v :?> string
+            if Text.RegularExpressions.Regex.IsMatch(s, regex) then Ok (box s)
             else Error $"{name}: must match pattern {regex}"
         Spec = Pattern regex
     }
 
     let min (n: float) : Rule = {
-        Check = fun name v ->
+        Apply = fun name v ->
             let d = Convert.ToDouble(v)
-            if d >= n then Ok () else Error $"{name}: must be at least {n}"
+            if d >= n then Ok v else Error $"{name}: must be at least {n}"
         Spec = Min n
     }
 
     let max (n: float) : Rule = {
-        Check = fun name v ->
+        Apply = fun name v ->
             let d = Convert.ToDouble(v)
-            if d <= n then Ok () else Error $"{name}: must be at most {n}"
+            if d <= n then Ok v else Error $"{name}: must be at most {n}"
         Spec = Max n
     }
 
     let email : Rule = {
-        Check = fun name v ->
+        Apply = fun name v ->
             let s = v :?> string
-            if s.Contains("@") && s.Contains(".") then Ok ()
+            if s.Contains("@") && s.Contains(".") then Ok (box s)
             else Error $"{name}: invalid email format"
         Spec = Format "email"
     }
 
     let url : Rule = {
-        Check = fun name v ->
+        Apply = fun name v ->
             let s = v :?> string
-            if s.StartsWith("http://") || s.StartsWith("https://") then Ok ()
+            if s.StartsWith("http://") || s.StartsWith("https://") then Ok (box s)
             else Error $"{name}: invalid URL format"
         Spec = Format "uri"
     }
 
     let enum' (values: string list) : Rule = {
-        Check = fun name v ->
+        Apply = fun name v ->
             let s = v :?> string
-            if values |> List.contains s then Ok ()
+            if values |> List.contains s then Ok (box s)
             else
                 let joined = String.Join(", ", values)
                 Error $"{name}: must be one of {joined}"
         Spec = Enum values
     }
 
+    // --- Transform rules ---
+
+    let trim : Rule = {
+        Apply = fun _name v -> Ok (box ((v :?> string).Trim()))
+        Spec = Format "trimmed"
+    }
+
+    let lowercase : Rule = {
+        Apply = fun _name v -> Ok (box ((v :?> string).ToLowerInvariant()))
+        Spec = Format "lowercase"
+    }
+
+    let uppercase : Rule = {
+        Apply = fun _name v -> Ok (box ((v :?> string).ToUpperInvariant()))
+        Spec = Format "uppercase"
+    }
+
     // --- Apply rules to a parsed value ---
 
-    let private applyRules (name: string) (rules: Rule list) (value: obj) : Result<unit, string list> =
-        let errors = rules |> List.choose (fun r ->
-            match r.Check name value with
-            | Ok () -> None
-            | Error e -> Some e)
-        if errors.IsEmpty then Ok () else Error errors
+    let private applyRules (name: string) (rules: Rule list) (value: obj) : Result<obj, string list> =
+        let mutable current = value
+        let errors = ResizeArray()
+        for rule in rules do
+            match rule.Apply name current with
+            | Ok transformed -> current <- transformed
+            | Error e -> errors.Add(e)
+        if errors.Count > 0 then Error (errors |> Seq.toList)
+        else Ok current
 
     // --- Type parsers ---
 
@@ -283,13 +329,34 @@ module Schema =
         try Ok (el.GetString()) with _ -> Error "expected string"
 
     let int (el: JsonElement) : Result<int, string> =
-        try Ok (el.GetInt32()) with _ -> Error "expected integer"
+        try
+            if el.ValueKind = JsonValueKind.Number then Ok (el.GetInt32())
+            elif el.ValueKind = JsonValueKind.String then
+                match System.Int32.TryParse(el.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
+                | true, n -> Ok n
+                | false, _ -> Error "expected integer"
+            else Error "expected integer"
+        with _ -> Error "expected integer"
 
     let bool (el: JsonElement) : Result<bool, string> =
-        try Ok (el.GetBoolean()) with _ -> Error "expected boolean"
+        try
+            if el.ValueKind = JsonValueKind.True || el.ValueKind = JsonValueKind.False then Ok (el.GetBoolean())
+            elif el.ValueKind = JsonValueKind.String then
+                match System.Boolean.TryParse(el.GetString()) with
+                | true, b -> Ok b
+                | false, _ -> Error "expected boolean"
+            else Error "expected boolean"
+        with _ -> Error "expected boolean"
 
     let float (el: JsonElement) : Result<float, string> =
-        try Ok (el.GetDouble()) with _ -> Error "expected number"
+        try
+            if el.ValueKind = JsonValueKind.Number then Ok (el.GetDouble())
+            elif el.ValueKind = JsonValueKind.String then
+                match System.Double.TryParse(el.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
+                | true, n -> Ok n
+                | false, _ -> Error "expected number"
+            else Error "expected number"
+        with _ -> Error "expected number"
 
     let list (itemParser: JsonElement -> Result<'T, string>) (el: JsonElement) : Result<'T list, string> =
         try
@@ -387,7 +454,7 @@ module Schema =
                     match parser el with
                     | Ok value ->
                         match applyRules name rules (box value) with
-                        | Ok () -> Ok value
+                        | Ok transformed -> Ok (transformed :?> 'T)
                         | Error errs -> Error errs
                     | Error e -> Error [$"{name}: {e}"]
                 | _ -> Error [$"{name} is required"]
@@ -427,7 +494,7 @@ module Schema =
                     match parser el with
                     | Ok value ->
                         match applyRules name rules (box value) with
-                        | Ok () -> Ok value
+                        | Ok transformed -> Ok (transformed :?> 'T)
                         | Error errs -> Error errs
                     | Error e -> Error [$"{name}: {e}"]
                 | _ -> Ok defaultValue
@@ -575,6 +642,156 @@ module Schema =
         writer.WriteEndObject()
         writer.Flush()
         Text.Encoding.UTF8.GetString(stream.ToArray())
+
+    // --- Auto-generate schema from F# record type ---
+
+    let inline fromType<'T> () : Schema<'T> =
+        let t = typeof<'T>
+        let fields = FSharp.Reflection.FSharpType.GetRecordFields(t)
+        let ctor = FSharp.Reflection.FSharpValue.PreComputeRecordConstructor(t)
+
+        // Build compiled fields
+        let compiledFields = fields |> Array.map (fun prop ->
+            let fieldType, isRequired, defaultVal =
+                let propType = prop.PropertyType
+                if propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option> then
+                    let innerType = propType.GetGenericArguments().[0]
+                    let ft =
+                        if innerType = typeof<string> then SchemaCompiler.FString
+                        elif innerType = typeof<int> then SchemaCompiler.FInt
+                        elif innerType = typeof<bool> then SchemaCompiler.FBool
+                        elif innerType = typeof<float> then SchemaCompiler.FFloat
+                        else SchemaCompiler.FString
+                    SchemaCompiler.FNullable ft, false, (box None)
+                else
+                    let ft =
+                        if propType = typeof<string> then SchemaCompiler.FString
+                        elif propType = typeof<int> then SchemaCompiler.FInt
+                        elif propType = typeof<bool> then SchemaCompiler.FBool
+                        elif propType = typeof<float> then SchemaCompiler.FFloat
+                        elif propType = typeof<string list> then SchemaCompiler.FStringList
+                        else SchemaCompiler.FString
+                    ft, true, null
+            {
+                SchemaCompiler.CompiledField.Name = prop.Name
+                SchemaCompiler.CompiledField.Type = fieldType
+                SchemaCompiler.CompiledField.Required = isRequired
+                SchemaCompiler.CompiledField.DefaultValue = defaultVal
+                SchemaCompiler.CompiledField.Rules = []
+            }
+        )
+
+        // Build field index for O(1) lookup
+        let fieldIndex = Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        for i in 0..compiledFields.Length-1 do
+            fieldIndex.[compiledFields.[i].Name] <- i
+
+        // Build param mapping (record constructor param order)
+        let ctorParams = t.GetConstructors().[0].GetParameters()
+        let paramMapping = ctorParams |> Array.map (fun p ->
+            compiledFields |> Array.findIndex (fun f ->
+                String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+
+        let construct (values: obj[]) =
+            let args = paramMapping |> Array.map (fun idx -> values.[idx])
+            ctor args :?> 'T
+
+        // Build JsonElement parser for compat
+        let parseElement (el: JsonElement) : Result<'T, string list> =
+            let errors = ResizeArray<string>()
+            let values = Array.zeroCreate compiledFields.Length
+            for i in 0..compiledFields.Length-1 do
+                let field = compiledFields.[i]
+                match el.TryGetProperty(field.Name) with
+                | true, prop when prop.ValueKind <> JsonValueKind.Null ->
+                    try
+                        values.[i] <-
+                            match field.Type with
+                            | SchemaCompiler.FString -> box (prop.GetString())
+                            | SchemaCompiler.FInt ->
+                                if prop.ValueKind = JsonValueKind.Number then box (prop.GetInt32())
+                                elif prop.ValueKind = JsonValueKind.String then
+                                    match System.Int32.TryParse(prop.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
+                                    | true, n -> box n
+                                    | false, _ -> failwith "expected integer"
+                                else failwith "expected integer"
+                            | SchemaCompiler.FBool ->
+                                if prop.ValueKind = JsonValueKind.True || prop.ValueKind = JsonValueKind.False then box (prop.GetBoolean())
+                                elif prop.ValueKind = JsonValueKind.String then
+                                    match System.Boolean.TryParse(prop.GetString()) with
+                                    | true, b -> box b
+                                    | false, _ -> failwith "expected boolean"
+                                else failwith "expected boolean"
+                            | SchemaCompiler.FFloat ->
+                                if prop.ValueKind = JsonValueKind.Number then box (prop.GetDouble())
+                                elif prop.ValueKind = JsonValueKind.String then
+                                    match System.Double.TryParse(prop.GetString(), Globalization.NumberStyles.Any, Globalization.CultureInfo.InvariantCulture) with
+                                    | true, n -> box n
+                                    | false, _ -> failwith "expected number"
+                                else failwith "expected number"
+                            | SchemaCompiler.FStringList ->
+                                box (prop.EnumerateArray() |> Seq.map (fun e -> e.GetString()) |> Seq.toList)
+                            | SchemaCompiler.FNullable inner ->
+                                let v = match inner with
+                                        | SchemaCompiler.FString -> box (prop.GetString())
+                                        | SchemaCompiler.FInt -> box (prop.GetInt32())
+                                        | SchemaCompiler.FBool -> box (prop.GetBoolean())
+                                        | SchemaCompiler.FFloat -> box (prop.GetDouble())
+                                        | _ -> box (prop.GetString())
+                                let innerType = match inner with
+                                                | SchemaCompiler.FString -> typeof<string>
+                                                | SchemaCompiler.FInt -> typeof<int>
+                                                | SchemaCompiler.FBool -> typeof<bool>
+                                                | SchemaCompiler.FFloat -> typeof<float>
+                                                | _ -> typeof<string>
+                                let optionType = typedefof<_ option>.MakeGenericType(innerType)
+                                let someCase = FSharp.Reflection.FSharpType.GetUnionCases(optionType).[1]
+                                FSharp.Reflection.FSharpValue.MakeUnion(someCase, [| v |])
+                            | _ -> box (prop.GetString())
+                    with ex ->
+                        errors.Add($"{field.Name}: {ex.Message}")
+                | _ ->
+                    if field.Required then errors.Add($"{field.Name} is required")
+                    else values.[i] <- field.DefaultValue
+            if errors.Count > 0 then Error (errors |> Seq.toList)
+            else Ok (construct values)
+
+        // Build FieldSpecs for JSON Schema generation
+        let fieldTypeToString (ft: SchemaCompiler.FieldType) =
+            match ft with
+            | SchemaCompiler.FString -> "string"
+            | SchemaCompiler.FInt -> "integer"
+            | SchemaCompiler.FBool -> "boolean"
+            | SchemaCompiler.FFloat -> "number"
+            | SchemaCompiler.FStringList -> "array"
+            | SchemaCompiler.FNullable inner ->
+                match inner with
+                | SchemaCompiler.FString -> "string"
+                | SchemaCompiler.FInt -> "integer"
+                | SchemaCompiler.FBool -> "boolean"
+                | SchemaCompiler.FFloat -> "number"
+                | _ -> "string"
+            | _ -> "string"
+
+        let fieldSpecs =
+            compiledFields |> Array.map (fun f ->
+                {
+                    FieldSpec.Name = f.Name
+                    FieldSpec.Type = fieldTypeToString f.Type
+                    FieldSpec.Required = f.Required
+                    FieldSpec.Rules = []
+                    FieldSpec.Items = None
+                    FieldSpec.Children = []
+                }
+            ) |> Array.toList
+
+        {
+            Parse = parseElement
+            ParseBuffer = SchemaCompiler.parseFromBuffer compiledFields paramMapping construct fieldIndex
+            Fields = fieldSpecs
+            CompiledFields = compiledFields
+            ParamMapping = paramMapping
+        }
 
 
 type SchemaBuilder() =
