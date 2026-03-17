@@ -122,77 +122,81 @@ module SchemaCompiler =
 
     and parseObject (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> obj) (reader: byref<Utf8JsonReader>) : obj =
         let fieldIndex = buildFieldIndex fields
-        let values = Array.zeroCreate fields.Length
+        let values = ArrayPool<obj>.Shared.Rent(fields.Length)
         let found = Array.zeroCreate<bool> fields.Length
+        try
+            if reader.TokenType <> JsonTokenType.StartObject then
+                reader.Read() |> ignore
 
-        if reader.TokenType <> JsonTokenType.StartObject then
-            reader.Read() |> ignore
-
-        while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
-            if reader.TokenType = JsonTokenType.PropertyName then
-                let propName = reader.GetString()
-                match fieldIndex.TryGetValue(propName) with
-                | true, fieldIdx ->
-                    reader.Read() |> ignore
-                    values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
-                    found.[fieldIdx] <- true
-                | false, _ ->
-                    reader.Read() |> ignore
-                    reader.Skip()
-
-        for i in 0..fields.Length-1 do
-            if not found.[i] && not fields.[i].Required then
-                values.[i] <- fields.[i].DefaultValue
-
-        let args = paramMapping |> Array.map (fun idx -> values.[idx])
-        construct args
-
-    let parseAndValidate (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (fieldIndex: Dictionary<string, int>) (reader: byref<Utf8JsonReader>) : Result<'T, string list> =
-        let values = Array.zeroCreate fields.Length
-        let found = Array.zeroCreate<bool> fields.Length
-        let errors = ResizeArray<string>()
-
-        // Advance to StartObject if needed
-        if reader.TokenType <> JsonTokenType.StartObject then
-            if not (reader.Read()) || reader.TokenType <> JsonTokenType.StartObject then
-                errors.Add("expected JSON object")
-
-        if errors.Count = 0 then
             while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
                 if reader.TokenType = JsonTokenType.PropertyName then
                     let propName = reader.GetString()
                     match fieldIndex.TryGetValue(propName) with
                     | true, fieldIdx ->
                         reader.Read() |> ignore
-                        try
-                            values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
-                            found.[fieldIdx] <- true
-                        with ex ->
-                            errors.Add($"{fields.[fieldIdx].Name}: {ex.Message}")
+                        values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
+                        found.[fieldIdx] <- true
                     | false, _ ->
                         reader.Read() |> ignore
                         reader.Skip()
 
-        // Check required + defaults + validate/transform rules
-        for i in 0..fields.Length-1 do
-            if not found.[i] then
-                if fields.[i].Required then
-                    errors.Add($"{fields.[i].Name} is required")
-                else
+            for i in 0..fields.Length-1 do
+                if not found.[i] && not fields.[i].Required then
                     values.[i] <- fields.[i].DefaultValue
-            else
-                let mutable current = values.[i]
-                for rule in fields.[i].Rules do
-                    match rule.Apply fields.[i].Name current with
-                    | Ok transformed -> current <- transformed
-                    | Error e -> errors.Add(e)
-                values.[i] <- current
 
-        if errors.Count > 0 then
-            Error (errors |> Seq.toList)
-        else
             let args = paramMapping |> Array.map (fun idx -> values.[idx])
-            Ok (construct args)
+            construct args
+        finally
+            ArrayPool<obj>.Shared.Return(values, clearArray = true)
+
+    let parseAndValidate (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (fieldIndex: Dictionary<string, int>) (reader: byref<Utf8JsonReader>) : Result<'T, string list> =
+        let values = ArrayPool<obj>.Shared.Rent(fields.Length)
+        let found = Array.zeroCreate<bool> fields.Length
+        let errors = ResizeArray<string>()
+        try
+            // Advance to StartObject if needed
+            if reader.TokenType <> JsonTokenType.StartObject then
+                if not (reader.Read()) || reader.TokenType <> JsonTokenType.StartObject then
+                    errors.Add("expected JSON object")
+
+            if errors.Count = 0 then
+                while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
+                    if reader.TokenType = JsonTokenType.PropertyName then
+                        let propName = reader.GetString()
+                        match fieldIndex.TryGetValue(propName) with
+                        | true, fieldIdx ->
+                            reader.Read() |> ignore
+                            try
+                                values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
+                                found.[fieldIdx] <- true
+                            with ex ->
+                                errors.Add($"{fields.[fieldIdx].Name}: {ex.Message}")
+                        | false, _ ->
+                            reader.Read() |> ignore
+                            reader.Skip()
+
+            // Check required + defaults + validate/transform rules
+            for i in 0..fields.Length-1 do
+                if not found.[i] then
+                    if fields.[i].Required then
+                        errors.Add($"{fields.[i].Name} is required")
+                    else
+                        values.[i] <- fields.[i].DefaultValue
+                else
+                    let mutable current = values.[i]
+                    for rule in fields.[i].Rules do
+                        match rule.Apply fields.[i].Name current with
+                        | Ok transformed -> current <- transformed
+                        | Error e -> errors.Add(e)
+                    values.[i] <- current
+
+            if errors.Count > 0 then
+                Error (errors |> Seq.toList)
+            else
+                let args = paramMapping |> Array.map (fun idx -> values.[idx])
+                Ok (construct args)
+        finally
+            ArrayPool<obj>.Shared.Return(values, clearArray = true)
 
     let parseFromBuffer (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (fieldIndex: Dictionary<string, int>) (buffer: ReadOnlySequence<byte>) : Result<'T, string list> =
         try

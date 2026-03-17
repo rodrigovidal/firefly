@@ -28,6 +28,10 @@
     <Compile Include="Validate.fs" />
     <Compile Include="Schema.fs" />
     <Compile Include="Jwt.fs" />
+    <Compile Include="Negotiate.fs" />
+    <Compile Include="Compress.fs" />
+    <Compile Include="RequestId.fs" />
+    <Compile Include="Health.fs" />
     <Compile Include="Cors.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />
