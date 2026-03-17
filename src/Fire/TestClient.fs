@@ -60,41 +60,6 @@ module TestClient =
     let withHeader (key: string) (value: string) (client: TestClient) : TestClient =
         { client with DefaultHeaders = (key, value) :: client.DefaultHeaders }
 
-    let private writeResponse (ctx: HttpContext) (response: Response) = task {
-        ctx.Response.StatusCode <- response.Status
-        for (key, value) in response.Headers do
-            ctx.Response.Headers.Append(key, value)
-        let hasContentType = ctx.Response.Headers.ContainsKey("Content-Type")
-        match response.Body with
-        | Empty -> ()
-        | Text s ->
-            if not hasContentType then
-                ctx.Response.ContentType <- "text/plain; charset=utf-8"
-            do! ctx.Response.WriteAsync(s)
-        | Json bytes ->
-            if not hasContentType then
-                ctx.Response.ContentType <- "application/json; charset=utf-8"
-            do! ctx.Response.Body.WriteAsync(ReadOnlyMemory(bytes))
-        | Stream stream ->
-            use stream = stream
-            do! stream.CopyToAsync(ctx.Response.Body)
-    }
-
-    let private dispatchRequest (trie: TrieNode) (config: FireConfig) (ctx: HttpContext) : Task<Response> = task {
-        let path = ctx.Request.Path.Value
-        let method' = ctx.Request.Method
-        match Trie.lookup method' path trie with
-        | Some (handler, ps) ->
-            let req = Request(ctx, ps)
-            return! handler req
-        | None ->
-            match config.NotFound with
-            | Some nfHandler ->
-                let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
-                return! nfHandler req
-            | None ->
-                return { Status = 404; Headers = []; Body = Empty }
-    }
 
     let private executeDirect (trie: TrieNode) (config: FireConfig) (method': string) (path: string) (headers: (string * string) list) (bodyOpt: string option) : Task<TestResponse> = task {
         let ctx = DefaultHttpContext()
@@ -120,7 +85,7 @@ module TestClient =
         let captureStream = new MemoryStream()
         ctx.Response.Body <- captureStream
 
-        let baseHandler : Handler = fun _req -> dispatchRequest trie config ctx
+        let baseHandler : Handler = fun _req -> Internal.dispatchRequest trie config ctx
 
         let composed =
             List.foldBack (fun (mw: Middleware) (h: Handler) -> mw h) config.Middlewares baseHandler
@@ -128,13 +93,17 @@ module TestClient =
         let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
         try
             let! response = composed req
-            do! writeResponse ctx response
+            do! Internal.writeResponse ctx response
         with ex ->
             match config.OnError with
             | Some errorHandler ->
                 try
-                    let! response = errorHandler ex req
-                    do! writeResponse ctx response
+                    let errorReq =
+                        match ctx.Items.TryGetValue("fire.current.request") with
+                        | true, r -> r :?> Request
+                        | false, _ -> req
+                    let! response = errorHandler ex errorReq
+                    do! Internal.writeResponse ctx response
                 with _ ->
                     ctx.Response.StatusCode <- 500
             | None ->

@@ -20,6 +20,7 @@
     <Compile Include="HandlerFactory.fs" />
     <Compile Include="Trie.fs" />
     <Compile Include="Route.fs" />
+    <Compile Include="Internal.fs" />
     <Compile Include="Log.fs" />
     <Compile Include="Static.fs" />
     <Compile Include="Timeout.fs" />

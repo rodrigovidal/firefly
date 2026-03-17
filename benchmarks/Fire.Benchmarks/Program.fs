@@ -35,7 +35,6 @@ let configureAspNetBuilder (builder: WebApplicationBuilder) =
     builder.Logging.SetMinimumLevel(LogLevel.None) |> ignore
     builder
 
-[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type PlainTextBenchmark() =
     let mutable firePort = 0
@@ -91,7 +90,6 @@ type PlainTextBenchmark() =
         return response
     }
 
-[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type JsonBenchmark() =
     let mutable firePort = 0
@@ -151,7 +149,6 @@ type JsonBenchmark() =
         return response
     }
 
-[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type RouteParamBenchmark() =
     let mutable firePort = 0
@@ -211,7 +208,6 @@ type RouteParamBenchmark() =
         return response
     }
 
-[<Config(typeof<BenchmarkConfig>)>]
 [<MemoryDiagnoser>]
 type MiddlewareBenchmark() =
     let mutable firePort = 0

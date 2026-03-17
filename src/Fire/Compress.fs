@@ -46,10 +46,16 @@ module Compress =
                     gz.Flush()
                     gz.Close()
                     let compressed = ms.ToArray()
-                    return
+                    let hasContentType = response.Headers |> List.exists (fun (k, _) ->
+                        k.Equals("Content-Type", System.StringComparison.OrdinalIgnoreCase))
+                    let result =
                         { response with Body = Json compressed }
                         |> Response.header "Content-Encoding" "gzip"
-                        |> Response.header "Content-Type" "text/plain; charset=utf-8"
+                    return
+                        if not hasContentType then
+                            result |> Response.header "Content-Type" "text/plain; charset=utf-8"
+                        else
+                            result
                 | Json bytes ->
                     use ms = new MemoryStream()
                     use gz = new GZipStream(ms, CompressionLevel.Fastest, leaveOpen = true)
@@ -80,10 +86,16 @@ module Compress =
                     br.Flush()
                     br.Close()
                     let compressed = ms.ToArray()
-                    return
+                    let hasContentType = response.Headers |> List.exists (fun (k, _) ->
+                        k.Equals("Content-Type", System.StringComparison.OrdinalIgnoreCase))
+                    let result =
                         { response with Body = Json compressed }
                         |> Response.header "Content-Encoding" "br"
-                        |> Response.header "Content-Type" "text/plain; charset=utf-8"
+                    return
+                        if not hasContentType then
+                            result |> Response.header "Content-Type" "text/plain; charset=utf-8"
+                        else
+                            result
                 | Json bytes ->
                     use ms = new MemoryStream()
                     use br = new BrotliStream(ms, CompressionLevel.Fastest, leaveOpen = true)

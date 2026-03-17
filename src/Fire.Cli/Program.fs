@@ -78,17 +78,8 @@ let private fireTestReferenceItems () =
     match fireProjectPath () with
     | Some projectPath ->
         let projectPath = projectPath.Replace("\\", "/")
-        let dllHintPath =
-            Path.ChangeExtension(projectPath, ".dll")
-                .Replace("/src/Fire/Fire.dll", "/src/Fire/bin/$(Configuration)/net10.0/Fire.dll")
-
         $"""  <ItemGroup>
     <ProjectReference Include="{projectPath}" />
-  </ItemGroup>
-  <ItemGroup>
-    <Reference Include="Fire">
-      <HintPath>{dllHintPath}</HintPath>
-    </Reference>
   </ItemGroup>"""
     | None ->
         """  <ItemGroup>

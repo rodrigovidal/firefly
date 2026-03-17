@@ -9,9 +9,6 @@ let ``Negotiate returns 406 for unsupported Accept type`` () = task {
     let routes =
         Route.start
         |> Route.get "/test" (fun _ -> task { return Response.text "hello" })
-    let client =
-        TestClient.create routes
-        |> TestClient.withHeader "Accept" "text/xml"
     let config = App.defaults |> App.middleware (Negotiate.middleware ["application/json"; "text/plain"])
     let client = TestClient.createWith routes config
                  |> TestClient.withHeader "Accept" "text/xml"
