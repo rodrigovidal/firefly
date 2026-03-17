@@ -135,15 +135,15 @@ let createWith (generateCode: unit -> string) =
 
     let routes =
         Route.start
-        |> Route.get("/", homePage)
-        |> Route.group("/api", fun api ->
+        |> Route.get "/" homePage
+        |> Route.group "/api" (fun api ->
             api
-            |> Route.middleware(createRateLimit)
-            |> Route.post("/shorten", createShortUrl)
-            |> Route.get("/stats", getStats)
-            |> Route.get("/stats/:code", getStatsForCode)
+            |> Route.middleware createRateLimit
+            |> Route.post "/shorten" createShortUrl
+            |> Route.get "/stats" getStats
+            |> Route.get "/stats/:code" getStatsForCode
         )
-        |> Route.get("/:code", redirectToUrl)
+        |> Route.get "/:code" redirectToUrl
 
     let config =
         App.defaults

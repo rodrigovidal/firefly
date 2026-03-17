@@ -9,7 +9,7 @@ let dummyHandler : Handler = fun _ -> task { return Response.ok }
 
 [<Fact>]
 let ``OpenApi.generate produces valid JSON with correct metadata`` () =
-    let routes = Route.start |> Route.get("/health", dummyHandler)
+    let routes = Route.start |> Route.get "/health" dummyHandler
     let json = OpenApi.generate "Test API" "1.0" routes
     let doc = JsonDocument.Parse(json)
     doc.RootElement.GetProperty("openapi").GetString() |> should equal "3.0.0"
@@ -20,9 +20,9 @@ let ``OpenApi.generate produces valid JSON with correct metadata`` () =
 let ``OpenApi.generate includes paths and methods`` () =
     let routes =
         Route.start
-        |> Route.get("/users", dummyHandler)
-        |> Route.post("/users", dummyHandler)
-        |> Route.get("/users/:id", dummyHandler)
+        |> Route.get "/users" dummyHandler
+        |> Route.post "/users" dummyHandler
+        |> Route.get "/users/:id" dummyHandler
     let json = OpenApi.generate "API" "1.0" routes
     let doc = JsonDocument.Parse(json)
     let paths = doc.RootElement.GetProperty("paths")
@@ -36,7 +36,7 @@ let ``OpenApi.generate includes paths and methods`` () =
 let ``OpenApi.generate extracts path parameters`` () =
     let routes =
         Route.start
-        |> Route.get("/users/:userId/posts/:postId", dummyHandler)
+        |> Route.get "/users/:userId/posts/:postId" dummyHandler
     let json = OpenApi.generate "API" "1.0" routes
     let doc = JsonDocument.Parse(json)
     let op = doc.RootElement.GetProperty("paths").GetProperty("/users/{userId}/posts/{postId}").GetProperty("get")
@@ -45,7 +45,7 @@ let ``OpenApi.generate extracts path parameters`` () =
 
 [<Fact>]
 let ``OpenApi.generate converts wildcard to parameter`` () =
-    let routes = Route.start |> Route.get("/static/*path", dummyHandler)
+    let routes = Route.start |> Route.get "/static/*path" dummyHandler
     let json = OpenApi.generate "API" "1.0" routes
     let doc = JsonDocument.Parse(json)
     let paths = doc.RootElement.GetProperty("paths")
@@ -53,7 +53,7 @@ let ``OpenApi.generate converts wildcard to parameter`` () =
 
 [<Fact>]
 let ``OpenApi.handler serves spec as JSON`` () = task {
-    let routes = Route.start |> Route.get("/users", dummyHandler)
+    let routes = Route.start |> Route.get "/users" dummyHandler
     let h = OpenApi.handler "API" "1.0" routes
     let! response = h (Unchecked.defaultof<Request>)
     response.Status |> should equal 200

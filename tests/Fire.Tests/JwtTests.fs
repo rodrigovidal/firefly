@@ -31,8 +31,8 @@ let ``Jwt.validate allows request with valid token`` () = task {
     let jwtMw = Jwt.defaults testSecret |> Jwt.validate
     let routes =
         Route.start
-        |> Route.middleware(jwtMw)
-        |> Route.get("/me", fun (req: Request) -> task {
+        |> Route.middleware jwtMw
+        |> Route.get "/me" (fun (req: Request) -> task {
             let claims = Jwt.claims req
             let sub = claims.Value.["sub"]
             return Response.text sub
@@ -48,8 +48,8 @@ let ``Jwt.validate rejects request without token`` () = task {
     let jwtMw = Jwt.defaults testSecret |> Jwt.validate
     let routes =
         Route.start
-        |> Route.middleware(jwtMw)
-        |> Route.get("/me", fun _ -> task { return Response.ok })
+        |> Route.middleware jwtMw
+        |> Route.get "/me" (fun _ -> task { return Response.ok })
     let client = TestClient.create routes
     let! r = client |> TestClient.get "/me"
     r.Status |> should equal 401
@@ -61,8 +61,8 @@ let ``Jwt.validate rejects request with invalid token`` () = task {
     let jwtMw = Jwt.defaults testSecret |> Jwt.validate
     let routes =
         Route.start
-        |> Route.middleware(jwtMw)
-        |> Route.get("/me", fun _ -> task { return Response.ok })
+        |> Route.middleware jwtMw
+        |> Route.get "/me" (fun _ -> task { return Response.ok })
     let client = TestClient.create routes |> TestClient.withHeader "Authorization" $"Bearer {token}"
     let! r = client |> TestClient.get "/me"
     r.Status |> should equal 401
@@ -81,8 +81,8 @@ let ``Jwt.validate with issuer rejects wrong issuer`` () = task {
     let jwtMw = Jwt.defaults testSecret |> Jwt.issuer "my-app" |> Jwt.validate
     let routes =
         Route.start
-        |> Route.middleware(jwtMw)
-        |> Route.get("/me", fun _ -> task { return Response.ok })
+        |> Route.middleware jwtMw
+        |> Route.get "/me" (fun _ -> task { return Response.ok })
     let client = TestClient.create routes |> TestClient.withHeader "Authorization" $"Bearer {token}"
     let! r = client |> TestClient.get "/me"
     r.Status |> should equal 401
@@ -92,7 +92,7 @@ let ``Jwt.validate with issuer rejects wrong issuer`` () = task {
 let ``Jwt.claims returns None when no JWT validated`` () = task {
     let routes =
         Route.start
-        |> Route.get("/public", fun (req: Request) -> task {
+        |> Route.get "/public" (fun (req: Request) -> task {
             let c = Jwt.claims req
             return Response.text (if c.IsNone then "no-claims" else "has-claims")
         })

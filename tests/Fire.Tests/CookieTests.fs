@@ -8,7 +8,7 @@ open Fire
 let ``Request.Cookie reads cookie from request`` () = task {
     let routes =
         Route.start
-        |> Route.get("/me", fun (req: Request) -> task {
+        |> Route.get "/me" (fun (req: Request) -> task {
             let session = req.Cookie "session" |> Option.defaultValue "none"
             return Response.text session
         })
@@ -24,7 +24,7 @@ let ``Request.Cookie reads cookie from request`` () = task {
 let ``Request.Cookie returns None when cookie missing`` () = task {
     let routes =
         Route.start
-        |> Route.get("/me", fun (req: Request) -> task {
+        |> Route.get "/me" (fun (req: Request) -> task {
             let session = req.Cookie "session"
             match session with
             | Some _ -> return Response.text "found"

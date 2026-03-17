@@ -17,8 +17,7 @@
     <Compile Include="Response.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
-    <Compile Include="DepsResolver.fs" />
-    <Compile Include="ModelBinder.fs" />
+    <Compile Include="HandlerFactory.fs" />
     <Compile Include="Trie.fs" />
     <Compile Include="Route.fs" />
     <Compile Include="Log.fs" />

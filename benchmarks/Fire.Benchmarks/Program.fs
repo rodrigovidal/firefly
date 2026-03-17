@@ -142,7 +142,7 @@ type RouteParamBenchmark() =
         // Fire server
         let routes =
             Route.start
-            |> Route.get "/users/:id" (fun req -> task {
+            |> Route.get "/users/:id" (fun (req: Request) -> task {
                 return Response.json {| id = req.Params.["id"] |}
             })
         let config = App.defaults |> App.port 0

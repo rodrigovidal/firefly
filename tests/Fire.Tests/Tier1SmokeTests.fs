@@ -12,19 +12,19 @@ open Fire
 let ``Tier 1 integration smoke test`` () = task {
     let routes =
         Route.start
-        |> Route.get("/", fun _ -> task { return Response.text "Fire" })
-        |> Route.get("/search", fun (req: Request) -> task {
+        |> Route.get "/" (fun _ -> task { return Response.text "Fire" })
+        |> Route.get "/search" (fun (req: Request) -> task {
             let q = req.QueryParam "q" |> Option.defaultValue "none"
             return Response.text q
         })
-        |> Route.post("/echo", fun (req: Request) -> task {
+        |> Route.post "/echo" (fun (req: Request) -> task {
             let! body = req.Text()
             return Response.text body
         })
-        |> Route.get("/static/*path", fun (req: Request) -> task {
+        |> Route.get "/static/*path" (fun (req: Request) -> task {
             return Response.text req.Params.["path"]
         })
-        |> Route.get("/cookie", fun _ -> task {
+        |> Route.get "/cookie" (fun _ -> task {
             return
                 Response.ok
                 |> Response.cookie "simple" "val"

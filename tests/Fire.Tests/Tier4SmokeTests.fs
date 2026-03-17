@@ -34,15 +34,15 @@ let ``Tier 4 integration smoke test`` () = task {
 
     let routes =
         Route.start
-        |> Route.get("/public", fun _ -> task { return Response.text "open" })
-        |> Route.group("/api", fun api ->
+        |> Route.get "/public" (fun _ -> task { return Response.text "open" })
+        |> Route.group "/api" (fun api ->
             api
-            |> Route.middleware(jwtMw)
-            |> Route.get("/me", fun (req: Request) -> task {
+            |> Route.middleware jwtMw
+            |> Route.get "/me" (fun (req: Request) -> task {
                 let claims = Jwt.claims req
                 return Response.json {| sub = claims.Value.["sub"] |}
             })
-            |> Route.post("/users", fun (req: Request) -> task {
+            |> Route.post "/users" (fun (req: Request) -> task {
                 let! body = req.Json<NewUser>()
                 match validateUser body with
                 | Ok user ->

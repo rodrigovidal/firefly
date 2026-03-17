@@ -242,6 +242,20 @@ module Schema =
                 return Error [$"invalid JSON: {ex.Message}"]
         }
 
+    // --- Handler integration ---
+
+    /// Wraps a handler with schema validation. Validates body, passes parsed value to handler.
+    let validated (schema: Schema<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
+        fun req -> task {
+            try
+                use! doc = JsonDocument.ParseAsync(req.Raw.Request.Body)
+                match schema.Parse doc.RootElement with
+                | Ok value -> return! handler value
+                | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
+            with ex ->
+                return Response.json {| errors = [$"invalid JSON: {ex.Message}"] |} |> Response.status 400
+        }
+
     // --- JSON Schema generation ---
 
     let toJsonSchema (schema: Schema<'T>) : string =

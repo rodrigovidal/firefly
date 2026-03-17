@@ -14,12 +14,12 @@ open Fire
 let ``Tier 3 integration smoke test`` () = task {
     let routes =
         Route.start
-        |> Route.get("/fast", fun _ -> task { return Response.text "ok" })
-        |> Route.get("/slow", fun _ -> task {
+        |> Route.get "/fast" (fun _ -> task { return Response.text "ok" })
+        |> Route.get "/slow" (fun _ -> task {
             do! Task.Delay(5000)
             return Response.text "done"
         })
-        |> Route.get("/users/:id", fun (req: Request) -> task {
+        |> Route.get "/users/:id" (fun (req: Request) -> task {
             return Response.json {| id = req.Params.["id"] |}
         })
 

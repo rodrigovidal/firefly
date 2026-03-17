@@ -18,7 +18,7 @@ let ``App.shutdownTimeout sets config`` () =
 let ``Server stops gracefully after stop is called`` () = task {
     let routes =
         Route.start
-        |> Route.get("/test", fun _ -> task { return Response.text "ok" })
+        |> Route.get "/test" (fun _ -> task { return Response.text "ok" })
     let config = App.defaults |> App.port 0 |> App.shutdownTimeout (TimeSpan.FromSeconds 5.0)
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()

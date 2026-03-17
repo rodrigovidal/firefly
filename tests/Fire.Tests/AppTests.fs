@@ -11,7 +11,7 @@ open Fire
 let ``App serves a simple GET route`` () = task {
     let routes =
         Route.start
-        |> Route.get("/hello", fun _ -> task { return Response.text "world" })
+        |> Route.get "/hello" (fun _ -> task { return Response.text "world" })
 
     let config = App.defaults |> App.port 0
     use cts = new CancellationTokenSource()
@@ -31,7 +31,7 @@ let ``App serves a simple GET route`` () = task {
 let ``App returns 404 for unmatched route`` () = task {
     let routes =
         Route.start
-        |> Route.get("/hello", fun _ -> task { return Response.text "world" })
+        |> Route.get "/hello" (fun _ -> task { return Response.text "world" })
 
     let config = App.defaults |> App.port 0
     use cts = new CancellationTokenSource()
@@ -49,7 +49,7 @@ let ``App returns 404 for unmatched route`` () = task {
 let ``App serves JSON response`` () = task {
     let routes =
         Route.start
-        |> Route.get("/data", fun _ -> task {
+        |> Route.get "/data" (fun _ -> task {
             return Response.json {| name = "fire"; version = 1 |}
         })
 
@@ -74,7 +74,7 @@ let ``App serves JSON response`` () = task {
 let ``App captures route params`` () = task {
     let routes =
         Route.start
-        |> Route.get("/users/:id", fun (req: Request) -> task {
+        |> Route.get "/users/:id" (fun (req: Request) -> task {
             let id = req.Params.["id"]
             return Response.text id
         })
@@ -102,8 +102,8 @@ let ``App applies middleware`` () = task {
 
     let routes =
         Route.start
-        |> Route.middleware(addHeader)
-        |> Route.get("/test", fun _ -> task { return Response.text "ok" })
+        |> Route.middleware addHeader
+        |> Route.get "/test" (fun _ -> task { return Response.text "ok" })
 
     let config = App.defaults |> App.port 0
     use cts = new CancellationTokenSource()
@@ -127,7 +127,7 @@ let ``App applies middleware`` () = task {
 let ``App calls custom error handler`` () = task {
     let routes =
         Route.start
-        |> Route.get("/boom", fun _ -> task {
+        |> Route.get "/boom" (fun _ -> task {
             return failwith "kaboom"
         })
 
@@ -155,7 +155,7 @@ let ``App calls custom error handler`` () = task {
 let ``App calls custom not-found handler`` () = task {
     let routes =
         Route.start
-        |> Route.get("/exists", fun _ -> task { return Response.text "yes" })
+        |> Route.get "/exists" (fun _ -> task { return Response.text "yes" })
 
     let config =
         App.defaults
@@ -190,7 +190,7 @@ type Greeter() =
 let ``App.dependencyInjection registers and resolves services`` () = task {
     let routes =
         Route.start
-        |> Route.get("/greet/:name", fun (req: Request) -> task {
+        |> Route.get "/greet/:name" (fun (req: Request) -> task {
             let greeter = req.Raw.RequestServices.GetRequiredService<IGreeter>()
             return Response.text (greeter.Greet(req.Params.["name"]))
         })
