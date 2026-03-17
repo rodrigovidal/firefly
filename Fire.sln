@@ -21,6 +21,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "blog-api", "examples\blog-a
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "todo-api", "examples\todo-api\todo-api.fsproj", "{F3A94DE2-1872-450C-B338-B0903B610885}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "url-shortener", "examples\url-shortener\url-shortener.fsproj", "{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -91,6 +93,18 @@ Global
 		{F3A94DE2-1872-450C-B338-B0903B610885}.Release|x64.Build.0 = Release|Any CPU
 		{F3A94DE2-1872-450C-B338-B0903B610885}.Release|x86.ActiveCfg = Release|Any CPU
 		{F3A94DE2-1872-450C-B338-B0903B610885}.Release|x86.Build.0 = Release|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Debug|x64.Build.0 = Debug|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Debug|x86.Build.0 = Debug|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Release|x64.ActiveCfg = Release|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Release|x64.Build.0 = Release|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Release|x86.ActiveCfg = Release|Any CPU
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -101,5 +115,6 @@ Global
 		{9E2E0533-57D0-4249-AF0A-B1B994FEEB87} = {66320409-64EC-F7C5-3DEF-65E7510DAAD1}
 		{7B3A5E30-3CEE-41E4-A676-70781F9C2511} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 		{F3A94DE2-1872-450C-B338-B0903B610885} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
+		{8FA1CDB2-A230-4CF4-845A-23E2AEADA0DD} = {B36A84DF-456D-A817-6EDD-3EC3E7F6E11F}
 	EndGlobalSection
 EndGlobal
