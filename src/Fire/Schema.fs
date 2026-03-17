@@ -1,8 +1,11 @@
 namespace Fire
 
 open System
+open System.Buffers
 open System.IO
+open System.IO.Pipelines
 open System.Text.Json
+open System.Collections.Concurrent
 
 // Rule specification for JSON Schema output
 type RuleSpec =
@@ -30,22 +33,165 @@ type Rule = {
     Spec: RuleSpec
 }
 
+// --- Compiled parser types (zero-alloc via Utf8JsonReader) ---
+
+module SchemaCompiler =
+
+    type FieldType =
+        | FString
+        | FInt
+        | FBool
+        | FFloat
+        | FStringList
+        | FNullable of FieldType
+        | FNested of CompiledField[] * int[] * (obj[] -> obj)  // fields, paramMapping, constructor
+
+    and CompiledField = {
+        Name: string
+        Type: FieldType
+        Required: bool
+        DefaultValue: obj
+        Rules: Rule list
+    }
+
+    /// Registry for nested schema compiled info, keyed by parser delegate identity
+    let internal nestedRegistry = ConcurrentDictionary<obj, FieldType>()
+
+    let rec readValue (fieldType: FieldType) (reader: byref<Utf8JsonReader>) : obj =
+        match fieldType with
+        | FString -> box (reader.GetString())
+        | FInt -> box (reader.GetInt32())
+        | FBool -> box (reader.GetBoolean())
+        | FFloat -> box (reader.GetDouble())
+        | FStringList ->
+            let items = ResizeArray<string>()
+            // reader should be at StartArray
+            while reader.Read() && reader.TokenType <> JsonTokenType.EndArray do
+                if reader.TokenType = JsonTokenType.String then
+                    items.Add(reader.GetString())
+            box (items |> Seq.toList)
+        | FNullable inner ->
+            if reader.TokenType = JsonTokenType.Null then
+                box None
+            else
+                let v = readValue inner &reader
+                let innerType =
+                    match inner with
+                    | FString -> typeof<string>
+                    | FInt -> typeof<int>
+                    | FBool -> typeof<bool>
+                    | FFloat -> typeof<float>
+                    | FStringList -> typeof<string list>
+                    | _ -> v.GetType()
+                let optionType = typedefof<_ option>.MakeGenericType(innerType)
+                let someCase = FSharp.Reflection.FSharpType.GetUnionCases(optionType).[1]
+                FSharp.Reflection.FSharpValue.MakeUnion(someCase, [| v |])
+        | FNested (nestedFields, nestedParamMapping, nestedCtor) ->
+            parseObject nestedFields nestedParamMapping nestedCtor &reader
+
+    and parseObject (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> obj) (reader: byref<Utf8JsonReader>) : obj =
+        let values = Array.zeroCreate fields.Length
+        let found = Array.zeroCreate<bool> fields.Length
+
+        if reader.TokenType <> JsonTokenType.StartObject then
+            reader.Read() |> ignore
+
+        while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
+            if reader.TokenType = JsonTokenType.PropertyName then
+                let propName = reader.GetString()
+                let mutable fieldIdx = -1
+                for i in 0..fields.Length-1 do
+                    if String.Equals(fields.[i].Name, propName, StringComparison.OrdinalIgnoreCase) then
+                        fieldIdx <- i
+                if fieldIdx >= 0 then
+                    reader.Read() |> ignore
+                    values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
+                    found.[fieldIdx] <- true
+                else
+                    reader.Read() |> ignore
+                    reader.Skip()
+
+        for i in 0..fields.Length-1 do
+            if not found.[i] && not fields.[i].Required then
+                values.[i] <- fields.[i].DefaultValue
+
+        let args = paramMapping |> Array.map (fun idx -> values.[idx])
+        construct args
+
+    let parseAndValidate (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (reader: byref<Utf8JsonReader>) : Result<'T, string list> =
+        let values = Array.zeroCreate fields.Length
+        let found = Array.zeroCreate<bool> fields.Length
+        let errors = ResizeArray<string>()
+
+        // Advance to StartObject if needed
+        if reader.TokenType <> JsonTokenType.StartObject then
+            if not (reader.Read()) || reader.TokenType <> JsonTokenType.StartObject then
+                errors.Add("expected JSON object")
+
+        if errors.Count = 0 then
+            while reader.Read() && reader.TokenType <> JsonTokenType.EndObject do
+                if reader.TokenType = JsonTokenType.PropertyName then
+                    let propName = reader.GetString()
+                    let mutable fieldIdx = -1
+                    for i in 0..fields.Length-1 do
+                        if String.Equals(fields.[i].Name, propName, StringComparison.OrdinalIgnoreCase) then
+                            fieldIdx <- i
+                    if fieldIdx >= 0 then
+                        reader.Read() |> ignore
+                        try
+                            values.[fieldIdx] <- readValue fields.[fieldIdx].Type &reader
+                            found.[fieldIdx] <- true
+                        with ex ->
+                            errors.Add($"{fields.[fieldIdx].Name}: {ex.Message}")
+                    else
+                        reader.Read() |> ignore
+                        reader.Skip()
+
+        // Check required + defaults + validate rules
+        for i in 0..fields.Length-1 do
+            if not found.[i] then
+                if fields.[i].Required then
+                    errors.Add($"{fields.[i].Name} is required")
+                else
+                    values.[i] <- fields.[i].DefaultValue
+            else
+                for rule in fields.[i].Rules do
+                    match rule.Check fields.[i].Name values.[i] with
+                    | Ok () -> ()
+                    | Error e -> errors.Add(e)
+
+        if errors.Count > 0 then
+            Error (errors |> Seq.toList)
+        else
+            let args = paramMapping |> Array.map (fun idx -> values.[idx])
+            Ok (construct args)
+
+    let parseFromBuffer (fields: CompiledField[]) (paramMapping: int[]) (construct: obj[] -> 'T) (buffer: ReadOnlySequence<byte>) : Result<'T, string list> =
+        try
+            let mutable reader = Utf8JsonReader(buffer)
+            parseAndValidate fields paramMapping construct &reader
+        with ex ->
+            Error [$"invalid JSON: {ex.Message}"]
+
 // A schema field: parses one field from JsonElement
 type SchemaField<'T> = {
     Name: string
     Parse: JsonElement -> Result<'T, string list>
     Spec: FieldSpec
+    Compiled: SchemaCompiler.CompiledField
 }
 
-// Internal: parser + accumulated specs
+// Internal: parser + accumulated specs + compiled fields
 type SchemaParser<'T> = {
     Parse: JsonElement -> Result<'T, string list>
     Specs: FieldSpec list
+    CompiledFields: SchemaCompiler.CompiledField list
 }
 
 // The public schema type
 type Schema<'T> = {
     Parse: JsonElement -> Result<'T, string list>
+    ParseBuffer: ReadOnlySequence<byte> -> Result<'T, string list>
     Fields: FieldSpec list
 }
 
@@ -156,10 +302,64 @@ module Schema =
         if el.ValueKind = JsonValueKind.Null then Ok None
         else parser el |> Result.map Some
 
-    let nest (schema: Schema<'T>) (el: JsonElement) : Result<'T, string> =
-        match schema.Parse el with
-        | Ok v -> Ok v
-        | Error errs -> Error (errs |> String.concat "; ")
+    /// Build a compiled FieldType for a nested schema
+    let private buildNestedFieldType<'T> (nestedSchema: Schema<'T>) : SchemaCompiler.FieldType =
+        let ctor = typeof<'T>.GetConstructors().[0]
+        let ctorParams = ctor.GetParameters()
+
+        // Reconstruct compiled fields from the nested schema's FieldSpecs
+        // For nested schemas built via the CE, the fields carry enough type info
+        let compiledFields =
+            nestedSchema.Fields |> List.map (fun spec ->
+                let fieldType =
+                    match spec.Type with
+                    | "string" -> SchemaCompiler.FString
+                    | "integer" -> SchemaCompiler.FInt
+                    | "boolean" -> SchemaCompiler.FBool
+                    | "number" -> SchemaCompiler.FFloat
+                    | _ -> SchemaCompiler.FString
+                {
+                    SchemaCompiler.CompiledField.Name = spec.Name
+                    SchemaCompiler.CompiledField.Type = fieldType
+                    SchemaCompiler.CompiledField.Required = spec.Required
+                    SchemaCompiler.CompiledField.DefaultValue = null
+                    SchemaCompiler.CompiledField.Rules = []
+                }
+            ) |> Array.ofList
+
+        let paramMapping =
+            ctorParams |> Array.map (fun p ->
+                compiledFields |> Array.findIndex (fun f ->
+                    System.String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+
+        let construct (args: obj[]) = ctor.Invoke(args) |> box
+
+        SchemaCompiler.FNested (compiledFields, paramMapping, construct)
+
+    /// Creates a nested parser and registers its compiled FieldType for the buffer path.
+    /// Usage: Schema.required "address" (Schema.nest addressSchema) []
+    let nest (nestedSchema: Schema<'T>) : (JsonElement -> Result<'T, string>) =
+        let fieldType = buildNestedFieldType nestedSchema
+        let parser = fun (el: JsonElement) ->
+            match nestedSchema.Parse el with
+            | Ok v -> Ok v
+            | Error errs -> Error (errs |> String.concat "; ")
+        // Register the compiled field type for this specific parser closure
+        SchemaCompiler.nestedRegistry.TryAdd(box parser, fieldType) |> ignore
+        parser
+
+    // --- Infer compiled FieldType from CLR type, checking nested registry ---
+
+    let private inferFieldType<'T> (parser: JsonElement -> Result<'T, string>) : SchemaCompiler.FieldType =
+        match SchemaCompiler.nestedRegistry.TryGetValue(box parser) with
+        | true, fieldType -> fieldType
+        | _ ->
+            if typeof<'T> = typeof<string> then SchemaCompiler.FString
+            elif typeof<'T> = typeof<int> then SchemaCompiler.FInt
+            elif typeof<'T> = typeof<bool> then SchemaCompiler.FBool
+            elif typeof<'T> = typeof<float> then SchemaCompiler.FFloat
+            elif typeof<'T> = typeof<string list> then SchemaCompiler.FStringList
+            else SchemaCompiler.FString // fallback
 
     // --- Field builders ---
 
@@ -180,6 +380,13 @@ module Schema =
         {
             Name = name
             Spec = spec
+            Compiled = {
+                Name = name
+                Type = inferFieldType parser
+                Required = true
+                DefaultValue = null
+                Rules = rules
+            }
             Parse = fun json ->
                 match json.TryGetProperty(name) with
                 | true, el when el.ValueKind <> JsonValueKind.Null ->
@@ -209,6 +416,13 @@ module Schema =
         {
             Name = name
             Spec = spec
+            Compiled = {
+                Name = name
+                Type = inferFieldType parser
+                Required = false
+                DefaultValue = box defaultValue
+                Rules = rules
+            }
             Parse = fun json ->
                 match json.TryGetProperty(name) with
                 | true, el when el.ValueKind <> JsonValueKind.Null ->
@@ -228,10 +442,22 @@ module Schema =
 
     let parseString (schema: Schema<'T>) (jsonString: string) : Result<'T, string list> =
         try
-            use doc = JsonDocument.Parse(jsonString)
-            schema.Parse doc.RootElement
+            let bytes = System.Text.Encoding.UTF8.GetBytes(jsonString)
+            let buffer = ReadOnlySequence<byte>(bytes)
+            schema.ParseBuffer buffer
         with ex ->
             Error [$"invalid JSON: {ex.Message}"]
+
+    let parseBuffer (schema: Schema<'T>) (buffer: ReadOnlySequence<byte>) : Result<'T, string list> =
+        schema.ParseBuffer buffer
+
+    let parsePipe (schema: Schema<'T>) (pipeReader: PipeReader) : System.Threading.Tasks.Task<Result<'T, string list>> = task {
+        let! readResult = pipeReader.ReadAsync()
+        let buffer = readResult.Buffer
+        let result = schema.ParseBuffer buffer
+        pipeReader.AdvanceTo(buffer.End)
+        return result
+    }
 
     let parseStream (schema: Schema<'T>) (stream: Stream) : System.Threading.Tasks.Task<Result<'T, string list>> =
         task {
@@ -244,12 +470,15 @@ module Schema =
 
     // --- Handler integration ---
 
-    /// Wraps a handler with schema validation. Validates body, passes parsed value to handler.
+    /// Wraps a handler with schema validation. Validates body via PipeReader (zero-alloc path).
     let validated (schema: Schema<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
         fun req -> task {
             try
-                use! doc = JsonDocument.ParseAsync(req.Raw.Request.Body)
-                match schema.Parse doc.RootElement with
+                let! readResult = req.Raw.Request.BodyReader.ReadAsync()
+                let buffer = readResult.Buffer
+                let result = schema.ParseBuffer buffer
+                req.Raw.Request.BodyReader.AdvanceTo(buffer.End)
+                match result with
                 | Ok value -> return! handler value
                 | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
             with ex ->
@@ -312,6 +541,7 @@ type SchemaBuilder() =
     member _.Bind(field: SchemaField<'T>, f: 'T -> SchemaParser<'U>) : SchemaParser<'U> =
         {
             Specs = field.Spec :: (f Unchecked.defaultof<'T>).Specs
+            CompiledFields = field.Compiled :: (f Unchecked.defaultof<'T>).CompiledFields
             Parse = fun json ->
                 match field.Parse json with
                 | Ok value ->
@@ -327,12 +557,27 @@ type SchemaBuilder() =
     member _.Return(value: 'T) : SchemaParser<'T> =
         {
             Specs = []
+            CompiledFields = []
             Parse = fun _ -> Ok value
         }
 
     member _.Run(parser: SchemaParser<'T>) : Schema<'T> =
+        let compiledFields = parser.CompiledFields |> List.rev |> Array.ofList
+
+        // Build parameter mapping: anonymous record constructors order params alphabetically
+        let ctor = typeof<'T>.GetConstructors().[0]
+        let ctorParams = ctor.GetParameters()
+        let paramMapping =
+            ctorParams |> Array.map (fun p ->
+                compiledFields |> Array.findIndex (fun f ->
+                    String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+
+        let construct (args: obj[]) =
+            ctor.Invoke(args) :?> 'T
+
         {
             Parse = parser.Parse
+            ParseBuffer = SchemaCompiler.parseFromBuffer compiledFields paramMapping construct
             Fields = parser.Specs |> List.rev
         }
 

@@ -1,5 +1,6 @@
 module Fire.Tests.SchemaTests
 
+open System.Buffers
 open System.Text.Json
 open Xunit
 open FsUnit.Xunit
@@ -157,4 +158,93 @@ let ``Schema parseStream works`` () = task {
     match result with
     | Ok todo -> todo.Title |> should equal "test"
     | Error _ -> failwith "expected Ok"
+}
+
+// --- parseBuffer tests ---
+
+[<Fact>]
+let ``Schema parseBuffer parses valid JSON`` () =
+    let json = """{"title":"Buy milk","completed":true}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let buffer = ReadOnlySequence<byte>(bytes)
+    match Schema.parseBuffer createTodoSchema buffer with
+    | Ok todo ->
+        todo.Title |> should equal "Buy milk"
+        todo.Completed |> should equal true
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema parseBuffer uses defaults for optional fields`` () =
+    let json = """{"title":"Buy milk"}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let buffer = ReadOnlySequence<byte>(bytes)
+    match Schema.parseBuffer createTodoSchema buffer with
+    | Ok todo ->
+        todo.Title |> should equal "Buy milk"
+        todo.Completed |> should equal false
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema parseBuffer rejects missing required fields`` () =
+    let json = """{"completed":true}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let buffer = ReadOnlySequence<byte>(bytes)
+    match Schema.parseBuffer createTodoSchema buffer with
+    | Error errs -> errs |> should contain "title is required"
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema parseBuffer validates rules`` () =
+    let json = """{"title":"ab"}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let buffer = ReadOnlySequence<byte>(bytes)
+    match Schema.parseBuffer createTodoSchema buffer with
+    | Error errs -> errs |> List.exists (fun e -> e.Contains("at least 3")) |> should be True
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema parseBuffer parses nested objects`` () =
+    let json = """{"name":"Alice","email":"alice@test.com","address":{"street":"Main","city":"NY","zip":"12345"}}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let buffer = ReadOnlySequence<byte>(bytes)
+    match Schema.parseBuffer createUserSchema buffer with
+    | Ok user ->
+        user.Name |> should equal "Alice"
+        user.Address.Street |> should equal "Main"
+        user.Address.Zip |> should equal "12345"
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema parseBuffer handles invalid JSON`` () =
+    let json = "not json{{{"
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let buffer = ReadOnlySequence<byte>(bytes)
+    match Schema.parseBuffer createTodoSchema buffer with
+    | Error _ -> () // expected
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema parseBuffer parses list fields`` () =
+    let listSchema = schema {
+        let! tags = Schema.required "tags" (Schema.list Schema.string) []
+        return {| Tags = tags |}
+    }
+    let json = """{"tags":["a","b","c"]}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let buffer = ReadOnlySequence<byte>(bytes)
+    match Schema.parseBuffer listSchema buffer with
+    | Ok r -> r.Tags |> should equal ["a"; "b"; "c"]
+    | Error errs -> failwith $"expected Ok, got {errs}"
+
+[<Fact>]
+let ``Schema parsePipe works`` () = task {
+    let json = """{"title":"test via pipe"}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+    let pipe = System.IO.Pipelines.Pipe()
+    let! _ = pipe.Writer.WriteAsync(System.ReadOnlyMemory<byte>(bytes))
+    do! pipe.Writer.CompleteAsync()
+    let! result = Schema.parsePipe createTodoSchema pipe.Reader
+    match result with
+    | Ok todo -> todo.Title |> should equal "test via pipe"
+    | Error errs -> failwith $"expected Ok, got {errs}"
 }
