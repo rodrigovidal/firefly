@@ -5,6 +5,7 @@
     <Nullable>disable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Generator.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

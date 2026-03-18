@@ -27,6 +27,8 @@ let private usage () =
         "Commands:"
         "  fire new <Name> [--output <path>] [--force]"
         "  fire dev [--project <path>]"
+        "  fire gen html <Resource> field:type [field:type ...]"
+        "  fire gen json <Resource> field:type [field:type ...]"
     ]
 
 let private ensureDirectory path =
@@ -202,6 +204,26 @@ let main argv =
         | ["new"; name; "--force"; "--output"; outputDir] ->
             createNewProject { Name = name; OutputDir = outputDir; Force = true }
             0
+        | "gen" :: kind :: resource :: fields when fields.Length > 0 ->
+            let projectDir =
+                match findProjectFromCurrentDirectory () with
+                | Some path -> Path.GetDirectoryName(path)
+                | None -> failwith "No F# project found. Run from project root."
+            let ns =
+                match findProjectFromCurrentDirectory () with
+                | Some path -> Path.GetFileNameWithoutExtension(path)
+                | None -> "App"
+            Generator.generate {
+                Kind = kind
+                Resource = resource
+                Fields = Generator.parseFields fields
+                ProjectDir = projectDir
+                Namespace = ns
+            }
+            0
+        | ["gen"] | ["gen"; _] ->
+            eprintfn "Usage: fire gen html|json <Resource> field:type [field:type ...]"
+            1
         | ["dev"] ->
             runDev None
         | ["dev"; "--project"; projectPath] ->
