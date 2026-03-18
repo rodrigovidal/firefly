@@ -95,7 +95,7 @@ let ``Validation rejects missing title`` () = task {
     let authed = client |> TestClient.withHeader "Authorization" $"Bearer {token}"
     let! r = authed |> TestClient.post "/api/todos" """{}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "Title is required"
+    r.Body |> should haveSubstring "Title"
     do! TestClient.stop client
 }
 
@@ -149,10 +149,10 @@ type PreloadedStore(items: App.Todo list) =
             data <- data @ [todo]
             return todo
         }
-        member _.Update(id, update) = task {
+        member _.Update(id, title, completed) = task {
             match data |> List.tryFind (fun t -> t.Id = id) with
             | Some _ ->
-                let updated : App.Todo = { Id = id; Title = update.Title; Completed = update.Completed }
+                let updated : App.Todo = { Id = id; Title = title; Completed = completed }
                 data <- data |> List.map (fun t -> if t.Id = id then updated else t)
                 return Some updated
             | None -> return None
@@ -169,7 +169,7 @@ type FailingStore() =
         member _.GetAll() = task { return failwith "database connection lost" }
         member _.GetById(_) = task { return failwith "database connection lost" }
         member _.Create(_) = task { return failwith "database connection lost" }
-        member _.Update(_, _) = task { return failwith "database connection lost" }
+        member _.Update(_, _, _) = task { return failwith "database connection lost" }
         member _.Delete(_) = task { return failwith "database connection lost" }
 
 [<Fact>]

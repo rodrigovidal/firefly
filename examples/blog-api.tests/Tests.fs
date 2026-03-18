@@ -93,7 +93,7 @@ let ``POST /api/posts validates title`` () = task {
     let! client = TestClient.start routes config
     let! r = client |> TestClient.post "/api/posts" """{"Title":"","Body":"Content","Tags":[]}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "Title is required"
+    r.Body |> should haveSubstring "Title"
     do! TestClient.stop client
 }
 
@@ -103,7 +103,7 @@ let ``POST /api/posts validates body`` () = task {
     let! client = TestClient.start routes config
     let! r = client |> TestClient.post "/api/posts" """{"Title":"Valid Title","Body":"","Tags":[]}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "Body is required"
+    r.Body |> should haveSubstring "Body"
     do! TestClient.stop client
 }
 
@@ -134,7 +134,7 @@ let ``POST /api/posts/:postId/comments validates author`` () = task {
     let! client = TestClient.start routes config
     let! r = client |> TestClient.post "/api/posts/1/comments" """{"Author":"","Body":"text"}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "Author is required"
+    r.Body |> should haveSubstring "Author"
     do! TestClient.stop client
 }
 
@@ -154,7 +154,7 @@ let ``POST /api/posts/:postId/comments validates body`` () = task {
     let! client = TestClient.start routes config
     let! r = client |> TestClient.post "/api/posts/1/comments" """{"Author":"Charlie","Body":""}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "Body is required"
+    r.Body |> should haveSubstring "Body"
     do! TestClient.stop client
 }
 

@@ -9,6 +9,7 @@ open System.Threading.Tasks
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.IdentityModel.JsonWebTokens
 open Microsoft.IdentityModel.Tokens
+open Flame
 open Fire
 
 // --- Types ---
@@ -18,11 +19,18 @@ type Todo =
       Title: string
       Completed: bool }
 
-type CreateTodo = { Title: string }
+// --- Schemas ---
 
-type UpdateTodo =
-    { Title: string
-      Completed: bool }
+let createTodoSchema = schema {
+    let! title = Schema.required "Title" Schema.string [ Schema.minLength 1; Schema.maxLength 200 ]
+    return {| Title = title |}
+}
+
+let updateTodoSchema = schema {
+    let! title = Schema.required "Title" Schema.string [ Schema.minLength 1 ]
+    let! completed = Schema.optional "Completed" Schema.bool false []
+    return {| Title = title; Completed = completed |}
+}
 
 // --- Store interface ---
 
@@ -30,7 +38,7 @@ type ITodoStore =
     abstract GetAll: unit -> Task<Todo list>
     abstract GetById: int -> Task<Todo option>
     abstract Create: string -> Task<Todo>
-    abstract Update: int * UpdateTodo -> Task<Todo option>
+    abstract Update: int * string * bool -> Task<Todo option>
     abstract Delete: int -> Task<bool>
 
 // --- In-memory implementation ---
@@ -55,10 +63,10 @@ type InMemoryTodoStore() =
             return todo
         }
 
-        member _.Update(id, update) = task {
+        member _.Update(id, title, completed) = task {
             match todos.TryGetValue(id) with
             | true, _ ->
-                let updated = { Id = id; Title = update.Title; Completed = update.Completed }
+                let updated = { Id = id; Title = title; Completed = completed }
                 todos.[id] <- updated
                 return Some updated
             | false, _ -> return None
@@ -113,19 +121,24 @@ let routes =
         // Protected routes
         |> Route.middleware jwtAuth
         // Create
-        |> Route.post "" (fun (store: ITodoStore) (body: CreateTodo) -> task {
-            if String.IsNullOrWhiteSpace body.Title then
-                return Response.json {| errors = ["Title is required"] |} |> Response.status 400
-            else
-                let! todo = store.Create(body.Title)
+        |> Route.post "" (fun (store: ITodoStore) (req: Request) -> task {
+            match! Schema.parseRequest createTodoSchema req with
+            | Ok input ->
+                let! todo = store.Create(input.Title)
                 return Response.json todo |> Response.status 201
+            | Error errors ->
+                return Response.json {| errors = errors |} |> Response.status 400
         })
         // Update
-        |> Route.put "/%i" (fun (store: ITodoStore) (id: int) (body: UpdateTodo) -> task {
-            let! result = store.Update(id, { Title = body.Title; Completed = body.Completed })
-            match result with
-            | Some updated -> return Response.json updated
-            | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
+        |> Route.put "/%i" (fun (store: ITodoStore) (id: int) (req: Request) -> task {
+            match! Schema.parseRequest updateTodoSchema req with
+            | Ok input ->
+                let! result = store.Update(id, input.Title, input.Completed)
+                match result with
+                | Some updated -> return Response.json updated
+                | None -> return Response.json {| error = "todo not found" |} |> Response.status 404
+            | Error errors ->
+                return Response.json {| errors = errors |} |> Response.status 400
         })
         // Delete
         |> Route.delete "/%i" (fun (store: ITodoStore) (id: int) -> task {

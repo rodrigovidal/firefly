@@ -2,6 +2,7 @@ module BlogApi.App
 
 open System
 open System.Collections.Generic
+open Flame
 open Fire
 
 // ---------------------------------------------------------------------------
@@ -22,9 +23,18 @@ type Comment =
       Body: string
       CreatedAt: DateTime }
 
-type CreatePost = { Title: string; Body: string; Tags: string list }
+let createPostSchema = schema {
+    let! title = Schema.required "Title" Schema.string [ Schema.minLength 1; Schema.maxLength 200 ]
+    let! body = Schema.required "Body" Schema.string [ Schema.minLength 1 ]
+    let! tags = Schema.optional "Tags" (Schema.list Schema.string) [] []
+    return {| Title = title; Body = body; Tags = tags |}
+}
 
-type CreateComment = { Author: string; Body: string }
+let createCommentSchema = schema {
+    let! author = Schema.required "Author" Schema.string [ Schema.minLength 1 ]
+    let! body = Schema.required "Body" Schema.string [ Schema.minLength 1; Schema.maxLength 1000 ]
+    return {| Author = author; Body = body |}
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -139,13 +149,10 @@ let create () =
             | None -> return notFoundJson "Post not found"
         }
 
-    let createPost (input: CreatePost) =
+    let createPost (req: Request) =
         task {
-            if String.IsNullOrWhiteSpace input.Title then
-                return badRequest "Title is required"
-            elif String.IsNullOrWhiteSpace input.Body then
-                return badRequest "Body is required"
-            else
+            match! Schema.parseRequest createPostSchema req with
+            | Ok input ->
                 let id = nextPostId
                 nextPostId <- nextPostId + 1
 
@@ -162,6 +169,8 @@ let create () =
                     Response.json post
                     |> Response.status 201
                     |> Response.header "Location" $"/api/posts/{id}"
+            | Error errors ->
+                return Response.json {| errors = errors |} |> Response.status 400
         }
 
     let listComments (postId: int) =
@@ -175,15 +184,12 @@ let create () =
             | None -> return notFoundJson "Post not found"
         }
 
-    let createComment (postId: int) (input: CreateComment) =
+    let createComment (postId: int) (req: Request) =
         task {
             match posts |> Seq.tryFind (fun p -> p.Id = postId) with
             | Some _ ->
-                if String.IsNullOrWhiteSpace input.Author then
-                    return badRequest "Author is required"
-                elif String.IsNullOrWhiteSpace input.Body then
-                    return badRequest "Body is required"
-                else
+                match! Schema.parseRequest createCommentSchema req with
+                | Ok input ->
                     let id = nextCommentId
                     nextCommentId <- nextCommentId + 1
 
@@ -200,6 +206,8 @@ let create () =
                         Response.json comment
                         |> Response.status 201
                         |> Response.header "Location" $"/api/posts/{postId}/comments/{id}"
+                | Error errors ->
+                    return Response.json {| errors = errors |} |> Response.status 400
             | None -> return notFoundJson "Post not found"
         }
 

@@ -49,7 +49,7 @@ let ``POST /api/shorten validates empty url`` () = task {
     let jsonClient = client |> TestClient.withHeader "Content-Type" "application/json"
     let! r = jsonClient |> TestClient.post "/api/shorten" """{"Url":""}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "url is required"
+    r.Body |> should haveSubstring "Url"
     do! TestClient.stop client
 }
 
@@ -60,7 +60,7 @@ let ``POST /api/shorten validates url scheme`` () = task {
     let jsonClient = client |> TestClient.withHeader "Content-Type" "application/json"
     let! r = jsonClient |> TestClient.post "/api/shorten" """{"Url":"ftp://bad.com"}"""
     r.Status |> should equal 400
-    r.Body |> should haveSubstring "url must start with http"
+    r.Body |> should haveSubstring "invalid URL"
     do! TestClient.stop client
 }
 

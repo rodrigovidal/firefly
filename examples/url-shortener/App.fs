@@ -2,6 +2,7 @@ module UrlShortener.App
 
 open System
 open System.Collections.Concurrent
+open Flame
 open Fire
 
 // ---------------------------------------------------------------------------
@@ -9,7 +10,11 @@ open Fire
 // ---------------------------------------------------------------------------
 
 type ShortUrl = { Code: string; Url: string; Clicks: int; CreatedAt: DateTime }
-type CreateUrl = { Url: string }
+
+let createUrlSchema = schema {
+    let! url = Schema.required "Url" Schema.string [ Schema.minLength 1; Schema.url ]
+    return {| Url = url |}
+}
 
 // ---------------------------------------------------------------------------
 // HTML landing page
@@ -73,31 +78,32 @@ let createWith (generateCode: unit -> string) =
     }
 
     let createShortUrl : Handler = fun req -> task {
-        let! url =
-            match req.ContentType with
-            | Some ct when ct.Contains("application/json") ->
-                task {
-                    let! body = req.Json<CreateUrl>()
-                    return body.Url
-                }
-            | _ ->
-                task {
-                    let! form = req.Form()
-                    return
-                        match form.TryGetValue("url") with
-                        | true, v -> v
-                        | false, _ -> ""
-                }
+        match req.ContentType with
+        | Some ct when ct.Contains("application/json") ->
+            match! Schema.parseRequest createUrlSchema req with
+            | Ok input ->
+                let code = generateCode ()
+                let entry = { Code = code; Url = input.Url; Clicks = 0; CreatedAt = DateTime.UtcNow }
+                store.[code] <- entry
+                return Response.json {| code = code; shortUrl = $"/{code}"; originalUrl = input.Url |} |> Response.status 201
+            | Error errors ->
+                return Response.json {| errors = errors |} |> Response.status 400
+        | _ ->
+            let! form = req.Form()
+            let url =
+                match form.TryGetValue("url") with
+                | true, v -> v
+                | false, _ -> ""
 
-        if String.IsNullOrWhiteSpace(url) then
-            return Response.json {| error = "url is required" |} |> Response.status 400
-        elif not (url.StartsWith("http://") || url.StartsWith("https://")) then
-            return Response.json {| error = "url must start with http:// or https://" |} |> Response.status 400
-        else
-            let code = generateCode ()
-            let entry = { Code = code; Url = url; Clicks = 0; CreatedAt = DateTime.UtcNow }
-            store.[code] <- entry
-            return Response.json {| code = code; shortUrl = $"/{code}"; originalUrl = url |} |> Response.status 201
+            if String.IsNullOrWhiteSpace(url) then
+                return Response.json {| errors = ["url is required"] |} |> Response.status 400
+            elif not (url.StartsWith("http://") || url.StartsWith("https://")) then
+                return Response.json {| errors = ["url must start with http:// or https://"] |} |> Response.status 400
+            else
+                let code = generateCode ()
+                let entry = { Code = code; Url = url; Clicks = 0; CreatedAt = DateTime.UtcNow }
+                store.[code] <- entry
+                return Response.json {| code = code; shortUrl = $"/{code}"; originalUrl = url |} |> Response.status 201
     }
 
     let getStats : Handler = fun _req -> task {
