@@ -8,5 +8,9 @@ obj/
 .vscode/
 *.DotSettings.user
 BenchmarkDotNet.Artifacts/
+
+## Node
+node_modules/
+packages/*/dist/
 coverage/
 TestResults/
