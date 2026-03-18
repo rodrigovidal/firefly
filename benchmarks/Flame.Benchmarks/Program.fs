@@ -139,13 +139,13 @@ type RealisticBenchmark() =
     }
 
     let orderSchema = schema {
-        let! name     = Schema.required "CustomerName" Schema.string [ Schema.minLength 1; Schema.maxLength 100 ]
+        let! customerName = Schema.required "CustomerName" Schema.string [ Schema.minLength 1; Schema.maxLength 100 ]
         let! email    = Schema.required "Email" Schema.string [ Schema.email ]
         let! phone    = Schema.required "Phone" Schema.string [ Schema.maxLength 20 ]
         let! amount   = Schema.required "Amount" Schema.float [ Schema.min 0.01; Schema.max 1000000.0 ]
         let! currency = Schema.required "Currency" Schema.string [ Schema.minLength 3; Schema.maxLength 3 ]
         let! billing  = Schema.required "Billing" (Schema.nest billingSchema) []
-        return {| Name = name; Email = email; Phone = phone; Amount = amount; Currency = currency; Billing = billing |}
+        return {| CustomerName = customerName; Email = email; Phone = phone; Amount = amount; Currency = currency; Billing = billing |}
     }
 
     let fluentValidator = CreateOrderValidator()
