@@ -54,6 +54,7 @@
     <Compile Include="SignedCookieTests.fs" />
     <Compile Include="AutoETagTests.fs" />
     <Compile Include="Tier4SmokeTests.fs" />
+    <Compile Include="NodeTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
