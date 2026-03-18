@@ -2,6 +2,7 @@ namespace Flame.Benchmarks
 
 open BenchmarkDotNet.Attributes
 open Flame
+open FluentValidation
 
 // --- Named types for STJ deserialization ---
 
@@ -71,6 +72,102 @@ type ValidationBenchmark() =
         if not (obj.email.Contains("@")) then valid <- false
         if obj.age < 0 || obj.age > 150 then valid <- false
         obj |> box
+
+// --- FluentValidation validator ---
+
+type ValidationInputValidator() =
+    inherit AbstractValidator<ValidationInput>()
+    do
+        base.RuleFor(fun x -> x.title).NotEmpty().MinimumLength(1).MaximumLength(200) |> ignore
+        base.RuleFor(fun x -> x.email).NotEmpty().EmailAddress() |> ignore
+        base.RuleFor(fun x -> x.age).InclusiveBetween(0, 150) |> ignore
+
+// --- Realistic model: 10 fields, 5 nested ---
+
+[<CLIMutable>]
+type BillingAddress = {
+    Street: string
+    City: string
+    State: string
+    Zip: string
+    Country: string
+}
+
+[<CLIMutable>]
+type CreateOrder = {
+    CustomerName: string
+    Email: string
+    Phone: string
+    Amount: float
+    Currency: string
+    Billing: BillingAddress
+}
+
+type BillingAddressValidator() =
+    inherit AbstractValidator<BillingAddress>()
+    do
+        base.RuleFor(fun x -> x.Street).NotEmpty().MaximumLength(200) |> ignore
+        base.RuleFor(fun x -> x.City).NotEmpty().MaximumLength(100) |> ignore
+        base.RuleFor(fun x -> x.State).NotEmpty().Length(2, 2) |> ignore
+        base.RuleFor(fun x -> x.Zip).NotEmpty().Matches(@"^\d{5}$") |> ignore
+        base.RuleFor(fun x -> x.Country).NotEmpty().MaximumLength(2) |> ignore
+
+type CreateOrderValidator() =
+    inherit AbstractValidator<CreateOrder>()
+    do
+        base.RuleFor(fun x -> x.CustomerName).NotEmpty().MinimumLength(1).MaximumLength(100) |> ignore
+        base.RuleFor(fun x -> x.Email).NotEmpty().EmailAddress() |> ignore
+        base.RuleFor(fun x -> x.Phone).NotEmpty().MaximumLength(20) |> ignore
+        base.RuleFor(fun x -> x.Amount).GreaterThan(0.0).LessThanOrEqualTo(1000000.0) |> ignore
+        base.RuleFor(fun x -> x.Currency).NotEmpty().Length(3, 3) |> ignore
+        base.RuleFor(fun x -> x.Billing).SetValidator(BillingAddressValidator()) |> ignore
+
+// --- Realistic benchmark: 10 fields + nested ---
+
+[<MemoryDiagnoser>]
+type RealisticBenchmark() =
+    let json = """{"CustomerName":"Alice Johnson","Email":"alice@example.com","Phone":"+1-555-0123","Amount":299.99,"Currency":"USD","Billing":{"Street":"123 Main St","City":"Springfield","State":"IL","Zip":"62701","Country":"US"}}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+
+    let billingSchema = schema {
+        let! street  = Schema.required "Street" Schema.string [ Schema.minLength 1; Schema.maxLength 200 ]
+        let! city    = Schema.required "City" Schema.string [ Schema.minLength 1; Schema.maxLength 100 ]
+        let! state   = Schema.required "State" Schema.string [ Schema.minLength 2; Schema.maxLength 2 ]
+        let! zip     = Schema.required "Zip" Schema.string [ Schema.pattern @"^\d{5}$" ]
+        let! country = Schema.required "Country" Schema.string [ Schema.minLength 1; Schema.maxLength 2 ]
+        return {| Street = street; City = city; State = state; Zip = zip; Country = country |}
+    }
+
+    let orderSchema = schema {
+        let! name     = Schema.required "CustomerName" Schema.string [ Schema.minLength 1; Schema.maxLength 100 ]
+        let! email    = Schema.required "Email" Schema.string [ Schema.email ]
+        let! phone    = Schema.required "Phone" Schema.string [ Schema.maxLength 20 ]
+        let! amount   = Schema.required "Amount" Schema.float [ Schema.min 0.01; Schema.max 1000000.0 ]
+        let! currency = Schema.required "Currency" Schema.string [ Schema.minLength 3; Schema.maxLength 3 ]
+        let! billing  = Schema.required "Billing" (Schema.nest billingSchema) []
+        return {| Name = name; Email = email; Phone = phone; Amount = amount; Currency = currency; Billing = billing |}
+    }
+
+    let fluentValidator = CreateOrderValidator()
+
+    [<Benchmark(Description = "Flame: parse + validate (string)")>]
+    member _.FlameString() : obj =
+        Schema.parseString orderSchema json |> box
+
+    [<Benchmark(Description = "Flame: parse + validate (buffer)")>]
+    member _.FlameBuffer() : obj =
+        let buffer = System.Buffers.ReadOnlySequence<byte>(bytes)
+        Schema.parseBuffer orderSchema buffer |> box
+
+    [<Benchmark(Description = "FluentValidation: STJ + validate", Baseline = true)>]
+    member _.FluentValidation() : obj =
+        let order = System.Text.Json.JsonSerializer.Deserialize<CreateOrder>(json)
+        let result = fluentValidator.Validate(order)
+        box (order, result.IsValid)
+
+    [<Benchmark(Description = "STJ only (no validation)")>]
+    member _.StjOnly() : obj =
+        System.Text.Json.JsonSerializer.Deserialize<CreateOrder>(json) |> box
 
 // --- 3. Nested objects ---
 
