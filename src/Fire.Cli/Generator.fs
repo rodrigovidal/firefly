@@ -68,16 +68,16 @@ let private generateDomain (opts: GeneratorOptions) =
     let entity = singular opts.Resource
     let fields =
         opts.Fields
-        |> List.map (fun f -> $"    {f.Name |> fun n -> n.Substring(0,1).ToUpper() + n.Substring(1)}: {fsharpType f.Type}")
+        |> List.map (fun f -> $"    {capitalize f.Name}: {fsharpType f.Type}")
         |> String.concat "\n"
     let inputFields =
         opts.Fields
         |> List.map (fun f ->
-            let cap = f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1)
+            let cap = capitalize f.Name
             $"{cap}: {fsharpType f.Type}")
         |> String.concat "; "
     let fieldCaps =
-        opts.Fields |> List.map (fun f -> f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1))
+        opts.Fields |> List.map (fun f -> capitalize f.Name)
     let createFields =
         fieldCaps
         |> List.map (fun n -> $"{n} = input.{n}")
@@ -152,13 +152,13 @@ let private generateSchema (opts: GeneratorOptions) =
     let bindings =
         opts.Fields
         |> List.map (fun f ->
-            let cap = f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1)
+            let cap = capitalize f.Name
             $"""    let! {lower f.Name} = Schema.required "{lower f.Name}" {schemaParser f.Type} {schemaRules f.Type}""")
         |> String.concat "\n"
     let returnFields =
         opts.Fields
         |> List.map (fun f ->
-            let cap = f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1)
+            let cap = capitalize f.Name
             $"{cap} = {lower f.Name}")
         |> String.concat "; "
     $"""let {lower entity}Schema = schema {{
@@ -172,7 +172,7 @@ let private generateHtmlController (opts: GeneratorOptions) =
     let entity = singular opts.Resource
     let resource = lower opts.Resource
     let schemaCode = generateSchema opts
-    let fieldCaps = opts.Fields |> List.map (fun f -> f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1))
+    let fieldCaps = opts.Fields |> List.map (fun f -> capitalize f.Name)
     let formValues =
         opts.Fields
         |> List.map (fun f ->
@@ -181,7 +181,7 @@ let private generateHtmlController (opts: GeneratorOptions) =
     let editValues =
         opts.Fields
         |> List.map (fun f ->
-            let cap = f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1)
+            let cap = capitalize f.Name
             $"\"{lower f.Name}\", item.{cap}")
     let editValuesStr = editValues |> String.concat "; "
 
@@ -281,7 +281,7 @@ module {entity}Controller =
 let private generateHtmlView (opts: GeneratorOptions) =
     let entity = singular opts.Resource
     let resource = lower opts.Resource
-    let fieldCaps = opts.Fields |> List.map (fun f -> f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1))
+    let fieldCaps = opts.Fields |> List.map (fun f -> capitalize f.Name)
     let showFields =
         fieldCaps
         |> List.map (fun n -> $"""                    Html.p [ Html.strong [ Text "{n}: " ]; Text (string item.{n}) ]""")
@@ -289,7 +289,7 @@ let private generateHtmlView (opts: GeneratorOptions) =
     let formFields =
         opts.Fields
         |> List.map (fun f ->
-            let cap = f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1)
+            let cap = capitalize f.Name
             match f.Type.ToLower() with
             | "bool" ->
                 $"""                    Html.label [ Text "{cap}" ]
