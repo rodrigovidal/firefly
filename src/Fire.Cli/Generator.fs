@@ -13,14 +13,27 @@ type GeneratorOptions = {
     Namespace: string     // e.g. "MyApp"
 }
 
+let capitalize (s: string) =
+    if String.IsNullOrEmpty(s) then s
+    else s.Substring(0, 1).ToUpper() + s.Substring(1)
+
 let private singular (name: string) =
-    if name.EndsWith("ies", StringComparison.OrdinalIgnoreCase) then
+    if name.Length < 2 then name
+    elif name.EndsWith("ies", StringComparison.OrdinalIgnoreCase) then
         name.Substring(0, name.Length - 3) + "y"
+    elif name.EndsWith("ses", StringComparison.OrdinalIgnoreCase)
+         || name.EndsWith("xes", StringComparison.OrdinalIgnoreCase)
+         || name.EndsWith("zes", StringComparison.OrdinalIgnoreCase)
+         || name.EndsWith("shes", StringComparison.OrdinalIgnoreCase)
+         || name.EndsWith("ches", StringComparison.OrdinalIgnoreCase) then
+        name.Substring(0, name.Length - 2)
     elif name.EndsWith("s", StringComparison.OrdinalIgnoreCase) then
         name.Substring(0, name.Length - 1)
     else name
 
-let private lower (s: string) = s.Substring(0, 1).ToLower() + s.Substring(1)
+let private lower (s: string) =
+    if String.IsNullOrEmpty(s) then s
+    else s.Substring(0, 1).ToLower() + s.Substring(1)
 
 let private fsharpType (t: string) =
     match t.ToLower() with
@@ -163,8 +176,7 @@ let private generateHtmlController (opts: GeneratorOptions) =
     let formValues =
         opts.Fields
         |> List.map (fun f ->
-            let cap = f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1)
-            $"\"{lower f.Name}\", req.FormValue \"{lower f.Name}\"")
+            $"\"{lower f.Name}\", tryGet \"{lower f.Name}\"")
     let formValuesStr = formValues |> String.concat "; "
     let editValues =
         opts.Fields
@@ -207,7 +219,7 @@ module {entity}Controller =
     }}
 
     let create (repo: I{entity}Repository) (req: Request) = task {{
-        match! Schema.parseRequest {lower entity}Schema req with
+        match! Schema.parse {lower entity}Schema req with
         | Ok input ->
             let! item = repo.Create input
             return Response.ok |> Response.redirect $"/{resource}/{{item.Id}}" 303
@@ -237,7 +249,7 @@ module {entity}Controller =
     let update (id: string) (repo: I{entity}Repository) (req: Request) = task {{
         match Guid.TryParse(id) with
         | true, guid ->
-            match! Schema.parseRequest {lower entity}Schema req with
+            match! Schema.parse {lower entity}Schema req with
             | Ok input ->
                 match! repo.Update guid input with
                 | Some _ -> return Response.ok |> Response.redirect $"/{resource}/{{guid}}" 303
@@ -278,8 +290,16 @@ let private generateHtmlView (opts: GeneratorOptions) =
         opts.Fields
         |> List.map (fun f ->
             let cap = f.Name.Substring(0,1).ToUpper() + f.Name.Substring(1)
-            let inputType = match f.Type.ToLower() with "int" | "float" -> "number" | "bool" -> "checkbox" | _ -> "text"
-            $"""                    Html.label [ Text "{cap}" ]
+            match f.Type.ToLower() with
+            | "bool" ->
+                $"""                    Html.label [ Text "{cap}" ]
+                    Html.input ([ Type "checkbox"; Name "{lower f.Name}" ] @ (if values |> Map.tryFind "{lower f.Name}" = Some "true" then [ Checked ] else []))
+                    match errors |> Map.tryFind "{lower f.Name}" with
+                    | Some msg -> Html.p ([ Class "error" ], [ Text msg ])
+                    | None -> Empty"""
+            | typ ->
+                let inputType = match typ with "int" | "float" -> "number" | _ -> "text"
+                $"""                    Html.label [ Text "{cap}" ]
                     Html.input [ Type "{inputType}"; Name "{lower f.Name}"; Value (values |> Map.tryFind "{lower f.Name}" |> Option.defaultValue "") ]
                     match errors |> Map.tryFind "{lower f.Name}" with
                     | Some msg -> Html.p ([ Class "error" ], [ Text msg ])

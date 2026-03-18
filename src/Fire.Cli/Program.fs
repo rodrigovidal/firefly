@@ -205,20 +205,16 @@ let main argv =
             createNewProject { Name = name; OutputDir = outputDir; Force = true }
             0
         | "gen" :: kind :: resource :: fields when fields.Length > 0 ->
-            let projectDir =
+            let projectPath =
                 match findProjectFromCurrentDirectory () with
-                | Some path -> Path.GetDirectoryName(path)
+                | Some path -> path
                 | None -> failwith "No F# project found. Run from project root."
-            let ns =
-                match findProjectFromCurrentDirectory () with
-                | Some path -> Path.GetFileNameWithoutExtension(path)
-                | None -> "App"
             Generator.generate {
                 Kind = kind
-                Resource = resource
+                Resource = Generator.capitalize resource
                 Fields = Generator.parseFields fields
-                ProjectDir = projectDir
-                Namespace = ns
+                ProjectDir = Path.GetDirectoryName(projectPath)
+                Namespace = Path.GetFileNameWithoutExtension(projectPath)
             }
             0
         | ["gen"] | ["gen"; _] ->
