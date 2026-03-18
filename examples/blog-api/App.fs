@@ -137,7 +137,7 @@ let create () =
 
                 match req.Header "If-None-Match" with
                 | Some clientTag when clientTag = etag ->
-                    return { Status = 304; Headers = []; Body = Empty }
+                    return { Status = 304; Headers = []; Body = ResponseBody.Empty }
                 | _ ->
                     let now = DateTime.UtcNow.ToString("o")
 

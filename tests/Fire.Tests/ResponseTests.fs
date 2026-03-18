@@ -15,13 +15,13 @@ let ``Response.ok has status 200 and empty body`` () =
 let ``Response.text sets Text body`` () =
     let r = Response.text "hello"
     r.Status |> should equal 200
-    r.Body |> should equal (Text "hello")
+    r.Body |> should equal (ResponseBody.Text "hello")
 
 [<Fact>]
 let ``Response.html sets HTML content type`` () =
     let r = Response.html "<h1>hello</h1>"
     r.Status |> should equal 200
-    r.Body |> should equal (Text "<h1>hello</h1>")
+    r.Body |> should equal (ResponseBody.Text "<h1>hello</h1>")
     r.Headers |> should contain ("Content-Type", "text/html; charset=utf-8")
 
 [<Fact>]
@@ -68,10 +68,10 @@ let ``Response.unauthorized has status 401`` () =
 [<Fact>]
 let ``Response.ofResult maps Ok`` () =
     let r = Ok "hello" |> Response.ofResult Response.text (fun _ -> Response.notFound)
-    r.Body |> should equal (Text "hello")
+    r.Body |> should equal (ResponseBody.Text "hello")
 
 [<Fact>]
 let ``Response.ofResult maps Error`` () =
     let r = Error "bad" |> Response.ofResult (fun _ -> Response.ok) (fun e -> Response.text e |> Response.status 400)
     r.Status |> should equal 400
-    r.Body |> should equal (Text "bad")
+    r.Body |> should equal (ResponseBody.Text "bad")
