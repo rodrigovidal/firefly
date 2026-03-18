@@ -26,6 +26,16 @@ module Csrf =
             req.Raw.Items.[tokenKey] <- t
             t
 
+    /// Render a hidden input element containing the CSRF token for use in forms.
+    let hiddenInput (req: Request) : Node =
+        let t = token req
+        Element("input", [ Attr.Type "hidden"; Name formFieldName; Value t ], [])
+
+    /// Render a meta tag containing the CSRF token for use with AJAX requests.
+    let metaTag (req: Request) : Node =
+        let t = token req
+        Element("meta", [ Custom("name", "csrf-token"); Custom("content", t) ], [])
+
     /// Middleware that validates CSRF tokens on state-changing methods (POST, PUT, PATCH, DELETE).
     /// The token must be present as X-CSRF-Token header or _csrf form field.
     let middleware : Middleware =
@@ -36,7 +46,10 @@ module Csrf =
                 // Set CSRF cookie if a new token was generated
                 match req.Raw.Items.TryGetValue(tokenKey) with
                 | true, token ->
-                    return response |> Response.cookie cookieName (token :?> string)
+                    let tokenStr = token :?> string
+                    let secure = if req.Raw.Request.IsHttps then "; Secure" else ""
+                    let cookieValue = sprintf "%s=%s; Path=/; HttpOnly; SameSite=Strict%s" cookieName tokenStr secure
+                    return response |> Response.header "Set-Cookie" cookieValue
                 | false, _ -> return response
             else
                 // Validate token

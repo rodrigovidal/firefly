@@ -47,6 +47,9 @@
     <Compile Include="Cors.fs" />
     <Compile Include="View/View.fs" />
     <Compile Include="Vite.fs" />
+    <Compile Include="Redirect.fs" />
+    <Compile Include="Sse.fs" />
+    <Compile Include="Partial.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />
   </ItemGroup>

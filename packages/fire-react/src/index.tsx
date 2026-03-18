@@ -46,10 +46,18 @@ async function navigate(url: string, pushState = true) {
         headers: { 'X-Fire-Navigation': 'true' }
     })
     const html = await response.text()
-    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const fireTitle = response.headers.get('X-Fire-Title')
 
-    document.body.innerHTML = doc.body.innerHTML
-    document.title = doc.title
+    if (fireTitle !== null) {
+        // Partial response — body content only, title in header
+        document.body.innerHTML = html
+        document.title = fireTitle
+    } else {
+        // Full response — parse and extract
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+        document.body.innerHTML = doc.body.innerHTML
+        document.title = doc.title
+    }
 
     if (pushState) history.pushState(null, '', url)
 
@@ -121,9 +129,16 @@ export function enableNavigation() {
                 redirect: 'follow',
             }).then(async (response) => {
                 const html = await response.text()
-                const doc = new DOMParser().parseFromString(html, 'text/html')
-                document.body.innerHTML = doc.body.innerHTML
-                document.title = doc.title
+                const fireTitle = response.headers.get('X-Fire-Title')
+
+                if (fireTitle !== null) {
+                    document.body.innerHTML = html
+                    document.title = fireTitle
+                } else {
+                    const doc = new DOMParser().parseFromString(html, 'text/html')
+                    document.body.innerHTML = doc.body.innerHTML
+                    document.title = doc.title
+                }
                 history.pushState(null, '', response.url)
                 window.scrollTo(0, 0)
                 window.dispatchEvent(new Event('fire:navigate'))
