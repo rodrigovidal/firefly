@@ -60,6 +60,7 @@
     <Compile Include="ComponentTests.fs" />
     <Compile Include="QueryTests.fs" />
     <Compile Include="ViteTests.fs" />
+    <Compile Include="PipelineTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

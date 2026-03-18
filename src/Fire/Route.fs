@@ -65,6 +65,11 @@ module Route =
     let middleware (mw: Middleware) (table: RouteTable) =
         { table with Middlewares = table.Middlewares @ [mw] }
 
+    let pipe (prefix: string) (pipeline: Pipeline) (configure: RouteTable -> RouteTable) (parent: RouteTable) =
+        let scoped = { Prefix = parent.Prefix + prefix; Middlewares = parent.Middlewares @ pipeline.Middlewares; Routes = [] }
+        let result = configure scoped
+        { parent with Routes = (result.Routes |> List.rev) @ parent.Routes }
+
     /// Register a route with a custom HTTP method and a plain Handler
     let method' (verb: string) (pattern: string) (handler: Handler) (table: RouteTable) =
         addRoute verb pattern handler table
