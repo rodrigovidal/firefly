@@ -11,6 +11,12 @@ open Microsoft.FSharp.Reflection
 [<RequireQualifiedAccess>]
 module HandlerFactory =
 
+    let private queryJsonOptions =
+        let opts = JsonSerializerOptions()
+        opts.NumberHandling <- System.Text.Json.Serialization.JsonNumberHandling.AllowReadingFromString
+        opts.PropertyNameCaseInsensitive <- true
+        opts
+
     /// Parse %i, %s, %b, %f from pattern and convert to :__p0, :__p1, etc.
     let convertPattern (pattern: string) : string * Type list =
         let specs = ResizeArray<Type>()
@@ -193,6 +199,8 @@ module HandlerFactory =
                             (t, "route")
                         elif isBodyMethod && (FSharpType.IsRecord t || (t.IsClass && t <> typeof<string> && not (t.FullName.StartsWith("Microsoft.FSharp.Core.FSharpFunc")))) then
                             (t, "body")
+                        elif (not isBodyMethod) && (FSharpType.IsRecord t || (t.IsClass && t <> typeof<string> && not (t.FullName.StartsWith("Microsoft.FSharp.Core.FSharpFunc")))) then
+                            (t, "query")
                         else
                             if specIdx < formatSpecs.Length then
                                 failwith $"Route format parameters support int, string, bool, and float, got {t.Name}"
@@ -229,6 +237,18 @@ module HandlerFactory =
                                 let body = req.Raw.Request.Body
                                 let! deserialized = JsonSerializer.DeserializeAsync(body, paramType)
                                 args.Add(deserialized)
+                            | "query" ->
+                                try
+                                    let q = req.Raw.Request.Query
+                                    let d = System.Collections.Generic.Dictionary<string, string>(q.Count)
+                                    for kvp in q do
+                                        d.[kvp.Key] <- kvp.Value.ToString()
+                                    let json = JsonSerializer.SerializeToUtf8Bytes(d :> System.Collections.Generic.IDictionary<string, string>)
+                                    let deserialized = JsonSerializer.Deserialize(ReadOnlySpan(json), paramType, queryJsonOptions)
+                                    args.Add(deserialized)
+                                with
+                                | :? JsonException | :? NotSupportedException ->
+                                    conversionError <- true
                             | "request" ->
                                 args.Add(box req)
                             | "request-obj" ->

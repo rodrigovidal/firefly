@@ -2,6 +2,7 @@ namespace Fire
 
 open System
 open System.Threading.Tasks
+open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 
 type Handler = Request -> Task<Response>
@@ -31,4 +32,5 @@ type FireConfig = {
     Middlewares: Middleware list
     ShutdownTimeout: TimeSpan option
     DependencyInjection: (IServiceCollection -> unit) option
+    Configure: (IApplicationBuilder -> unit) option
 }

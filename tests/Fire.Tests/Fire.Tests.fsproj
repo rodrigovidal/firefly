@@ -7,6 +7,7 @@
 
 <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Evlog" Version="0.0.1-beta" />
     <PackageReference Include="FsUnit.xUnit" Version="7.1.1" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.16.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
@@ -64,6 +65,10 @@
     <Compile Include="SseTests.fs" />
     <Compile Include="PartialTests.fs" />
     <Compile Include="CsrfPolishTests.fs" />
+    <Compile Include="MiddlewareTests.fs" />
+    <Compile Include="QueryBindingTests.fs" />
+    <Compile Include="IdempotentTests.fs" />
+    <Compile Include="EvlogTests.fs" />
     <Compile Include="PipelineTests.fs" />
   </ItemGroup>
 

@@ -47,6 +47,9 @@
     <Compile Include="Cors.fs" />
     <Compile Include="View/View.fs" />
     <Compile Include="Vite.fs" />
+    <Compile Include="Middleware.fs" />
+    <Compile Include="Evlog.fs" />
+    <Compile Include="Idempotent.fs" />
     <Compile Include="Redirect.fs" />
     <Compile Include="Sse.fs" />
     <Compile Include="Partial.fs" />
@@ -60,6 +63,7 @@
     <None Include="../../README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Evlog" Version="0.0.1-beta" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.16.0" />
   </ItemGroup>
   <ItemGroup>

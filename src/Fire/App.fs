@@ -24,6 +24,7 @@ module App =
         Middlewares = []
         ShutdownTimeout = None
         DependencyInjection = None
+        Configure = None
     }
 
     let port p config = { config with Port = p }
@@ -33,6 +34,7 @@ module App =
     let middleware mw (config: FireConfig) = { config with Middlewares = config.Middlewares @ [mw] }
     let shutdownTimeout ts config = { config with ShutdownTimeout = Some ts }
     let dependencyInjection fn config = { config with DependencyInjection = Some fn }
+    let configure fn config = { config with Configure = Some fn }
 
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
@@ -102,6 +104,9 @@ module App =
         // In dev mode, register the SSE live reload endpoint
         if devMode then
             app.Map("/__fire/livereload", RequestDelegate(LiveReload.endpoint)) |> ignore
+        match config.Configure with
+        | Some configure -> configure (app :> IApplicationBuilder)
+        | None -> ()
         (app :> IApplicationBuilder).Run(RequestDelegate(fun ctx -> handleRequest trie config ctx))
         (app :> IHost).RunAsync(ct)
 
@@ -115,6 +120,9 @@ module App =
         ) |> ignore
         applyConfig builder config
         let app = builder.Build()
+        match config.Configure with
+        | Some configure -> configure (app :> IApplicationBuilder)
+        | None -> ()
         (app :> IApplicationBuilder).Run(RequestDelegate(fun ctx -> handleRequest trie config ctx))
         do! app.StartAsync(ct)
         let server = app.Services.GetRequiredService<IServer>()
