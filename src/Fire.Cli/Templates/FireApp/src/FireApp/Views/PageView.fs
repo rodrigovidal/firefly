@@ -1,6 +1,6 @@
 namespace FireApp.Views
 
-open System
+open Fire
 open FireApp.Components
 open FireApp.Layouts
 
@@ -8,18 +8,17 @@ module PageView =
 
     let home () =
         let content =
-            [
-                "<section class=\"hero\">"
-                "  <p class=\"eyebrow\">Fire starter</p>"
-                "  <h1>Opinionated by default.</h1>"
-                "  <p>Controllers, views, layouts, assets, config, and tests already have a home.</p>"
-                "  <div class=\"actions\">"
-                "    <a class=\"button primary\" href=\"/health\">Health JSON</a>"
-                "    <a class=\"button secondary\" href=\"/assets/css/app.css\">CSS asset</a>"
-                "  </div>"
-                CoreComponents.featureGrid()
-                "</section>"
-            ]
-            |> String.concat Environment.NewLine
+            Html.section ([ Class "hero" ], [
+                Html.p ([ Class "eyebrow" ], [ Text "Fire starter" ])
+                Html.h1 [ Text "Opinionated by default." ]
+                Html.p [ Text "Controllers, views, layouts, assets, config, and tests already have a home." ]
+                Html.div ([ Class "actions" ], [
+                    Html.a ([ Class "button primary"; Href "/health" ], [ Text "Health JSON" ])
+                    Html.a ([ Class "button secondary"; Href "/assets/css/app.css" ], [ Text "CSS asset" ])
+                ])
+                CoreComponents.featureGrid ()
+            ])
 
-        RootLayout.render "FireApp" content
+        View.page "FireApp" content
+        |> View.withLayout RootLayout.render
+        |> View.render
