@@ -2,6 +2,7 @@ module TodoApiDb.App
 
 open System.Data
 open Microsoft.Extensions.DependencyInjection
+open Flame
 open Fire
 
 let createTodoSchema = schema {

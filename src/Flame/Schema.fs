@@ -233,6 +233,7 @@ type SchemaParser<'T> = {
     Parse: JsonElement -> Result<'T, string list>
     Specs: FieldSpec list
     CompiledFields: SchemaCompiler.CompiledField list
+    Refinements: ('T -> Result<'T, string list>) list
 }
 
 // The public schema type
@@ -242,6 +243,12 @@ type Schema<'T> = {
     Fields: FieldSpec list
     CompiledFields: SchemaCompiler.CompiledField[]
     ParamMapping: int[]
+    Refinements: ('T -> Result<'T, string list>) list
+}
+
+/// Cross-field validation check. Use with `do!` inside a schema CE.
+type SchemaCheck = {
+    Validate: unit -> Result<unit, string>
 }
 
 [<RequireQualifiedAccess>]
@@ -829,14 +836,21 @@ module Schema =
             Fields = fieldSpecs
             CompiledFields = compiledFields
             ParamMapping = paramMapping
+            Refinements = []
         }
 
+    /// Cross-field validation. Use with `do!` inside a schema CE:
+    /// do! Schema.check (fun () -> if a = b then Ok () else Error "a must equal b")
+    let check (validate: unit -> Result<unit, string>) : SchemaCheck =
+        { SchemaCheck.Validate = validate }
 
 type SchemaBuilder() =
     member _.Bind(field: SchemaField<'T>, f: 'T -> SchemaParser<'U>) : SchemaParser<'U> =
+        let restDefault = f Unchecked.defaultof<'T>
         {
-            Specs = field.Spec :: (f Unchecked.defaultof<'T>).Specs
-            CompiledFields = field.Compiled :: (f Unchecked.defaultof<'T>).CompiledFields
+            Specs = field.Spec :: restDefault.Specs
+            CompiledFields = field.Compiled :: restDefault.CompiledFields
+            Refinements = restDefault.Refinements
             Parse = fun json ->
                 match field.Parse json with
                 | Ok value ->
@@ -844,15 +858,31 @@ type SchemaBuilder() =
                     | Ok result -> Ok result
                     | Error errs -> Error errs
                 | Error errs1 ->
-                    match (f Unchecked.defaultof<'T>).Parse json with
+                    match restDefault.Parse json with
                     | Ok _ -> Error errs1
                     | Error errs2 -> Error (errs1 @ errs2)
+        }
+
+    /// Bind for cross-field validation via `do! Schema.check (fun () -> ...)`
+    member _.Bind(check: SchemaCheck, f: unit -> SchemaParser<'U>) : SchemaParser<'U> =
+        let restForSpecs = f ()
+        // Mark that this schema has checks — forces buffer path to use JsonElement fallback
+        let marker : 'U -> Result<'U, string list> = fun v -> Ok v
+        {
+            Specs = restForSpecs.Specs
+            CompiledFields = restForSpecs.CompiledFields
+            Refinements = marker :: restForSpecs.Refinements  // non-empty = hasChecks
+            Parse = fun json ->
+                match check.Validate() with
+                | Ok () -> (f ()).Parse json
+                | Error msg -> Error [msg]
         }
 
     member _.Return(value: 'T) : SchemaParser<'T> =
         {
             Specs = []
             CompiledFields = []
+            Refinements = []
             Parse = fun _ -> Ok value
         }
 
@@ -872,12 +902,28 @@ type SchemaBuilder() =
         let construct (args: obj[]) =
             ctor.Invoke(args) :?> 'T
 
+        let hasChecks = not (List.isEmpty parser.Refinements)
+
+        // If schema has cross-field checks, the buffer path falls back to the
+        // JsonElement Parse path (which runs the CE closures that capture the checks).
+        let bufferParse =
+            if hasChecks then
+                fun (buffer: ReadOnlySequence<byte>) ->
+                    try
+                        use doc = JsonDocument.Parse(buffer)
+                        parser.Parse doc.RootElement
+                    with ex ->
+                        Error [$"invalid JSON: {ex.Message}"]
+            else
+                SchemaCompiler.parseFromBuffer compiledFields paramMapping construct fieldIndex
+
         {
             Parse = parser.Parse
-            ParseBuffer = SchemaCompiler.parseFromBuffer compiledFields paramMapping construct fieldIndex
+            ParseBuffer = bufferParse
             Fields = parser.Specs |> List.rev
             CompiledFields = compiledFields
             ParamMapping = paramMapping
+            Refinements = parser.Refinements
         }
 
 [<AutoOpen>]

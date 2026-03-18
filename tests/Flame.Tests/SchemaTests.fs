@@ -144,3 +144,65 @@ let ``Error messages use correct grammar for plural`` () =
     match Schema.parseString s """{"x":"ab"}""" with
     | Error errs -> errs.[0] |> should haveSubstring "3 characters"
     | Ok _ -> failwith "expected Error"
+
+// --- Cross-field validation ---
+
+[<Fact>]
+let ``Schema.check validates cross-field constraints`` () =
+    let s = schema {
+        let! password = Schema.req "password" Schema.string
+        let! confirm = Schema.req "confirm" Schema.string
+        do! Schema.check (fun () ->
+            if password = confirm then Ok ()
+            else Error "confirm: must match password"
+        )
+        return {| Password = password |}
+    }
+    match Schema.parseString s """{"password":"abc","confirm":"abc"}""" with
+    | Ok r -> r.Password |> should equal "abc"
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Schema.check rejects when cross-field constraint fails`` () =
+    let s = schema {
+        let! password = Schema.req "password" Schema.string
+        let! confirm = Schema.req "confirm" Schema.string
+        do! Schema.check (fun () ->
+            if password = confirm then Ok ()
+            else Error "confirm: must match password"
+        )
+        return {| Password = password |}
+    }
+    match Schema.parseString s """{"password":"abc","confirm":"xyz"}""" with
+    | Error errs -> errs |> List.exists (fun e -> e.Contains("must match")) |> should be True
+    | Ok _ -> failwith "expected Error"
+
+[<Fact>]
+let ``Schema.check works with date comparison`` () =
+    let s = schema {
+        let! startDate = Schema.req "start" Schema.dateTime
+        let! endDate = Schema.req "end" Schema.dateTime
+        do! Schema.check (fun () ->
+            if endDate > startDate then Ok ()
+            else Error "end: must be after start"
+        )
+        return {| Start = startDate; End = endDate |}
+    }
+    match Schema.parseString s """{"start":"2026-01-01","end":"2026-12-31"}""" with
+    | Ok r -> r.Start.Year |> should equal 2026
+    | Error e -> failwith $"expected Ok, got {e}"
+
+[<Fact>]
+let ``Schema.check rejects invalid date order`` () =
+    let s = schema {
+        let! startDate = Schema.req "start" Schema.dateTime
+        let! endDate = Schema.req "end" Schema.dateTime
+        do! Schema.check (fun () ->
+            if endDate > startDate then Ok ()
+            else Error "end: must be after start"
+        )
+        return {| Start = startDate; End = endDate |}
+    }
+    match Schema.parseString s """{"start":"2026-12-31","end":"2026-01-01"}""" with
+    | Error errs -> errs |> List.exists (fun e -> e.Contains("must be after")) |> should be True
+    | Ok _ -> failwith "expected Error"
