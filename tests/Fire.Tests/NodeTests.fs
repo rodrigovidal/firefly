@@ -92,6 +92,13 @@ let ``Html.element escape hatch works`` () =
     | _ -> failwith "expected dialog element"
 
 [<Fact>]
+let ``Html.elementWithAttrs escape hatch works`` () =
+    let node = Html.elementWithAttrs "dialog" ([ Class "modal" ], [ Text "content" ])
+    match node with
+    | Element("dialog", [ Class "modal" ], [ Text "content" ]) -> ()
+    | _ -> failwith "expected dialog element with attrs"
+
+[<Fact>]
 let ``Nested elements compose`` () =
     let node =
         Html.div [
