@@ -108,4 +108,38 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
             | true, values -> Some (values.ToString())
             | false, _ -> None
 
+    /// Merge all input sources into a single dictionary: route params + query string + body (form or JSON).
+    /// Priority: route params > body > query (later sources don't overwrite earlier ones).
+    member _.All() : Task<IReadOnlyDictionary<string, string>> =
+        let merged = Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+        // 1. Query string (lowest priority)
+        let query = ctx.Request.Query
+        for kvp in query do
+            merged.[kvp.Key] <- kvp.Value.ToString()
+        // Capture before task (struct can't be captured in closures)
+        let httpRequest = ctx.Request
+        let contentType = ctx.Request.ContentType
+        let params' = routeParams
+        task {
+            // 2. Body (form or JSON) — overwrites query
+            let ct = if contentType = null then "" else contentType
+            if ct.Contains("application/x-www-form-urlencoded") || ct.Contains("multipart/form-data") then
+                let! form = httpRequest.ReadFormAsync()
+                for kvp in form do
+                    merged.[kvp.Key] <- kvp.Value.ToString()
+            elif ct.Contains("application/json") then
+                try
+                    use reader = new StreamReader(httpRequest.Body, Encoding.UTF8, leaveOpen = true)
+                    let! text = reader.ReadToEndAsync()
+                    if not (System.String.IsNullOrWhiteSpace text) then
+                        use doc = System.Text.Json.JsonDocument.Parse(text)
+                        for prop in doc.RootElement.EnumerateObject() do
+                            merged.[prop.Name] <- prop.Value.ToString()
+                with _ -> ()
+            // 3. Route params (highest priority) — overwrites body and query
+            for kvp in params' do
+                merged.[kvp.Key] <- kvp.Value
+            return merged :> IReadOnlyDictionary<string, string>
+        }
+
     member _.Raw = ctx

@@ -619,6 +619,70 @@ module Schema =
                 return Error [$"invalid JSON: {ex.Message}"]
         }
 
+    // --- Parse from key-value map (form data, query params, merged sources) ---
+
+    let parseMap (schema: Schema<'T>) (data: IReadOnlyDictionary<string, string>) : Result<'T, string list> =
+        let fields = schema.CompiledFields
+        let errors = ResizeArray<string>()
+        let values = Array.zeroCreate fields.Length
+
+        for i in 0..fields.Length-1 do
+            let field = fields.[i]
+            // Case-insensitive lookup
+            let rawValue =
+                match data |> Seq.tryFind (fun kvp ->
+                    String.Equals(kvp.Key, field.Name, StringComparison.OrdinalIgnoreCase)) with
+                | Some kvp -> Some kvp.Value
+                | None -> None
+
+            match rawValue with
+            | None | Some "" ->
+                if field.Required then
+                    errors.Add($"{field.Name} is required")
+                else
+                    values.[i] <- field.DefaultValue
+            | Some v ->
+                try
+                    // Convert string to target type (coercion)
+                    let converted =
+                        match field.Type with
+                        | SchemaCompiler.FString -> box v
+                        | SchemaCompiler.FInt ->
+                            match Int32.TryParse(v, Globalization.CultureInfo.InvariantCulture) with
+                            | true, n -> box n
+                            | false, _ -> failwith $"{field.Name}: expected integer"
+                        | SchemaCompiler.FBool ->
+                            match Boolean.TryParse(v) with
+                            | true, b -> box b
+                            | false, _ -> failwith $"{field.Name}: expected boolean"
+                        | SchemaCompiler.FFloat ->
+                            match Double.TryParse(v, Globalization.CultureInfo.InvariantCulture) with
+                            | true, f -> box f
+                            | false, _ -> failwith $"{field.Name}: expected number"
+                        | SchemaCompiler.FDateTime ->
+                            match DateTime.TryParse(v) with
+                            | true, dt -> box dt
+                            | false, _ -> failwith $"{field.Name}: expected date/time"
+                        | SchemaCompiler.FDateTimeOffset ->
+                            match DateTimeOffset.TryParse(v) with
+                            | true, dto -> box dto
+                            | false, _ -> failwith $"{field.Name}: expected date/time"
+                        | _ -> box v  // fallback: treat as string
+
+                    // Apply rules (transforms + validation)
+                    match applyRules field.Name field.Rules converted with
+                    | Ok transformed -> values.[i] <- transformed
+                    | Error errs -> errors.AddRange(errs)
+                with ex ->
+                    errors.Add(ex.Message)
+
+        if errors.Count > 0 then
+            Error (errors |> Seq.toList)
+        else
+            let args = schema.ParamMapping |> Array.map (fun idx -> values.[idx])
+            let ctor = typeof<'T>.GetConstructors().[0]
+            Ok (ctor.Invoke(args) :?> 'T)
+
     // --- JSON Schema generation ---
 
     let toJsonSchema (schema: Schema<'T>) : string =
