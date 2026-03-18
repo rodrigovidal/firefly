@@ -66,3 +66,38 @@ module View =
                 sb.Append("</body></html>") |> ignore
                 sb.ToString()
         Response.html html
+
+    /// Middleware that wraps the body content of HTML responses in a layout.
+    /// Use in pipelines for nested layouts: inner views render content,
+    /// this middleware wraps it in a section layout (e.g., admin sidebar),
+    /// and the outermost View.withLayout renders the full document shell.
+    ///
+    /// The wrap function receives (title, body-inner-html) and returns new body-inner-html.
+    /// It extracts content between <body> and </body>, wraps it, and puts it back.
+    let layout (wrap: string -> string -> string) : Middleware =
+        fun next req -> task {
+            let! response = next req
+            match response.Body with
+            | ResponseBody.Text html when
+                response.Headers |> List.exists (fun (k, v) ->
+                    k.Equals("Content-Type", System.StringComparison.OrdinalIgnoreCase)
+                    && v.Contains("text/html")) ->
+                let bodyStart = html.IndexOf("<body>")
+                let bodyEnd = html.IndexOf("</body>")
+                if bodyStart >= 0 && bodyEnd > bodyStart then
+                    let contentStart = bodyStart + 6
+                    let content = html.Substring(contentStart, bodyEnd - contentStart)
+                    let title =
+                        let idx = html.IndexOf("<title>")
+                        if idx >= 0 then
+                            let endIdx = html.IndexOf("</title>", idx)
+                            if endIdx >= 0 then html.Substring(idx + 7, endIdx - idx - 7)
+                            else ""
+                        else ""
+                    let wrapped = wrap title content
+                    let newHtml = html.Substring(0, contentStart) + wrapped + html.Substring(bodyEnd)
+                    return { response with Body = ResponseBody.Text newHtml }
+                else
+                    return response
+            | _ -> return response
+        }

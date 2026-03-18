@@ -170,3 +170,67 @@ let ``View.render with layout and QueryCache appends dehydration to content`` ()
         body |> should haveSubstring "__FIRE_QUERY_STATE__"
         body |> should haveSubstring "<p>hi</p>"
     | _ -> failwith "expected Text body"
+
+[<Fact>]
+let ``View.layout middleware wraps body content`` () = task {
+    let adminWrap (_title: string) (content: string) =
+        $"""<div class="admin"><nav>Sidebar</nav><div class="main">{content}</div></div>"""
+    let inner : Handler = fun _ -> task {
+        return
+            View.page "Dashboard" (Html.h1 [ Text "Hello" ])
+            |> View.render
+    }
+    let handler = (View.layout adminWrap) inner
+    let! response = handler (Unchecked.defaultof<Request>)
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should haveSubstring "<nav>Sidebar</nav>"
+        body |> should haveSubstring "<h1>Hello</h1>"
+        body |> should haveSubstring "class=\"admin\""
+    | _ -> failwith "expected Text body layout"
+}
+
+[<Fact>]
+let ``View.layout middleware passes non-HTML through`` () = task {
+    let wrap (_t: string) (c: string) = $"<div>{c}</div>"
+    let inner : Handler = fun _ -> task { return Response.json {| x = 1 |} }
+    let handler = (View.layout wrap) inner
+    let! response = handler (Unchecked.defaultof<Request>)
+    response.Headers |> should not' (contain ("Content-Type", "text/html; charset=utf-8"))
+}
+
+[<Fact>]
+let ``View.layout middleware extracts title`` () = task {
+    let mutable receivedTitle = ""
+    let wrap (title: string) (content: string) =
+        receivedTitle <- title
+        $"<div>{content}</div>"
+    let inner : Handler = fun _ -> task {
+        return View.page "MyTitle" (Text "hi") |> View.render
+    }
+    let handler = (View.layout wrap) inner
+    let! _ = handler (Unchecked.defaultof<Request>)
+    receivedTitle |> should equal "MyTitle"
+}
+
+[<Fact>]
+let ``View.layout composes for nested layouts`` () = task {
+    let outerWrap (_title: string) (content: string) =
+        $"""<div class="outer">{content}</div>"""
+    let innerWrap (_title: string) (content: string) =
+        $"""<div class="inner">{content}</div>"""
+    let inner : Handler = fun _ -> task {
+        return View.page "Test" (Html.p [ Text "content" ]) |> View.render
+    }
+    let handler = (View.layout outerWrap) ((View.layout innerWrap) inner)
+    let! response = handler (Unchecked.defaultof<Request>)
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should haveSubstring "class=\"outer\""
+        body |> should haveSubstring "class=\"inner\""
+        body |> should haveSubstring "<p>content</p>"
+        let outerIdx = body.IndexOf("outer")
+        let innerIdx = body.IndexOf("inner")
+        outerIdx |> should be (lessThan innerIdx)
+    | _ -> failwith "expected Text body nested"
+}
