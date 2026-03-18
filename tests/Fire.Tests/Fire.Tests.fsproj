@@ -59,6 +59,7 @@
     <Compile Include="ViewTests.fs" />
     <Compile Include="ComponentTests.fs" />
     <Compile Include="QueryTests.fs" />
+    <Compile Include="ViteTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

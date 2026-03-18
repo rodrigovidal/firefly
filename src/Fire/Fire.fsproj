@@ -46,6 +46,7 @@
     <Compile Include="Health.fs" />
     <Compile Include="Cors.fs" />
     <Compile Include="View/View.fs" />
+    <Compile Include="Vite.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />
   </ItemGroup>
