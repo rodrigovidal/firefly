@@ -246,6 +246,85 @@ type TransformBenchmark() =
         let obj = System.Text.Json.JsonSerializer.Deserialize<TransformInput>(json)
         {| Name = obj.name.Trim(); Email = obj.email.Trim().ToLowerInvariant() |} |> box
 
+// --- 6. parseLookup vs parseMap (allocation comparison) ---
+
+[<MemoryDiagnoser>]
+type LookupVsMapBenchmark() =
+    let lookupSchema = schema {
+        let! name  = Schema.required "name" Schema.string [ Schema.minLength 1 ]
+        let! email = Schema.required "email" Schema.string [ Schema.email ]
+        let! age   = Schema.required "age" Schema.int [ Schema.min 0.0; Schema.max 150.0 ]
+        return {| Name = name; Email = email; Age = age |}
+    }
+
+    // Simulates route params / query string — pre-existing dictionary
+    let data =
+        let d = System.Collections.Generic.Dictionary<string, string>()
+        d.["name"] <- "Alice"
+        d.["email"] <- "alice@test.com"
+        d.["age"] <- "30"
+        d :> System.Collections.Generic.IReadOnlyDictionary<string, string>
+
+    // Simulates direct source (e.g., IQueryCollection.TryGetValue)
+    let lookup (name: string) =
+        match name.ToLowerInvariant() with
+        | "name" -> Some "Alice"
+        | "email" -> Some "alice@test.com"
+        | "age" -> Some "30"
+        | _ -> None
+
+    [<Benchmark(Description = "Flame: parseLookup (zero-alloc)", Baseline = true)>]
+    member _.ParseLookup() : obj =
+        Schema.parseLookup lookupSchema lookup |> box
+
+    [<Benchmark(Description = "Flame: parseMap (from dict)")>]
+    member _.ParseMap() : obj =
+        Schema.parseMap lookupSchema data |> box
+
+// --- 7. Realistic with parseLookup (form/query simulation) ---
+
+[<MemoryDiagnoser>]
+type RealisticLookupBenchmark() =
+    let json = """{"CustomerName":"Alice Johnson","Email":"alice@example.com","Phone":"+1-555-0123","Amount":299.99,"Currency":"USD","Billing":{"Street":"123 Main St","City":"Springfield","State":"IL","Zip":"62701","Country":"US"}}"""
+    let bytes = System.Text.Encoding.UTF8.GetBytes(json)
+
+    let billingSchema = schema {
+        let! street  = Schema.required "Street" Schema.string [ Schema.minLength 1; Schema.maxLength 200 ]
+        let! city    = Schema.required "City" Schema.string [ Schema.minLength 1; Schema.maxLength 100 ]
+        let! state   = Schema.required "State" Schema.string [ Schema.minLength 2; Schema.maxLength 2 ]
+        let! zip     = Schema.required "Zip" Schema.string [ Schema.pattern @"^\d{5}$" ]
+        let! country = Schema.required "Country" Schema.string [ Schema.minLength 1; Schema.maxLength 2 ]
+        return {| Street = street; City = city; State = state; Zip = zip; Country = country |}
+    }
+
+    let orderSchema = schema {
+        let! customerName = Schema.required "CustomerName" Schema.string [ Schema.minLength 1; Schema.maxLength 100 ]
+        let! email    = Schema.required "Email" Schema.string [ Schema.email ]
+        let! phone    = Schema.required "Phone" Schema.string [ Schema.maxLength 20 ]
+        let! amount   = Schema.required "Amount" Schema.float [ Schema.min 0.01; Schema.max 1000000.0 ]
+        let! currency = Schema.required "Currency" Schema.string [ Schema.minLength 3; Schema.maxLength 3 ]
+        let! billing  = Schema.required "Billing" (Schema.nest billingSchema) []
+        return {| CustomerName = customerName; Email = email; Phone = phone; Amount = amount; Currency = currency; Billing = billing |}
+    }
+
+    [<Benchmark(Description = "Flame: buffer (JSON body)", Baseline = true)>]
+    member _.FlameBuffer() : obj =
+        let buffer = System.Buffers.ReadOnlySequence<byte>(bytes)
+        Schema.parseBuffer orderSchema buffer |> box
+
+    [<Benchmark(Description = "Flame: parseLookup (form/query sim)")>]
+    member _.FlameLookup() : obj =
+        // Simulates what parseParams/parseQuery do — direct lookup, no dict
+        Schema.parseLookup orderSchema (fun name ->
+            match name with
+            | "CustomerName" -> Some "Alice Johnson"
+            | "Email" -> Some "alice@example.com"
+            | "Phone" -> Some "+1-555-0123"
+            | "Amount" -> Some "299.99"
+            | "Currency" -> Some "USD"
+            | _ -> None  // Billing is nested — not available in flat form data
+        ) |> box
+
 // --- Entry point ---
 
 module Program =
