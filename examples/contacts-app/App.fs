@@ -265,9 +265,38 @@ let create () =
         | None -> return Views.notFound
     }
 
+    // Demo: Component.client + QueryCache (Phase 2 view engine)
+    let interactivePage (_req: Request) = task {
+        let cache = QueryCache()
+        let fetch () = task {
+            return contacts |> Seq.tryHead |> Option.map (fun c -> {| name = c.Name; email = c.Email |})
+        }
+        let! featured = Query.prefetch "featured" fetch cache
+        let content =
+            Html.div [
+                Html.h1 [ Text "Interactive Demo" ]
+                Html.p [ Text "This page uses Component.client and QueryCache." ]
+                match featured with
+                | Some f ->
+                    Html.div ([ Class "card" ], [
+                        Html.p [ Html.strong [ Text "Featured: " ]; Text f.name ]
+                        Component.client "ContactActions" {| email = f.email |}
+                    ])
+                | None ->
+                    Html.p ([ Class "empty" ], [ Text "No contacts yet." ])
+            ]
+        return
+            View.page "Interactive" content
+            |> View.withQueryCache cache
+            |> View.withScript "/static/client.js"
+            |> View.withLayout Layout.main
+            |> View.render
+    }
+
     let routes =
         Route.start
         |> Route.get "/" listContacts
+        |> Route.get "/interactive" interactivePage
         |> Route.get "/contacts/new" newContact
         |> Route.post "/contacts" createContact
         |> Route.get "/contacts/%i" showContact
