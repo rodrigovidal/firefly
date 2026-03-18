@@ -892,10 +892,19 @@ type SchemaBuilder() =
         // Build parameter mapping: anonymous record constructors order params alphabetically
         let ctor = typeof<'T>.GetConstructors().[0]
         let ctorParams = ctor.GetParameters()
-        let paramMapping =
-            ctorParams |> Array.map (fun p ->
-                compiledFields |> Array.findIndex (fun f ->
-                    String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+        // Try to build param mapping from JSON field names to constructor params.
+        // This succeeds when JSON field names match record property names (common case).
+        // When they don't match (e.g., JSON "CustomerName" but property "Name"),
+        // we fall back to the Parse (JsonElement) path which handles mapping via closures.
+        let paramMapping, canUseBufferPath =
+            let mapping = Array.zeroCreate ctorParams.Length
+            let mutable allMatched = true
+            for i in 0..ctorParams.Length-1 do
+                match compiledFields |> Array.tryFindIndex (fun f ->
+                    String.Equals(f.Name, ctorParams.[i].Name, StringComparison.OrdinalIgnoreCase)) with
+                | Some idx -> mapping.[i] <- idx
+                | None -> allMatched <- false; mapping.[i] <- min i (compiledFields.Length - 1)
+            (mapping, allMatched)
 
         let fieldIndex = SchemaCompiler.buildFieldIndex compiledFields
 
@@ -904,10 +913,11 @@ type SchemaBuilder() =
 
         let hasChecks = not (List.isEmpty parser.Refinements)
 
-        // If schema has cross-field checks, the buffer path falls back to the
-        // JsonElement Parse path (which runs the CE closures that capture the checks).
+        // Fall back to JsonElement Parse path when:
+        // 1. Schema has cross-field checks (closures needed)
+        // 2. JSON field names don't match record property names (mapping broken)
         let bufferParse =
-            if hasChecks then
+            if hasChecks || not canUseBufferPath then
                 fun (buffer: ReadOnlySequence<byte>) ->
                     try
                         use doc = JsonDocument.Parse(buffer)
