@@ -78,9 +78,8 @@ let createWith (generateCode: unit -> string) =
     }
 
     let createShortUrl : Handler = fun req -> task {
-        // Merges JSON body, form data, and query params into one — Flame validates it
-        let! all = req.All()
-        match Schema.parseMap createUrlSchema all with
+        // Auto-detects: JSON → zero-alloc buffer path, form → form path
+        match! Schema.parse createUrlSchema req with
         | Ok input ->
             let code = generateCode ()
             let entry = { Code = code; Url = input.Url; Clicks = 0; CreatedAt = DateTime.UtcNow }

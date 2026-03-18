@@ -22,20 +22,7 @@ module Schema =
         return ReadOnlySequence<byte>(stream.ToArray())
     }
 
-    /// Wraps a handler with schema validation. Validates body via PipeReader.
-    let validated (schema: Flame.Schema<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
-        fun req -> task {
-            try
-                let! buffer = readPipeToBuffer req.Raw.Request.BodyReader
-                let result = schema.ParseBuffer buffer
-                match result with
-                | Ok value -> return! handler value
-                | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
-            with ex ->
-                return Response.json {| errors = [$"invalid JSON: {ex.Message}"] |} |> Response.status 400
-        }
-
-    /// Parse and validate the request body using a schema. Returns Result.
+    /// Parse JSON body via PipeReader (zero-alloc buffer path).
     let parseRequest (schema: Flame.Schema<'T>) (req: Request) : System.Threading.Tasks.Task<Result<'T, string list>> = task {
         try
             let! buffer = readPipeToBuffer req.Raw.Request.BodyReader
@@ -43,3 +30,49 @@ module Schema =
         with ex ->
             return Error [$"invalid JSON: {ex.Message}"]
     }
+
+    /// Parse form body directly from IFormCollection (minimal alloc).
+    let parseFormRequest (schema: Flame.Schema<'T>) (req: Request) : System.Threading.Tasks.Task<Result<'T, string list>> =
+        let httpRequest = req.Raw.Request
+        task {
+            try
+                let! form = httpRequest.ReadFormAsync()
+                let dict = System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+                for kvp in form do
+                    dict.[kvp.Key] <- kvp.Value.ToString()
+                return Flame.Schema.parseMap schema dict
+            with ex ->
+                return Error [$"invalid form data: {ex.Message}"]
+        }
+
+    /// Auto-detect content type and parse accordingly.
+    /// JSON → zero-alloc buffer path. Form → form path.
+    let parse (schema: Flame.Schema<'T>) (req: Request) : System.Threading.Tasks.Task<Result<'T, string list>> =
+        let ct = req.Raw.Request.ContentType
+        if ct <> null && (ct.Contains("application/x-www-form-urlencoded") || ct.Contains("multipart/form-data")) then
+            parseFormRequest schema req
+        else
+            parseRequest schema req
+
+    /// Parse route params into a typed record.
+    let parseParams (schema: Flame.Schema<'T>) (req: Request) : Result<'T, string list> =
+        Flame.Schema.parseMap schema req.Params
+
+    /// Parse query string into a typed record.
+    let parseQuery (schema: Flame.Schema<'T>) (req: Request) : Result<'T, string list> =
+        let query = req.Raw.Request.Query
+        let dict = System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
+        for kvp in query do
+            dict.[kvp.Key] <- kvp.Value.ToString()
+        Flame.Schema.parseMap schema dict
+
+    /// Wraps a handler with schema validation. Auto-detects content type.
+    let validated (schema: Flame.Schema<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
+        fun req -> task {
+            try
+                match! parse schema req with
+                | Ok value -> return! handler value
+                | Error errors -> return Response.json {| errors = errors |} |> Response.status 400
+            with ex ->
+                return Response.json {| errors = [$"invalid request: {ex.Message}"] |} |> Response.status 400
+        }
