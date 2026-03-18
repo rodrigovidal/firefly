@@ -39,7 +39,7 @@ module View =
             | Some layout -> layout config.Title content
             | None ->
                 let sb = System.Text.StringBuilder()
-                sb.Append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">") |> ignore
+                sb.Append("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">") |> ignore
                 sb.Append($"<title>{System.Net.WebUtility.HtmlEncode config.Title}</title>") |> ignore
                 for href in config.Styles do
                     sb.Append($"""<link rel="stylesheet" href="{System.Net.WebUtility.HtmlEncode href}">""") |> ignore

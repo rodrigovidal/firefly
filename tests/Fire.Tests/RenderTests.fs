@@ -87,3 +87,18 @@ let ``Render complex nested structure`` () =
         ])
         |> Render.toHtml
     html |> should equal """<div class="page"><h1>Title</h1><p class="lead">Intro</p><ul><li><a href="/one">One</a></li><li><a href="/two">Two</a></li></ul></div>"""
+
+[<Fact>]
+let ``Render Data attr key is HTML-encoded`` () =
+    let html = Render.toHtml (Html.div ([ Data("x\"y", "val") ], [ Text "hi" ]))
+    html |> should equal """<div data-x&quot;y="val">hi</div>"""
+
+[<Fact>]
+let ``Render Custom attr key is HTML-encoded`` () =
+    let html = Render.toHtml (Html.div ([ Custom("x\"y", "val") ], [ Text "hi" ]))
+    html |> should equal """<div x&quot;y="val">hi</div>"""
+
+[<Fact>]
+let ``Render void element via escape hatch has no closing tag`` () =
+    let html = Render.toHtml (Html.element "wbr" [])
+    html |> should equal "<wbr>"

@@ -7,7 +7,7 @@ open System.Text
 module Render =
 
     let private voidElements =
-        Set.ofList [ "br"; "hr"; "img"; "input"; "meta"; "link" ]
+        Set.ofList [ "area"; "base"; "br"; "col"; "embed"; "hr"; "img"; "input"; "link"; "meta"; "param"; "source"; "track"; "wbr" ]
 
     let private renderAttr (sb: StringBuilder) (attr: Attr) =
         match attr with
@@ -24,8 +24,8 @@ module Render =
         | Checked -> sb.Append(" checked") |> ignore
         | Required -> sb.Append(" required") |> ignore
         | Readonly -> sb.Append(" readonly") |> ignore
-        | Data(k, v) -> sb.Append($""" data-{k}="{WebUtility.HtmlEncode v}" """.TrimEnd()) |> ignore
-        | Custom(k, v) -> sb.Append($""" {k}="{WebUtility.HtmlEncode v}" """.TrimEnd()) |> ignore
+        | Data(k, v) -> sb.Append($""" data-{WebUtility.HtmlEncode k}="{WebUtility.HtmlEncode v}" """.TrimEnd()) |> ignore
+        | Custom(k, v) -> sb.Append($""" {WebUtility.HtmlEncode k}="{WebUtility.HtmlEncode v}" """.TrimEnd()) |> ignore
 
     let rec private render (sb: StringBuilder) (node: Node) =
         match node with

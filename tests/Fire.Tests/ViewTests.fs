@@ -46,7 +46,7 @@ let ``View.render without layout produces default HTML document`` () =
     response.Headers |> should contain ("Content-Type", "text/html; charset=utf-8")
     match response.Body with
     | ResponseBody.Text body ->
-        body |> should haveSubstring "<!DOCTYPE html>"
+        body |> should haveSubstring """<!DOCTYPE html><html lang="en">"""
         body |> should haveSubstring "<title>Home</title>"
         body |> should haveSubstring "<h1>Hello</h1>"
         body |> should haveSubstring """<link rel="stylesheet" href="/app.css">"""
@@ -91,4 +91,21 @@ let ``View.render multiple scripts appear in order`` () =
         let idxA = body.IndexOf("/a.js")
         let idxB = body.IndexOf("/b.js")
         idxA |> should be (lessThan idxB)
+    | _ -> failwith "expected Text body"
+
+[<Fact>]
+let ``View.render with layout ignores scripts and styles`` () =
+    let myLayout (title: string) (content: string) =
+        $"<html><head><title>{title}</title></head><body>{content}</body></html>"
+    let response =
+        View.page "Test" (Html.p [ Text "hi" ])
+        |> View.withScript "/app.js"
+        |> View.withStyle "/app.css"
+        |> View.withLayout myLayout
+        |> View.render
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should not' (haveSubstring "/app.js")
+        body |> should not' (haveSubstring "/app.css")
+        body |> should haveSubstring "<p>hi</p>"
     | _ -> failwith "expected Text body"
