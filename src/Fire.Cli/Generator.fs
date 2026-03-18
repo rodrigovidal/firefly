@@ -17,7 +17,7 @@ let capitalize (s: string) =
     if String.IsNullOrEmpty(s) then s
     else s.Substring(0, 1).ToUpper() + s.Substring(1)
 
-let private singular (name: string) =
+let singular (name: string) =
     if name.Length < 2 then name
     elif name.EndsWith("ies", StringComparison.OrdinalIgnoreCase) then
         name.Substring(0, name.Length - 3) + "y"
