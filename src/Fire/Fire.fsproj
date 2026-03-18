@@ -44,6 +44,7 @@
     <Compile Include="DevErrorPage.fs" />
     <Compile Include="Health.fs" />
     <Compile Include="Cors.fs" />
+    <Compile Include="View/View.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />
   </ItemGroup>
