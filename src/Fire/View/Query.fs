@@ -5,7 +5,7 @@ open System.Text.Json
 type QueryEntry = { Key: string; Data: obj }
 
 type QueryCache() =
-    let entries = System.Collections.Generic.List<QueryEntry>()
+    let entries = System.Collections.Concurrent.ConcurrentBag<QueryEntry>()
 
     member _.Add(key: string, data: obj) =
         entries.Add({ Key = key; Data = data })
@@ -13,7 +13,7 @@ type QueryCache() =
     member _.Entries = entries |> Seq.toList
 
     member _.DehydrateScript() : Node =
-        if entries.Count = 0 then Empty
+        if entries.IsEmpty then Empty
         else
             let json =
                 entries
