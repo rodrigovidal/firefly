@@ -51,7 +51,9 @@ let ``DehydrateScript produces valid TanStack Query dehydrate format`` () =
         s |> should haveSubstring "\"queries\":["
         s |> should haveSubstring "\"queryKey\""
         s |> should haveSubstring "\"status\":\"success\""
+        s |> should haveSubstring "\"fetchStatus\":\"idle\""
         s |> should haveSubstring "\"dataUpdateCount\":1"
+        s |> should haveSubstring "\"dataUpdatedAt\":"
         s |> should haveSubstring "\"data\""
     | _ -> failwith "expected Raw node"
 
