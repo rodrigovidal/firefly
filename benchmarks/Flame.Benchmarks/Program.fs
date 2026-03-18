@@ -3,9 +3,18 @@ namespace Flame.Benchmarks
 open BenchmarkDotNet.Attributes
 open Flame
 
-// --- 1. Simple parse ---
+// --- Named types for STJ deserialization ---
 
 type SimpleTodo = { Title: string; Completed: bool }
+
+[<CLIMutable>] type ValidationInput = { title: string; email: string; age: int }
+
+[<CLIMutable>] type NestedAddress = { street: string; city: string; zip: string }
+[<CLIMutable>] type NestedUser = { name: string; address: NestedAddress }
+
+[<CLIMutable>] type TransformInput = { name: string; email: string }
+
+// --- 1. Simple parse ---
 
 [<MemoryDiagnoser>]
 type SimpleParserBenchmark() =
@@ -19,17 +28,17 @@ type SimpleParserBenchmark() =
     }
 
     [<Benchmark(Description = "Flame: simple parse")>]
-    member _.FlameSimple() =
-        Schema.parseString flameSchema json
+    member _.FlameSimple() : obj =
+        Schema.parseString flameSchema json |> box
 
     [<Benchmark(Description = "System.Text.Json: deserialize", Baseline = true)>]
-    member _.StjSimple() =
-        System.Text.Json.JsonSerializer.Deserialize<SimpleTodo>(json)
+    member _.StjSimple() : obj =
+        System.Text.Json.JsonSerializer.Deserialize<SimpleTodo>(json) |> box
 
     [<Benchmark(Description = "Flame: buffer parse (zero-alloc)")>]
-    member _.FlameBuffer() =
+    member _.FlameBuffer() : obj =
         let buffer = System.Buffers.ReadOnlySequence<byte>(bytes)
-        Schema.parseBuffer flameSchema buffer
+        Schema.parseBuffer flameSchema buffer |> box
 
 // --- 2. Validation ---
 
@@ -46,22 +55,22 @@ type ValidationBenchmark() =
     }
 
     [<Benchmark(Description = "Flame: parse + validate")>]
-    member _.FlameValidated() =
-        Schema.parseString flameSchema validJson
+    member _.FlameValidated() : obj =
+        Schema.parseString flameSchema validJson |> box
 
     [<Benchmark(Description = "Flame: buffer parse + validate")>]
-    member _.FlameBufferValidated() =
+    member _.FlameBufferValidated() : obj =
         let buffer = System.Buffers.ReadOnlySequence<byte>(bytes)
-        Schema.parseBuffer flameSchema buffer
+        Schema.parseBuffer flameSchema buffer |> box
 
     [<Benchmark(Description = "STJ + manual validation", Baseline = true)>]
-    member _.StjManual() =
-        let obj = System.Text.Json.JsonSerializer.Deserialize<{| title: string; email: string; age: int |}>(validJson)
+    member _.StjManual() : obj =
+        let obj = System.Text.Json.JsonSerializer.Deserialize<ValidationInput>(validJson)
         let mutable valid = true
         if System.String.IsNullOrEmpty(obj.title) || obj.title.Length > 200 then valid <- false
         if not (obj.email.Contains("@")) then valid <- false
         if obj.age < 0 || obj.age > 150 then valid <- false
-        obj
+        obj |> box
 
 // --- 3. Nested objects ---
 
@@ -83,17 +92,17 @@ type NestedBenchmark() =
     }
 
     [<Benchmark(Description = "Flame: nested parse")>]
-    member _.FlameNested() =
-        Schema.parseString userSchema json
+    member _.FlameNested() : obj =
+        Schema.parseString userSchema json |> box
 
     [<Benchmark(Description = "Flame: nested buffer")>]
-    member _.FlameNestedBuffer() =
+    member _.FlameNestedBuffer() : obj =
         let buffer = System.Buffers.ReadOnlySequence<byte>(bytes)
-        Schema.parseBuffer userSchema buffer
+        Schema.parseBuffer userSchema buffer |> box
 
     [<Benchmark(Description = "STJ: nested deserialize", Baseline = true)>]
-    member _.StjNested() =
-        System.Text.Json.JsonSerializer.Deserialize<{| name: string; address: {| street: string; city: string; zip: string |} |}>(json)
+    member _.StjNested() : obj =
+        System.Text.Json.JsonSerializer.Deserialize<NestedUser>(json) |> box
 
 // --- 4. Schema.fromType vs STJ ---
 
@@ -106,12 +115,12 @@ type FromTypeBenchmark() =
     let flameSchema = Schema.fromType<UserRecord>()
 
     [<Benchmark(Description = "Flame: fromType parse")>]
-    member _.FlameFromType() =
-        Schema.parseString flameSchema json
+    member _.FlameFromType() : obj =
+        Schema.parseString flameSchema json |> box
 
     [<Benchmark(Description = "STJ: deserialize", Baseline = true)>]
-    member _.StjDeserialize() =
-        System.Text.Json.JsonSerializer.Deserialize<UserRecord>(json)
+    member _.StjDeserialize() : obj =
+        System.Text.Json.JsonSerializer.Deserialize<UserRecord>(json) |> box
 
 // --- 5. Transform benchmark ---
 
@@ -127,18 +136,18 @@ type TransformBenchmark() =
     }
 
     [<Benchmark(Description = "Flame: parse + transform")>]
-    member _.FlameTransform() =
-        Schema.parseString flameSchema json
+    member _.FlameTransform() : obj =
+        Schema.parseString flameSchema json |> box
 
     [<Benchmark(Description = "Flame: buffer + transform")>]
-    member _.FlameBufferTransform() =
+    member _.FlameBufferTransform() : obj =
         let buffer = System.Buffers.ReadOnlySequence<byte>(bytes)
-        Schema.parseBuffer flameSchema buffer
+        Schema.parseBuffer flameSchema buffer |> box
 
     [<Benchmark(Description = "STJ + manual transform", Baseline = true)>]
-    member _.StjManualTransform() =
-        let obj = System.Text.Json.JsonSerializer.Deserialize<{| name: string; email: string |}>(json)
-        {| Name = obj.name.Trim(); Email = obj.email.Trim().ToLowerInvariant() |}
+    member _.StjManualTransform() : obj =
+        let obj = System.Text.Json.JsonSerializer.Deserialize<TransformInput>(json)
+        {| Name = obj.name.Trim(); Email = obj.email.Trim().ToLowerInvariant() |} |> box
 
 // --- Entry point ---
 
