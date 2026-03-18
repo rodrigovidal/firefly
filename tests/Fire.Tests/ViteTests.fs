@@ -84,3 +84,12 @@ let ``Vite.shouldProxy does not match Fire routes`` () =
     Vite.shouldProxy "/contacts" |> should be False
     Vite.shouldProxy "/api/users" |> should be False
     Vite.shouldProxy "/static/logo.png" |> should be False
+
+[<Fact>]
+let ``Vite.devMiddleware passes non-Vite requests through`` () = task {
+    let inner : Handler = fun _ -> task { return Response.text "from fire" }
+    let mw = Vite.devMiddleware 5173
+    let handler = mw inner
+    let! response = handler (Unchecked.defaultof<Request>)
+    response.Body |> should equal (ResponseBody.Text "from fire")
+}

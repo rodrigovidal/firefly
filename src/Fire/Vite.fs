@@ -51,10 +51,46 @@ window.__vite_plugin_react_preamble_installed__ = true
 </script>"""
 
     let shouldProxy (path: string) : bool =
-        path.StartsWith("/@vite/", StringComparison.Ordinal) ||
+        not (isNull path) &&
+        (path.StartsWith("/@vite/", StringComparison.Ordinal) ||
         path.StartsWith("/@react-refresh", StringComparison.Ordinal) ||
         path.StartsWith("/src/", StringComparison.Ordinal) ||
-        path.StartsWith("/node_modules/.vite/", StringComparison.Ordinal)
+        path.StartsWith("/node_modules/.vite/", StringComparison.Ordinal))
+
+    let private defaultPort = 5173
+
+    // --- Dev proxy middleware ---
+
+    let private httpClient = lazy (new Net.Http.HttpClient())
+
+    let devMiddleware (port: int) : Middleware =
+        fun next req ->
+            let path = try req.Path with _ -> null
+            if shouldProxy path then
+                task {
+                    try
+                        let url = $"http://localhost:{port}{path}"
+                        let! proxyResponse = httpClient.Value.GetAsync(url)
+                        let! body = proxyResponse.Content.ReadAsStringAsync()
+                        let contentType =
+                            match proxyResponse.Content.Headers.ContentType with
+                            | null -> "application/octet-stream"
+                            | ct -> ct.ToString()
+                        return
+                            Response.text body
+                            |> Response.status (int proxyResponse.StatusCode)
+                            |> Response.header "Content-Type" contentType
+                    with
+                    | :? Net.Http.HttpRequestException ->
+                        return
+                            Response.text "Vite dev server not running. Start it with 'npm run dev'."
+                            |> Response.status 502
+                }
+            else
+                next req
+
+    let dev () : Middleware = devMiddleware defaultPort
+    let devWithPort (port: int) : Middleware = devMiddleware port
 
     let private isDevelopment () =
         let env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
@@ -62,7 +98,6 @@ window.__vite_plugin_react_preamble_installed__ = true
         || String.Equals(env, "dev", StringComparison.OrdinalIgnoreCase)
 
     let mutable private cachedManifest : Map<string, ManifestEntry> option = None
-    let private defaultPort = 5173
 
     let private getManifest (manifestPath: string) =
         match cachedManifest with
