@@ -57,6 +57,7 @@
     <Compile Include="NodeTests.fs" />
     <Compile Include="RenderTests.fs" />
     <Compile Include="ViewTests.fs" />
+    <Compile Include="ComponentTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
