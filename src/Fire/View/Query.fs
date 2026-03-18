@@ -19,9 +19,9 @@ type QueryCache() =
                 entries
                 |> Seq.map (fun e ->
                     let data = JsonSerializer.Serialize(e.Data)
-                    $"""{{"queryKey":["{e.Key}"],"state":{{"data":{data}}}}}""")
+                    $"""{{"queryKey":["{e.Key}"],"state":{{"data":{data},"dataUpdateCount":1,"status":"success"}}}}""")
                 |> String.concat ","
-            Raw $"""<script>window.__FIRE_QUERY_STATE__=[{json}]</script>"""
+            Raw $"""<script>window.__FIRE_QUERY_STATE__={{"mutations":[],"queries":[{json}]}}</script>"""
 
 [<RequireQualifiedAccess>]
 module Query =

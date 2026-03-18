@@ -42,13 +42,16 @@ let ``DehydrateScript returns Raw script with JSON`` () =
     | _ -> failwith "expected Raw node"
 
 [<Fact>]
-let ``DehydrateScript produces valid TanStack Query format`` () =
+let ``DehydrateScript produces valid TanStack Query dehydrate format`` () =
     let cache = QueryCache()
     cache.Add("key-1", {| x = 1 |})
     match cache.DehydrateScript() with
     | Raw s ->
+        s |> should haveSubstring "\"mutations\":[]"
+        s |> should haveSubstring "\"queries\":["
         s |> should haveSubstring "\"queryKey\""
-        s |> should haveSubstring "\"state\""
+        s |> should haveSubstring "\"status\":\"success\""
+        s |> should haveSubstring "\"dataUpdateCount\":1"
         s |> should haveSubstring "\"data\""
     | _ -> failwith "expected Raw node"
 
