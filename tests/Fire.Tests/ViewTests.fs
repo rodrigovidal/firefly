@@ -109,3 +109,64 @@ let ``View.render with layout ignores scripts and styles`` () =
         body |> should not' (haveSubstring "/app.css")
         body |> should haveSubstring "<p>hi</p>"
     | _ -> failwith "expected Text body"
+
+[<Fact>]
+let ``View.page creates ViewConfig with QueryCache None`` () =
+    let config = View.page "Home" (Text "hi")
+    config.QueryCache |> should equal None
+
+[<Fact>]
+let ``View.withQueryCache sets cache`` () =
+    let cache = QueryCache()
+    let config =
+        View.page "Home" (Text "hi")
+        |> View.withQueryCache cache
+    config.QueryCache |> Option.isSome |> should be True
+
+[<Fact>]
+let ``View.render with QueryCache injects dehydration script`` () =
+    let cache = QueryCache()
+    cache.Add("user-1", {| name = "Alice" |})
+    let response =
+        View.page "Home" (Html.p [ Text "hi" ])
+        |> View.withQueryCache cache
+        |> View.withScript "/app.js"
+        |> View.render
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should haveSubstring "__FIRE_QUERY_STATE__"
+        body |> should haveSubstring "Alice"
+        // Dehydration script should appear before user scripts
+        let idxState = body.IndexOf("__FIRE_QUERY_STATE__")
+        let idxApp = body.IndexOf("/app.js")
+        idxState |> should be (lessThan idxApp)
+    | _ -> failwith "expected Text body"
+
+[<Fact>]
+let ``View.render with empty QueryCache does not inject script`` () =
+    let cache = QueryCache()
+    let response =
+        View.page "Home" (Text "hi")
+        |> View.withQueryCache cache
+        |> View.render
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should not' (haveSubstring "__FIRE_QUERY_STATE__")
+    | _ -> failwith "expected Text body"
+
+[<Fact>]
+let ``View.render with layout and QueryCache appends dehydration to content`` () =
+    let cache = QueryCache()
+    cache.Add("k", {| v = 1 |})
+    let myLayout (title: string) (content: string) =
+        $"<html><body>{content}</body></html>"
+    let response =
+        View.page "Home" (Html.p [ Text "hi" ])
+        |> View.withQueryCache cache
+        |> View.withLayout myLayout
+        |> View.render
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should haveSubstring "__FIRE_QUERY_STATE__"
+        body |> should haveSubstring "<p>hi</p>"
+    | _ -> failwith "expected Text body"

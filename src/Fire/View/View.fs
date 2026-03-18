@@ -7,6 +7,7 @@ type ViewConfig = {
     Styles: string list
     Head: Node list
     Layout: (string -> string -> string) option
+    QueryCache: QueryCache option
 }
 
 [<RequireQualifiedAccess>]
@@ -18,7 +19,8 @@ module View =
           Scripts = []
           Styles = []
           Head = []
-          Layout = None }
+          Layout = None
+          QueryCache = None }
 
     let withScript (src: string) (config: ViewConfig) : ViewConfig =
         { config with Scripts = config.Scripts @ [ src ] }
@@ -32,11 +34,22 @@ module View =
     let withLayout (layout: string -> string -> string) (config: ViewConfig) : ViewConfig =
         { config with Layout = Some layout }
 
+    let withQueryCache (cache: QueryCache) (config: ViewConfig) : ViewConfig =
+        { config with QueryCache = Some cache }
+
     let render (config: ViewConfig) : Response =
         let content = Render.toHtml config.Content
+        let dehydrationScript =
+            match config.QueryCache with
+            | Some cache ->
+                let script = cache.DehydrateScript()
+                match script with
+                | Node.Empty -> ""
+                | _ -> Render.toHtml script
+            | None -> ""
         let html =
             match config.Layout with
-            | Some layout -> layout config.Title content
+            | Some layout -> layout config.Title (content + dehydrationScript)
             | None ->
                 let sb = System.Text.StringBuilder()
                 sb.Append("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">") |> ignore
@@ -47,6 +60,7 @@ module View =
                     sb.Append(Render.toHtml node) |> ignore
                 sb.Append("</head><body>") |> ignore
                 sb.Append(content) |> ignore
+                sb.Append(dehydrationScript) |> ignore
                 for src in config.Scripts do
                     sb.Append($"""<script src="{System.Net.WebUtility.HtmlEncode src}"></script>""") |> ignore
                 sb.Append("</body></html>") |> ignore
