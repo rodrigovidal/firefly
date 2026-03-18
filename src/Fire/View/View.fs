@@ -101,3 +101,17 @@ module View =
                     return response
             | _ -> return response
         }
+
+    /// Middleware that catches exceptions and renders a fallback UI.
+    /// The fallback receives the exception and page title, returns a Node.
+    let errorBoundary (fallback: exn -> string -> Node) : Middleware =
+        fun next req -> task {
+            try
+                return! next req
+            with ex ->
+                let node = fallback ex "Error"
+                return
+                    page "Error" node
+                    |> render
+                    |> fun r -> Response.status 500 r
+        }

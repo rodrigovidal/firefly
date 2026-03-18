@@ -131,3 +131,22 @@ module Component =
     let client (name: string) (props: 'T) : Node =
         let json = System.Text.Json.JsonSerializer.Serialize(props)
         Element("div", [ Data("fire-component", name); Data("fire-props", json) ], [])
+
+module Meta =
+    let description (text: string) : Node =
+        Element("meta", [ Custom("name", "description"); Custom("content", text) ], [])
+
+    let ogTitle (text: string) : Node =
+        Element("meta", [ Custom("property", "og:title"); Custom("content", text) ], [])
+
+    let ogDescription (text: string) : Node =
+        Element("meta", [ Custom("property", "og:description"); Custom("content", text) ], [])
+
+    let ogImage (url: string) : Node =
+        Element("meta", [ Custom("property", "og:image"); Custom("content", url) ], [])
+
+    let robots (content: string) : Node =
+        Element("meta", [ Custom("name", "robots"); Custom("content", content) ], [])
+
+    let canonical (url: string) : Node =
+        Element("link", [ Custom("rel", "canonical"); Href url ], [])

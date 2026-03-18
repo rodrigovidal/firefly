@@ -234,3 +234,77 @@ let ``View.layout composes for nested layouts`` () = task {
         outerIdx |> should be (lessThan innerIdx)
     | _ -> failwith "expected Text body nested"
 }
+
+// --- Meta helpers ---
+
+[<Fact>]
+let ``Meta.description renders meta tag`` () =
+    let html = Meta.description "A great page" |> Render.toHtml
+    html |> should haveSubstring "name=\"description\""
+    html |> should haveSubstring "content=\"A great page\""
+
+[<Fact>]
+let ``Meta.ogTitle renders og:title meta tag`` () =
+    let html = Meta.ogTitle "My Page" |> Render.toHtml
+    html |> should haveSubstring "property=\"og:title\""
+    html |> should haveSubstring "content=\"My Page\""
+
+[<Fact>]
+let ``Meta.ogImage renders og:image meta tag`` () =
+    let html = Meta.ogImage "/img/hero.png" |> Render.toHtml
+    html |> should haveSubstring "property=\"og:image\""
+    html |> should haveSubstring "/img/hero.png"
+
+[<Fact>]
+let ``Meta.robots renders robots meta tag`` () =
+    let html = Meta.robots "noindex, nofollow" |> Render.toHtml
+    html |> should haveSubstring "name=\"robots\""
+    html |> should haveSubstring "noindex, nofollow"
+
+[<Fact>]
+let ``Meta.canonical renders link tag`` () =
+    let html = Meta.canonical "https://example.com/page" |> Render.toHtml
+    html |> should haveSubstring "rel=\"canonical\""
+    html |> should haveSubstring "href=\"https://example.com/page\""
+
+[<Fact>]
+let ``Meta tags compose with View.withHead`` () =
+    let response =
+        View.page "Test" (Text "hi")
+        |> View.withHead (Meta.description "Test page")
+        |> View.withHead (Meta.robots "index")
+        |> View.render
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should haveSubstring "name=\"description\""
+        body |> should haveSubstring "name=\"robots\""
+    | _ -> failwith "expected Text body meta"
+
+// --- Error boundary ---
+
+[<Fact>]
+let ``View.errorBoundary catches exception and renders fallback`` () = task {
+    let fallback (ex: exn) (_title: string) =
+        Html.div [ Html.h1 [ Text "Oops" ]; Html.p [ Text ex.Message ] ]
+    let inner : Handler = fun _ -> task {
+        return failwith "broken"
+    }
+    let handler = (View.errorBoundary fallback) inner
+    let! response = handler (Unchecked.defaultof<Request>)
+    response.Status |> should equal 500
+    match response.Body with
+    | ResponseBody.Text body ->
+        body |> should haveSubstring "Oops"
+        body |> should haveSubstring "broken"
+    | _ -> failwith "expected Text body error"
+}
+
+[<Fact>]
+let ``View.errorBoundary passes successful responses through`` () = task {
+    let fallback (_ex: exn) (_title: string) = Html.p [ Text "error" ]
+    let inner : Handler = fun _ -> task { return Response.text "ok" }
+    let handler = (View.errorBoundary fallback) inner
+    let! response = handler (Unchecked.defaultof<Request>)
+    response.Status |> should equal 200
+    response.Body |> should equal (ResponseBody.Text "ok")
+}
