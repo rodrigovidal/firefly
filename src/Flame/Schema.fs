@@ -619,21 +619,18 @@ module Schema =
                 return Error [$"invalid JSON: {ex.Message}"]
         }
 
-    // --- Parse from key-value map (form data, query params, merged sources) ---
+    // --- Parse from any lookup function (zero intermediate allocation) ---
 
-    let parseMap (schema: Schema<'T>) (data: IReadOnlyDictionary<string, string>) : Result<'T, string list> =
+    /// Core: parse from a lookup function. No dictionary allocation.
+    /// The lookup takes a field name and returns Some value or None.
+    let parseLookup (schema: Schema<'T>) (lookup: string -> string option) : Result<'T, string list> =
         let fields = schema.CompiledFields
         let errors = ResizeArray<string>()
         let values = Array.zeroCreate fields.Length
 
         for i in 0..fields.Length-1 do
             let field = fields.[i]
-            // Case-insensitive lookup
-            let rawValue =
-                match data |> Seq.tryFind (fun kvp ->
-                    String.Equals(kvp.Key, field.Name, StringComparison.OrdinalIgnoreCase)) with
-                | Some kvp -> Some kvp.Value
-                | None -> None
+            let rawValue = lookup field.Name
 
             match rawValue with
             | None | Some "" ->
@@ -643,7 +640,6 @@ module Schema =
                     values.[i] <- field.DefaultValue
             | Some v ->
                 try
-                    // Convert string to target type (coercion)
                     let converted =
                         match field.Type with
                         | SchemaCompiler.FString -> box v
@@ -667,9 +663,8 @@ module Schema =
                             match DateTimeOffset.TryParse(v) with
                             | true, dto -> box dto
                             | false, _ -> failwith $"{field.Name}: expected date/time"
-                        | _ -> box v  // fallback: treat as string
+                        | _ -> box v
 
-                    // Apply rules (transforms + validation)
                     match applyRules field.Name field.Rules converted with
                     | Ok transformed -> values.[i] <- transformed
                     | Error errs -> errors.AddRange(errs)
@@ -682,6 +677,14 @@ module Schema =
             let args = schema.ParamMapping |> Array.map (fun idx -> values.[idx])
             let ctor = typeof<'T>.GetConstructors().[0]
             Ok (ctor.Invoke(args) :?> 'T)
+
+    /// Parse from a dictionary. Delegates to parseLookup.
+    let parseMap (schema: Schema<'T>) (data: IReadOnlyDictionary<string, string>) : Result<'T, string list> =
+        parseLookup schema (fun name ->
+            match data |> Seq.tryFind (fun kvp ->
+                String.Equals(kvp.Key, name, StringComparison.OrdinalIgnoreCase)) with
+            | Some kvp -> Some kvp.Value
+            | None -> None)
 
     // --- JSON Schema generation ---
 

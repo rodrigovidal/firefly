@@ -31,16 +31,16 @@ module Schema =
             return Error [$"invalid JSON: {ex.Message}"]
     }
 
-    /// Parse form body directly from IFormCollection (minimal alloc).
+    /// Parse form body directly from IFormCollection. Zero dictionary allocation.
     let parseFormRequest (schema: Flame.Schema<'T>) (req: Request) : System.Threading.Tasks.Task<Result<'T, string list>> =
         let httpRequest = req.Raw.Request
         task {
             try
                 let! form = httpRequest.ReadFormAsync()
-                let dict = System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
-                for kvp in form do
-                    dict.[kvp.Key] <- kvp.Value.ToString()
-                return Flame.Schema.parseMap schema dict
+                return Flame.Schema.parseLookup schema (fun name ->
+                    match form.TryGetValue(name) with
+                    | true, v -> Some (v.ToString())
+                    | false, _ -> None)
             with ex ->
                 return Error [$"invalid form data: {ex.Message}"]
         }
@@ -54,17 +54,22 @@ module Schema =
         else
             parseRequest schema req
 
-    /// Parse route params into a typed record.
+    /// Parse route params into a typed record. Zero allocation — reads directly from params.
     let parseParams (schema: Flame.Schema<'T>) (req: Request) : Result<'T, string list> =
-        Flame.Schema.parseMap schema req.Params
+        let params' = req.Params
+        Flame.Schema.parseLookup schema (fun name ->
+            // Case-insensitive lookup in route params
+            params' |> Seq.tryFind (fun kvp ->
+                System.String.Equals(kvp.Key, name, System.StringComparison.OrdinalIgnoreCase))
+            |> Option.map (fun kvp -> kvp.Value))
 
-    /// Parse query string into a typed record.
+    /// Parse query string into a typed record. Zero allocation — reads directly from IQueryCollection.
     let parseQuery (schema: Flame.Schema<'T>) (req: Request) : Result<'T, string list> =
         let query = req.Raw.Request.Query
-        let dict = System.Collections.Generic.Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
-        for kvp in query do
-            dict.[kvp.Key] <- kvp.Value.ToString()
-        Flame.Schema.parseMap schema dict
+        Flame.Schema.parseLookup schema (fun name ->
+            match query.TryGetValue(name) with
+            | true, v -> Some (v.ToString())
+            | false, _ -> None)
 
     /// Wraps a handler with schema validation. Auto-detects content type.
     let validated (schema: Flame.Schema<'T>) (handler: 'T -> System.Threading.Tasks.Task<Response>) : Handler =
