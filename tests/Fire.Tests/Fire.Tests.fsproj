@@ -58,6 +58,7 @@
     <Compile Include="RenderTests.fs" />
     <Compile Include="ViewTests.fs" />
     <Compile Include="ComponentTests.fs" />
+    <Compile Include="QueryTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

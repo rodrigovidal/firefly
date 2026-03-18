@@ -15,6 +15,7 @@
   <ItemGroup>
     <Compile Include="View/Node.fs" />
     <Compile Include="View/Render.fs" />
+    <Compile Include="View/Query.fs" />
     <Compile Include="Request.fs" />
     <Compile Include="Response.fs" />
     <Compile Include="Cookie.fs" />
