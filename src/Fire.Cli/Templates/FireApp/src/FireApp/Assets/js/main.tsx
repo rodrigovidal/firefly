@@ -1,4 +1,4 @@
-import { hydrateFireApp } from '@fire/fire-react'
+import { hydrateFireApp, enableNavigation } from '@fire/fire-react'
 
 // Register your React components here.
 // They will be hydrated wherever Component.client "Name" is used in F#.
@@ -8,3 +8,4 @@ import { hydrateFireApp } from '@fire/fire-react'
 //   hydrateFireApp({ Counter })
 
 hydrateFireApp({})
+enableNavigation()
