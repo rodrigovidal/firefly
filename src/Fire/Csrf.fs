@@ -54,13 +54,20 @@ module Csrf =
             else
                 // Validate token
                 let cookieToken = req.Cookie cookieName
-                let submittedToken =
+                let! submittedToken = task {
                     match req.Header headerName with
-                    | Some t -> Some t
+                    | Some t -> return Some t
                     | None ->
-                        // Check form field (for traditional form submissions)
-                        // Read from query as fallback
-                        req.QueryParam formFieldName
+                        // Check form body for traditional form submissions
+                        let ct = req.ContentType |> Option.defaultValue ""
+                        if ct.Contains("application/x-www-form-urlencoded") || ct.Contains("multipart/form-data") then
+                            let! form = req.Form()
+                            match form.TryGetValue(formFieldName) with
+                            | true, v -> return Some v
+                            | false, _ -> return req.QueryParam formFieldName
+                        else
+                            return req.QueryParam formFieldName
+                }
 
                 match cookieToken, submittedToken with
                 | Some ct, Some st when ct = st ->

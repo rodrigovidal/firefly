@@ -71,3 +71,33 @@ let ``CSRF POST with mismatched token returns 403`` () = task {
     let! response = client |> TestClient.post "/submit" "{}"
     response.Status |> should equal 403
 }
+
+[<Fact>]
+let ``CSRF POST with matching _csrf form field succeeds`` () = task {
+    let token = "test-csrf-form-token"
+    let routes =
+        Route.start
+        |> Route.post "/submit" (fun _ -> task { return Response.text "submitted" })
+    let config = App.defaults |> App.middleware Csrf.middleware
+    let client =
+        TestClient.createWith routes config
+        |> TestClient.withHeader "Cookie" $"_fire_csrf={token}"
+        |> TestClient.withHeader "Content-Type" "application/x-www-form-urlencoded"
+    let! response = client |> TestClient.post "/submit" $"_csrf={token}"
+    response.Status |> should equal 200
+    response.Body |> should equal "submitted"
+}
+
+[<Fact>]
+let ``CSRF POST with mismatched _csrf form field returns 403`` () = task {
+    let routes =
+        Route.start
+        |> Route.post "/submit" (fun _ -> task { return Response.text "submitted" })
+    let config = App.defaults |> App.middleware Csrf.middleware
+    let client =
+        TestClient.createWith routes config
+        |> TestClient.withHeader "Cookie" "_fire_csrf=real-token"
+        |> TestClient.withHeader "Content-Type" "application/x-www-form-urlencoded"
+    let! response = client |> TestClient.post "/submit" "_csrf=wrong-token"
+    response.Status |> should equal 403
+}
