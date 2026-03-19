@@ -83,3 +83,40 @@ let ``Evlog captures request status`` () = task {
     r2.StatusCode |> should equal System.Net.HttpStatusCode.NotFound
     do! stop()
 }
+
+[<Fact>]
+let ``Evlog emits wide event with accumulated context via Drain`` () = task {
+    let mutable drainedJson = System.ReadOnlyMemory<byte>.Empty
+    let routes =
+        Route.start
+        |> Route.get "/checkout" (fun (req: Request) -> task {
+            req.Evlog.Set("user", "usr_42")
+            req.Evlog.Set("cart.items", 3)
+            return Response.text "done"
+        })
+    let config =
+        App.defaults
+        |> App.port 0
+        |> App.dependencyInjection (fun services ->
+            services.AddEvlog(fun opts ->
+                opts.Service <- "test-drain"
+                opts.Pretty <- false
+                opts.Drain <- fun ctx ->
+                    drainedJson <- ctx.EventJson
+                    System.Threading.Tasks.Task.CompletedTask
+            ) |> ignore
+        )
+        |> App.configure (fun app -> app.UseEvlog() |> ignore)
+    use cts = new CancellationTokenSource()
+    let! (port, stop) = App.runTest routes config cts.Token
+    use client = new System.Net.Http.HttpClient()
+    let! resp = client.GetAsync($"http://127.0.0.1:{port}/checkout")
+    resp.StatusCode |> should equal System.Net.HttpStatusCode.OK
+    // Give Evlog a moment to drain (it may be async)
+    do! System.Threading.Tasks.Task.Delay(100)
+    let json = System.Text.Encoding.UTF8.GetString(drainedJson.Span)
+    json |> should not' (equal "")
+    json |> should haveSubstring "usr_42"
+    json |> should haveSubstring "test-drain"
+    do! stop()
+}
