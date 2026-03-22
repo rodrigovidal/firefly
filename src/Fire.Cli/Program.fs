@@ -29,6 +29,7 @@ let private usage () =
         "  fire dev [--project <path>]"
         "  fire gen html <Resource> field:type [field:type ...]"
         "  fire gen json <Resource> field:type [field:type ...]"
+        "  fire openapi [--project <path>] [--output <path>] [--title <title>] [--version <version>] [--routes <name>]"
     ]
 
 let private ensureDirectory path =
@@ -167,6 +168,30 @@ let private startProcess (fileName: string) (arguments: string) (workingDir: str
     proc.WaitForExit()
     proc.ExitCode
 
+let private parseOpenApiArgs (args: string list) =
+    let rec loop args (opts: OpenApiGenerator.OpenApiOptions) =
+        match args with
+        | [] -> opts
+        | "--project" :: path :: rest -> loop rest { opts with ProjectPath = Path.GetFullPath(path) }
+        | "--output" :: path :: rest -> loop rest { opts with Output = Some path }
+        | "--title" :: title :: rest -> loop rest { opts with Title = Some title }
+        | "--version" :: version :: rest -> loop rest { opts with Version = Some version }
+        | "--routes" :: name :: rest -> loop rest { opts with RouteName = Some name }
+        | unknown :: _ -> failwith $"Unknown option: {unknown}"
+
+    let projectPath =
+        match findProjectFromCurrentDirectory () with
+        | Some path -> path
+        | None -> failwith "No F# project found. Pass --project <path>."
+
+    loop args {
+        ProjectPath = projectPath
+        Title = None
+        Version = None
+        Output = None
+        RouteName = None
+    }
+
 let private runDev (projectPath: string option) =
     let resolvedProject =
         match projectPath with
@@ -224,6 +249,10 @@ let main argv =
             runDev None
         | ["dev"; "--project"; projectPath] ->
             runDev (Some projectPath)
+        | "openapi" :: rest ->
+            let opts = parseOpenApiArgs rest
+            OpenApiGenerator.generate opts
+            0
         | ["help"]
         | ["--help"]
         | ["-h"] ->
