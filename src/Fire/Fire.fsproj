@@ -67,6 +67,6 @@
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.16.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Flame" Version="0.1.0" />
+    <PackageReference Include="Flame" Version="0.1.0-alpha.2" />
   </ItemGroup>
 </Project>
