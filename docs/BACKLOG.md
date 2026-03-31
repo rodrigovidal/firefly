@@ -70,6 +70,11 @@ Detailed plan: `docs/plans/2026-03-17-phoenix-dev-loop-plan.md`
 - [x] `Schema.fromType<'T>()` — auto-generate schema from F# record type
 - [x] Schema coercion — `"42"` → `42` when field expects int
 - [x] Schema transforms — `Schema.trim`, `Schema.lowercase`, `Schema.uppercase`
+- [x] Complex types in `fromType` — nested records, `option` (auto-required/optional), typed lists (`int list`, `Tag list`)
+- [x] Zod-parity string validators — `uuid`, `ip`, `ipv4`, `ipv6`, `datetime`, `startsWith`, `endsWith`, `includes`, `length`, `nonempty`
+- [x] Zod-parity number validators — `gt`, `lt`, `positive`, `negative`, `nonnegative`, `nonpositive`, `int'`, `multipleOf`
+- [x] Array validators — `minItems`, `maxItems`, `nonEmpty`
+- [x] JSON Schema output for all new validators — `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`, `minItems`, `maxItems`, `format`
 
 ## Tier 8: Performance
 

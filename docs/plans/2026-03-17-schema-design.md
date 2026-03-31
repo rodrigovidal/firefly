@@ -42,10 +42,16 @@ type FieldSpec = {
 type RuleSpec =
     | MinLength of int
     | MaxLength of int
+    | ExactLength of int
     | Pattern of string
     | Min of float
     | Max of float
-    | Format of string  // "email", "uri", etc.
+    | ExclusiveMin of float
+    | ExclusiveMax of float
+    | MultipleOf of float
+    | MinItems of int
+    | MaxItems of int
+    | Format of string  // "email", "uri", "uuid", "ip", "ipv4", "ipv6", "date-time", etc.
     | Enum of string list
 ```
 
@@ -66,24 +72,66 @@ module Schema =
     let nullable (parser: JsonElement -> Result<'T, string>) : JsonElement -> Result<'T option, string>
     let nest (schema: Schema<'T>) : JsonElement -> Result<'T, string>
 
-    // Rules — transform a parser to add validation
+    // String rules
     let minLength (len: int) : Rule
     let maxLength (len: int) : Rule
+    let length (len: int) : Rule       // exact length
+    let nonempty : Rule                // non-empty string
     let pattern (regex: string) : Rule
-    let min (n: float) : Rule
-    let max (n: float) : Rule
     let email : Rule
     let url : Rule
+    let uuid : Rule
+    let ip : Rule
+    let ipv4 : Rule
+    let ipv6 : Rule
+    let datetime : Rule                // ISO 8601 date/time string
+    let startsWith (prefix: string) : Rule
+    let endsWith (suffix: string) : Rule
+    let includes (substring: string) : Rule
     let enum' (values: string list) : Rule
+
+    // String transforms
+    let trim : Rule
+    let lowercase : Rule
+    let uppercase : Rule
+
+    // Number rules
+    let min (n: float) : Rule          // >= n (inclusive)
+    let max (n: float) : Rule          // <= n (inclusive)
+    let gt (n: float) : Rule           // > n (exclusive)
+    let lt (n: float) : Rule           // < n (exclusive)
+    let positive : Rule                // > 0
+    let negative : Rule                // < 0
+    let nonnegative : Rule             // >= 0
+    let nonpositive : Rule             // <= 0
+    let int' : Rule                    // must be an integer
+    let multipleOf (n: float) : Rule   // divisible by n
+
+    // Array rules
+    let minItems (n: int) : Rule
+    let maxItems (n: int) : Rule
+    let nonEmpty : Rule                // at least 1 item
 
     // Field builders — used inside schema CE
     let required (name: string) (parser) (rules: Rule list) : SchemaField<'T>
     let optional (name: string) (parser) (defaultValue: 'T) (rules: Rule list) : SchemaField<'T>
+    let req (name: string) (parser) : SchemaField<'T>   // required, no rules
+    let opt (name: string) (parser) (defaultValue: 'T) : SchemaField<'T>  // optional, no rules
+
+    // Cross-field validation
+    let check (validate: unit -> Result<unit, string>) : SchemaCheck
+
+    // Auto-generate schema from F# record type
+    let fromType<'T> () : Schema<'T>  // supports nested records, option, typed lists
 
     // Parse from various sources
     let parseJson (schema: Schema<'T>) (json: JsonElement) : Result<'T, string list>
     let parseString (schema: Schema<'T>) (jsonString: string) : Result<'T, string list>
+    let parseBuffer (schema: Schema<'T>) (buffer: ReadOnlySequence<byte>) : Result<'T, string list>
+    let parsePipe (schema: Schema<'T>) (pipeReader: PipeReader) : Task<Result<'T, string list>>
     let parseStream (schema: Schema<'T>) (stream: Stream) : Task<Result<'T, string list>>
+    let parseLookup (schema: Schema<'T>) (lookup: string -> string option) : Result<'T, string list>
+    let parseMap (schema: Schema<'T>) (data: IReadOnlyDictionary<string, string>) : Result<'T, string list>
 
     // Generate JSON Schema
     let toJsonSchema (schema: Schema<'T>) : string
@@ -166,6 +214,46 @@ let createTask = schema {
 }
 ```
 
+### Cross-field validation
+
+```fsharp
+let passwordSchema = schema {
+    let! password = Schema.req "password" Schema.string
+    let! confirm  = Schema.req "confirm" Schema.string
+    do! Schema.check (fun () ->
+        if password = confirm then Ok ()
+        else Error "confirm: must match password"
+    )
+    return {| Password = password |}
+}
+```
+
+### Auto-generated from types
+
+`Schema.fromType<'T>()` introspects F# record fields. Option fields become optional, nested records and typed lists are handled recursively:
+
+```fsharp
+type Address = { Street: string; Zip: string }
+type User = { Name: string; Age: int; Address: Address; Tags: string list; Nickname: string option }
+
+let userSchema = Schema.fromType<User>()
+// Name: required string, Age: required int, Address: required nested object,
+// Tags: required array of strings, Nickname: optional string
+```
+
+### Parse from lookup (zero-alloc for query strings)
+
+```fsharp
+let querySchema = schema {
+    let! page = Schema.opt "page" Schema.int 1
+    let! limit = Schema.opt "limit" Schema.int 20
+    return {| Page = page; Limit = limit |}
+}
+
+// Parse from query string without JSON allocation
+Schema.parseLookup querySchema (fun name -> req.QueryParam name)
+```
+
 ## Fire Route Integration
 
 Schemas slot into Route.post/put/patch as a parameter before the handler:
@@ -214,12 +302,16 @@ Nested field errors use dot notation.
 
 ## Files
 
-- `src/Fire/Schema.fs` — Schema<'T>, SchemaBuilder CE, type parsers, rules, parseJson/parseStream, toJsonSchema
+- `src/Flame/Schema.fs` — standalone Flame library: SchemaCompiler, Schema<'T>, SchemaBuilder CE, type parsers, rules, all parse functions, toJsonSchema, fromType
+- `src/Fire/Schema.fs` — Fire web integration: `Schema.validated` handler wrapper, `parseQuery`, `parseParams`, `parseFormRequest`
 
 ## Implementation Notes
 
-- SchemaParser internally is `JsonElement -> Result<'T, string list> * FieldSpec list`
-- The CE accumulates FieldSpecs for JSON Schema generation alongside the parser
-- Rules are applied after type parsing — parse first, validate second
-- Schema.parseStream reads the full body into a JsonDocument, then delegates to parseJson
+- **Two parsing paths**: fast zero-alloc `Utf8JsonReader` path (default for `parseString`/`parseBuffer`) and `JsonElement` fallback (used when cross-field checks are present, or via `parseJson`)
+- **SchemaCompiler module**: compiled `FieldType` discriminated union (`FString`, `FInt`, `FBool`, `FFloat`, `FDateTime`, `FDateTimeOffset`, `FStringList`, `FNullable`, `FNested`, `FList`) with `ArrayPool<obj>` for zero-alloc value storage
+- The CE accumulates `FieldSpecs` for JSON Schema generation alongside the parser
+- Rules are applied after type parsing — parse first, validate/transform second
 - Error collection is non-short-circuiting — all field errors returned at once
+- `fromType<'T>()` uses F# reflection (`FSharpType.GetRecordFields`, `PreComputeRecordConstructor`) to recursively build schemas for records, including nested records, option types, and typed lists
+- `parseLookup` is zero-allocation — converts directly from string values without JSON intermediate
+- Nested errors use dot notation (`address.zip: ...`), list errors use bracket notation (`items.[0]: ...`)

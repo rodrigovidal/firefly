@@ -84,23 +84,48 @@ Zod-like typed schemas with a computation expression, zero-allocation parsing vi
 ```fsharp
 let createUserSchema = schema {
     let! name  = Schema.required "name"  Schema.string [Schema.minLength 1; Schema.maxLength 100]
-    let! email = Schema.required "email" Schema.string [Schema.email]
+    let! email = Schema.required "email" Schema.string [Schema.email; Schema.trim; Schema.lowercase]
+    let! role  = Schema.required "role"  Schema.string [Schema.enum' ["admin"; "user"; "viewer"]]
     let! age   = Schema.optional "age"   Schema.int 0  [Schema.min 0; Schema.max 150]
-    return {| name = name; email = email; age = age |}
+    return {| Name = name; Email = email; Role = role; Age = age |}
 }
 
 // Use as a validating handler wrapper
 Route.post "/users" (Schema.validated createUserSchema (fun user -> task {
-    return Response.json {| created = user.name |}
+    return Response.json {| created = user.Name |}
 }))
 
 // Generate JSON Schema
 let jsonSchema = Schema.toJsonSchema createUserSchema
 ```
 
-Built-in rules: `minLength`, `maxLength`, `pattern`, `min`, `max`, `email`, `url`, `enum'`.
+Auto-generate schemas from F# types — option fields become optional, nested records and typed lists are handled recursively:
 
-Supports nested schemas with `Schema.nest`, nullable fields with `Schema.nullable`, and lists with `Schema.list`.
+```fsharp
+type Address = { Street: string; Zip: string }
+type User = { Name: string; Age: int; Address: Address; Tags: string list; Nickname: string option }
+
+let userSchema = Schema.fromType<User>()
+match Schema.parseString userSchema jsonBody with
+| Ok user -> // fully typed User record
+| Error errors -> // list of validation errors with dotted paths
+```
+
+**Built-in rules:**
+
+| Category | Rules |
+|---|---|
+| String length | `minLength`, `maxLength`, `length`, `nonempty` |
+| String format | `email`, `url`, `uuid`, `ip`, `ipv4`, `ipv6`, `datetime`, `pattern` |
+| String content | `startsWith`, `endsWith`, `includes`, `enum'` |
+| String transforms | `trim`, `lowercase`, `uppercase` |
+| Number bounds | `min`, `max`, `gt`, `lt` |
+| Number checks | `positive`, `negative`, `nonnegative`, `nonpositive`, `int'`, `multipleOf` |
+| Array bounds | `minItems`, `maxItems`, `nonEmpty` |
+
+Supports nested schemas with `Schema.nest`, nullable fields with `Schema.nullable`, lists with `Schema.list`, and cross-field validation with `Schema.check`.
+
+Parse from multiple sources: `parseString`, `parseJson`, `parseBuffer`, `parsePipe`, `parseStream`, `parseLookup`, `parseMap`.
 
 ### Middleware
 

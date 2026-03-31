@@ -12,9 +12,15 @@ open System.Collections.Concurrent
 type RuleSpec =
     | MinLength of int
     | MaxLength of int
+    | ExactLength of int
     | Pattern of string
     | Min of float
     | Max of float
+    | ExclusiveMin of float
+    | ExclusiveMax of float
+    | MultipleOf of float
+    | MinItems of int
+    | MaxItems of int
     | Format of string
     | Enum of string list
 
@@ -48,6 +54,7 @@ module SchemaCompiler =
         | FStringList
         | FNullable of FieldType
         | FNested of CompiledField[] * int[] * (obj[] -> obj)  // fields, paramMapping, constructor
+        | FList of FieldType * (obj seq -> obj)  // elementType, listBuilder
 
     and CompiledField = {
         Name: string
@@ -115,6 +122,16 @@ module SchemaCompiler =
                 if reader.TokenType = JsonTokenType.String then
                     items.Add(reader.GetString())
             box (items |> Seq.toList)
+        | FList (inner, buildList) ->
+            let items = ResizeArray<obj>()
+            let mutable idx = 0
+            while reader.Read() && reader.TokenType <> JsonTokenType.EndArray do
+                try
+                    items.Add(readValue inner &reader)
+                with ex ->
+                    failwith $"[{idx}]: {ex.Message}"
+                idx <- idx + 1
+            buildList items
         | FNullable inner ->
             if reader.TokenType = JsonTokenType.Null then
                 box None
@@ -154,8 +171,11 @@ module SchemaCompiler =
                         reader.Skip()
 
             for i in 0..fields.Length-1 do
-                if not found.[i] && not fields.[i].Required then
-                    values.[i] <- fields.[i].DefaultValue
+                if not found.[i] then
+                    if fields.[i].Required then
+                        failwith $"{fields.[i].Name} is required"
+                    else
+                        values.[i] <- fields.[i].DefaultValue
 
             let args = paramMapping |> Array.map (fun idx -> values.[idx])
             construct args
@@ -184,7 +204,7 @@ module SchemaCompiler =
                                 found.[fieldIdx] <- true
                             with ex ->
                                 match fields.[fieldIdx].Type with
-                                | FNested _ -> errors.Add($"{fields.[fieldIdx].Name}.{ex.Message}")
+                                | FNested _ | FList _ -> errors.Add($"{fields.[fieldIdx].Name}.{ex.Message}")
                                 | _ -> errors.Add($"{fields.[fieldIdx].Name}: {ex.Message}")
                         | false, _ ->
                             reader.Read() |> ignore
@@ -341,6 +361,185 @@ module Schema =
     let uppercase : Rule = {
         Apply = fun _name v -> Ok (box ((v :?> string).ToUpperInvariant()))
         Spec = Format "uppercase"
+    }
+
+    // --- String validators ---
+
+    let length (len: int) : Rule =
+        let unit = pluralize len "character"
+        {
+            Apply = fun name v ->
+                let s = v :?> string
+                if s.Length = len then Ok (box s)
+                else Error $"{name}: must be exactly {len} {unit}"
+            Spec = ExactLength len
+        }
+
+    let nonempty : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            if s.Length > 0 then Ok (box s)
+            else Error $"{name}: must not be empty"
+        Spec = MinLength 1
+    }
+
+    let uuid : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            match Guid.TryParse(s) with
+            | true, _ -> Ok (box s)
+            | false, _ -> Error $"{name}: invalid UUID format"
+        Spec = Format "uuid"
+    }
+
+    let startsWith (prefix: string) : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            if s.StartsWith(prefix, StringComparison.Ordinal) then Ok (box s)
+            else Error $"{name}: must start with \"{prefix}\""
+        Spec = Pattern $"^{Text.RegularExpressions.Regex.Escape(prefix)}"
+    }
+
+    let endsWith (suffix: string) : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            if s.EndsWith(suffix, StringComparison.Ordinal) then Ok (box s)
+            else Error $"{name}: must end with \"{suffix}\""
+        Spec = Pattern $"{Text.RegularExpressions.Regex.Escape(suffix)}$"
+    }
+
+    let includes (substring: string) : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            if s.Contains(substring) then Ok (box s)
+            else Error $"{name}: must contain \"{substring}\""
+        Spec = Pattern (Text.RegularExpressions.Regex.Escape(substring))
+    }
+
+    let ip : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            match Net.IPAddress.TryParse(s) with
+            | true, _ -> Ok (box s)
+            | false, _ -> Error $"{name}: invalid IP address"
+        Spec = Format "ip"
+    }
+
+    let ipv4 : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            match Net.IPAddress.TryParse(s) with
+            | true, addr when addr.AddressFamily = Net.Sockets.AddressFamily.InterNetwork -> Ok (box s)
+            | _ -> Error $"{name}: invalid IPv4 address"
+        Spec = Format "ipv4"
+    }
+
+    let ipv6 : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            match Net.IPAddress.TryParse(s) with
+            | true, addr when addr.AddressFamily = Net.Sockets.AddressFamily.InterNetworkV6 -> Ok (box s)
+            | _ -> Error $"{name}: invalid IPv6 address"
+        Spec = Format "ipv6"
+    }
+
+    let datetime : Rule = {
+        Apply = fun name v ->
+            let s = v :?> string
+            match DateTimeOffset.TryParse(s) with
+            | true, _ -> Ok (box s)
+            | false, _ -> Error $"{name}: invalid date/time format"
+        Spec = Format "date-time"
+    }
+
+    // --- Number validators ---
+
+    let gt (n: float) : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if d > n then Ok v else Error $"{name}: must be greater than {n}"
+        Spec = ExclusiveMin n
+    }
+
+    let lt (n: float) : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if d < n then Ok v else Error $"{name}: must be less than {n}"
+        Spec = ExclusiveMax n
+    }
+
+    let int' : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if d = System.Math.Floor(d) then Ok v
+            else Error $"{name}: must be an integer"
+        Spec = MultipleOf 1.0
+    }
+
+    let positive : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if d > 0.0 then Ok v else Error $"{name}: must be positive"
+        Spec = ExclusiveMin 0.0
+    }
+
+    let negative : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if d < 0.0 then Ok v else Error $"{name}: must be negative"
+        Spec = ExclusiveMax 0.0
+    }
+
+    let nonnegative : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if d >= 0.0 then Ok v else Error $"{name}: must be non-negative"
+        Spec = Min 0.0
+    }
+
+    let nonpositive : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if d <= 0.0 then Ok v else Error $"{name}: must be non-positive"
+        Spec = Max 0.0
+    }
+
+    let multipleOf (n: float) : Rule = {
+        Apply = fun name v ->
+            let d = Convert.ToDouble(v)
+            if System.Math.Abs(d % n) < 1e-10 then Ok v
+            else Error $"{name}: must be a multiple of {n}"
+        Spec = MultipleOf n
+    }
+
+    // --- Array validators ---
+
+    let private getCollectionLength (v: obj) =
+        v.GetType().GetProperty("Length").GetValue(v) :?> int
+
+    let minItems (n: int) : Rule =
+        let unit = pluralize n "item"
+        {
+            Apply = fun name v ->
+                if getCollectionLength v >= n then Ok v
+                else Error $"{name}: must have at least {n} {unit}"
+            Spec = MinItems n
+        }
+
+    let maxItems (n: int) : Rule =
+        let unit = pluralize n "item"
+        {
+            Apply = fun name v ->
+                if getCollectionLength v <= n then Ok v
+                else Error $"{name}: must have at most {n} {unit}"
+            Spec = MaxItems n
+        }
+
+    let nonEmpty : Rule = {
+        Apply = fun name v ->
+            if getCollectionLength v > 0 then Ok v
+            else Error $"{name}: must not be empty"
+        Spec = MinItems 1
     }
 
     // --- Apply rules to a parsed value ---
@@ -699,14 +898,38 @@ module Schema =
                 match rule with
                 | MinLength n -> writer.WriteNumber("minLength", n)
                 | MaxLength n -> writer.WriteNumber("maxLength", n)
+                | ExactLength n ->
+                    writer.WriteNumber("minLength", n)
+                    writer.WriteNumber("maxLength", n)
                 | Pattern p -> writer.WriteString("pattern", p)
                 | Min n -> writer.WriteNumber("minimum", n)
                 | Max n -> writer.WriteNumber("maximum", n)
+                | ExclusiveMin n -> writer.WriteNumber("exclusiveMinimum", n)
+                | ExclusiveMax n -> writer.WriteNumber("exclusiveMaximum", n)
+                | MultipleOf n -> writer.WriteNumber("multipleOf", n)
+                | MinItems n -> writer.WriteNumber("minItems", n)
+                | MaxItems n -> writer.WriteNumber("maxItems", n)
                 | Format f -> writer.WriteString("format", f)
                 | Enum values ->
                     writer.WriteStartArray("enum")
                     for v in values do writer.WriteStringValue(v)
                     writer.WriteEndArray()
+            match spec.Items with
+            | Some itemSpec ->
+                writer.WriteStartObject("items")
+                writer.WriteString("type", itemSpec.Type)
+                if itemSpec.Children.Length > 0 then
+                    writer.WriteStartObject("properties")
+                    for child in itemSpec.Children do
+                        writeFieldSchema writer child
+                    writer.WriteEndObject()
+                    let itemRequired = itemSpec.Children |> List.filter (fun c -> c.Required) |> List.map (fun c -> c.Name)
+                    if itemRequired.Length > 0 then
+                        writer.WriteStartArray("required")
+                        for r in itemRequired do writer.WriteStringValue(r)
+                        writer.WriteEndArray()
+                writer.WriteEndObject()
+            | None -> ()
             if spec.Children.Length > 0 then
                 writer.WriteStartObject("properties")
                 for child in spec.Children do
@@ -738,6 +961,18 @@ module Schema =
         Text.Encoding.UTF8.GetString(stream.ToArray())
 
     // --- Auto-generate schema from F# record type ---
+
+    let private makeListBuilder (elementType: Type) : obj seq -> obj =
+        let listType = typedefof<_ list>.MakeGenericType(elementType)
+        let cases = FSharp.Reflection.FSharpType.GetUnionCases(listType)
+        let consCase = cases |> Array.find (fun c -> c.Name = "Cons")
+        let empty = FSharp.Reflection.FSharpValue.MakeUnion(cases |> Array.find (fun c -> c.Name = "Empty"), [||])
+        fun items ->
+            let arr = items |> Seq.toArray
+            let mutable result = empty
+            for i in (arr.Length - 1) .. -1 .. 0 do
+                result <- FSharp.Reflection.FSharpValue.MakeUnion(consCase, [| arr.[i]; result |])
+            result
 
     let private buildOptionValue (optionType: Type) (value: obj) =
         let someCase = FSharp.Reflection.FSharpType.GetUnionCases(optionType) |> Array.find (fun c -> c.Name = "Some")
@@ -773,6 +1008,20 @@ module Schema =
                 | false, _ -> failwith "expected number"
             else
                 failwith "expected number"
+        elif targetType = typeof<DateTime> then
+            if prop.ValueKind = JsonValueKind.String then
+                match DateTime.TryParse(prop.GetString()) with
+                | true, dt -> box dt
+                | false, _ -> failwith "expected date/time"
+            else
+                box (prop.GetDateTime())
+        elif targetType = typeof<DateTimeOffset> then
+            if prop.ValueKind = JsonValueKind.String then
+                match DateTimeOffset.TryParse(prop.GetString()) with
+                | true, dto -> box dto
+                | false, _ -> failwith "expected date/time with offset"
+            else
+                box (prop.GetDateTimeOffset())
         elif targetType = typeof<string list> then
             if prop.ValueKind <> JsonValueKind.Array then
                 failwith "expected array"
@@ -784,6 +1033,43 @@ module Schema =
                 let innerType = targetType.GetGenericArguments().[0]
                 let innerValue = parseElementValue innerType prop
                 buildOptionValue targetType innerValue
+        elif targetType.IsGenericType && targetType.GetGenericTypeDefinition() = typedefof<_ list> then
+            if prop.ValueKind <> JsonValueKind.Array then failwith "expected array"
+            let elemType = targetType.GetGenericArguments().[0]
+            let items = prop.EnumerateArray() |> Seq.mapi (fun idx item ->
+                try parseElementValue elemType item
+                with ex -> failwith $"[{idx}]: {ex.Message}") |> Seq.toArray
+            let listBuilder = makeListBuilder elemType
+            listBuilder items
+        elif FSharp.Reflection.FSharpType.IsRecord(targetType) then
+            if prop.ValueKind <> JsonValueKind.Object then failwith "expected object"
+            let fields = FSharp.Reflection.FSharpType.GetRecordFields(targetType)
+            let ctor = FSharp.Reflection.FSharpValue.PreComputeRecordConstructor(targetType)
+            let ctorParams = targetType.GetConstructors() |> Array.find (fun c -> c.GetParameters().Length = fields.Length) |> fun c -> c.GetParameters()
+            let fieldMap = Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            for i in 0..fields.Length-1 do fieldMap.[fields.[i].Name] <- i
+            let values = Array.zeroCreate fields.Length
+            let found = Array.zeroCreate<bool> fields.Length
+            let errors = ResizeArray<string>()
+            for kv in prop.EnumerateObject() do
+                match fieldMap.TryGetValue(kv.Name) with
+                | true, idx ->
+                    try
+                        values.[idx] <- parseElementValue fields.[idx].PropertyType kv.Value
+                        found.[idx] <- true
+                    with ex -> errors.Add($"{fields.[idx].Name}: {ex.Message}")
+                | _ -> ()
+            for i in 0..fields.Length-1 do
+                if not found.[i] then
+                    let pt = fields.[i].PropertyType
+                    if pt.IsGenericType && pt.GetGenericTypeDefinition() = typedefof<_ option> then
+                        values.[i] <- box None
+                    else
+                        errors.Add($"{fields.[i].Name} is required")
+            if errors.Count > 0 then failwith (errors |> String.concat "; ")
+            let paramMapping = ctorParams |> Array.map (fun p -> fields |> Array.findIndex (fun f -> String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+            let args = paramMapping |> Array.map (fun idx -> values.[idx])
+            ctor args
         elif targetType = typeof<obj> then
             match prop.ValueKind with
             | JsonValueKind.String -> box (prop.GetString())
@@ -813,8 +1099,37 @@ module Schema =
             SchemaCompiler.FDateTimeOffset
         elif propType = typeof<string list> then
             SchemaCompiler.FStringList
+        elif propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ list> then
+            let elemType = propType.GetGenericArguments().[0]
+            SchemaCompiler.FList (compiledFieldTypeOf elemType, makeListBuilder elemType)
+        elif FSharp.Reflection.FSharpType.IsRecord(propType) then
+            let (nestedFields, nestedMapping, nestedCtor) = buildRecordCompiledFields propType
+            SchemaCompiler.FNested (nestedFields, nestedMapping, nestedCtor)
         else
             SchemaCompiler.FString
+
+    and private buildRecordCompiledFields (t: Type) =
+        let fields = FSharp.Reflection.FSharpType.GetRecordFields(t)
+        let ctor = FSharp.Reflection.FSharpValue.PreComputeRecordConstructor(t)
+        let compiledFields =
+            fields |> Array.map (fun prop ->
+                let propType = prop.PropertyType
+                let isOptional = propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option>
+                {
+                    SchemaCompiler.CompiledField.Name = prop.Name
+                    SchemaCompiler.CompiledField.Type = compiledFieldTypeOf propType
+                    SchemaCompiler.CompiledField.Required = not isOptional
+                    SchemaCompiler.CompiledField.DefaultValue = if isOptional then box None else null
+                    SchemaCompiler.CompiledField.Rules = []
+                })
+        let ctorParams = t.GetConstructors() |> Array.find (fun c -> c.GetParameters().Length = fields.Length) |> fun c -> c.GetParameters()
+        let paramMapping =
+            ctorParams |> Array.map (fun p ->
+                compiledFields |> Array.findIndex (fun f -> String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
+        let construct (values: obj[]) =
+            let args = paramMapping |> Array.map (fun idx -> values.[idx])
+            ctor args
+        (compiledFields, paramMapping, construct)
 
     let rec private schemaTypeNameOf (propType: Type) =
         if propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option> then
@@ -829,43 +1144,58 @@ module Schema =
             "number"
         elif propType = typeof<DateTime> || propType = typeof<DateTimeOffset> then
             "string"
-        elif propType = typeof<string list> then
+        elif propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ list> then
             "array"
+        elif FSharp.Reflection.FSharpType.IsRecord(propType) then
+            "object"
         else
             "string"
 
-    let fromType<'T> () : Schema<'T> =
+    let rec private buildFieldSpec (prop: Reflection.PropertyInfo) =
+        let propType = prop.PropertyType
+        let isOptional = propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option>
+        let actualType = if isOptional then propType.GetGenericArguments().[0] else propType
+        {
+            FieldSpec.Name = prop.Name
+            FieldSpec.Type = schemaTypeNameOf propType
+            FieldSpec.Required = not isOptional
+            FieldSpec.Rules = []
+            FieldSpec.Items =
+                if actualType.IsGenericType && actualType.GetGenericTypeDefinition() = typedefof<_ list> then
+                    let elemType = actualType.GetGenericArguments().[0]
+                    Some {
+                        FieldSpec.Name = ""
+                        FieldSpec.Type = schemaTypeNameOf elemType
+                        FieldSpec.Required = false
+                        FieldSpec.Rules = []
+                        FieldSpec.Items = None
+                        FieldSpec.Children =
+                            if FSharp.Reflection.FSharpType.IsRecord(elemType) then
+                                FSharp.Reflection.FSharpType.GetRecordFields(elemType)
+                                |> Array.map buildFieldSpec |> Array.toList
+                            else []
+                    }
+                else None
+            FieldSpec.Children =
+                if FSharp.Reflection.FSharpType.IsRecord(actualType) then
+                    FSharp.Reflection.FSharpType.GetRecordFields(actualType)
+                    |> Array.map buildFieldSpec |> Array.toList
+                else []
+        }
+
+    let private fromTypeCache = ConcurrentDictionary<Type, obj>()
+
+    let private buildFromType<'T> () : Schema<'T> =
         let t = typeof<'T>
         let fields = FSharp.Reflection.FSharpType.GetRecordFields(t)
-        let ctor = FSharp.Reflection.FSharpValue.PreComputeRecordConstructor(t)
-
-        let compiledFields =
-            fields
-            |> Array.map (fun prop ->
-                let propType = prop.PropertyType
-                let isOptional = propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option>
-                {
-                    SchemaCompiler.CompiledField.Name = prop.Name
-                    SchemaCompiler.CompiledField.Type = compiledFieldTypeOf propType
-                    SchemaCompiler.CompiledField.Required = not isOptional
-                    SchemaCompiler.CompiledField.DefaultValue = if isOptional then box None else null
-                    SchemaCompiler.CompiledField.Rules = []
-                })
+        let (compiledFields, paramMapping, constructObj) = buildRecordCompiledFields t
 
         let fieldIndex = Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         for i in 0..compiledFields.Length-1 do
             fieldIndex.[compiledFields.[i].Name] <- i
 
-        let ctorParams = t.GetConstructors().[0].GetParameters()
-        let paramMapping =
-            ctorParams
-            |> Array.map (fun p ->
-                compiledFields
-                |> Array.findIndex (fun f -> String.Equals(f.Name, p.Name, StringComparison.OrdinalIgnoreCase)))
-
         let construct (values: obj[]) =
-            let args = paramMapping |> Array.map (fun idx -> values.[idx])
-            ctor args :?> 'T
+            constructObj values :?> 'T
 
         let parseElement (el: JsonElement) : Result<'T, string list> =
             let errors = ResizeArray<string>()
@@ -884,18 +1214,7 @@ module Schema =
             if errors.Count > 0 then Error (errors |> Seq.toList)
             else Ok (construct values)
 
-        let fieldSpecs =
-            fields |> Array.map (fun prop ->
-                let isOptional = prop.PropertyType.IsGenericType && prop.PropertyType.GetGenericTypeDefinition() = typedefof<_ option>
-                {
-                    FieldSpec.Name = prop.Name
-                    FieldSpec.Type = schemaTypeNameOf prop.PropertyType
-                    FieldSpec.Required = not isOptional
-                    FieldSpec.Rules = []
-                    FieldSpec.Items = None
-                    FieldSpec.Children = []
-                }
-            ) |> Array.toList
+        let fieldSpecs = fields |> Array.map buildFieldSpec |> Array.toList
 
         {
             Parse = parseElement
@@ -905,6 +1224,10 @@ module Schema =
             ParamMapping = paramMapping
             Refinements = []
         }
+
+    /// Auto-generate a schema from an F# record type. Cached — reflection runs once per type.
+    let fromType<'T> () : Schema<'T> =
+        fromTypeCache.GetOrAdd(typeof<'T>, fun _ -> box (buildFromType<'T>())) :?> Schema<'T>
 
     /// Cross-field validation. Use with `do!` inside a schema CE:
     /// do! Schema.check (fun () -> if a = b then Ok () else Error "a must equal b")
