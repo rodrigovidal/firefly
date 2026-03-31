@@ -32,7 +32,7 @@ let createUserSchema = schema {
 
 let taskSchema = schema {
     let! title = Schema.required "title" Schema.string []
-    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
+    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
     return {| Title = title; Priority = priority |}
 }
 
@@ -766,7 +766,7 @@ let ``Schema.optional field with parse error returns error`` () =
 let ``Schema.optional field with failing rule returns errors`` () =
     let s = schema {
         let! title = Schema.required "title" Schema.string []
-        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
+        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
         return {| Title = title; Priority = priority |}
     }
     let json = """{"title":"test","priority":"urgent"}"""
@@ -909,7 +909,7 @@ let ``Schema.required parse error via JsonElement`` () =
 let ``Schema.optional rule failure via JsonElement`` () =
     let s = schema {
         let! title = Schema.required "title" Schema.string []
-        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
+        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
         return {| Title = title; Priority = priority |}
     }
     let json = """{"title":"test","priority":"urgent"}"""

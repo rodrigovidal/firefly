@@ -85,7 +85,7 @@ Zod-like typed schemas with a computation expression, zero-allocation parsing vi
 let createUserSchema = schema {
     let! name  = Schema.required "name"  Schema.string [Schema.minLength 1; Schema.maxLength 100]
     let! email = Schema.required "email" Schema.string [Schema.email; Schema.trim; Schema.lowercase]
-    let! role  = Schema.required "role"  Schema.string [Schema.enum' ["admin"; "user"; "viewer"]]
+    let! role  = Schema.required "role"  Schema.string [Schema.oneOf ["admin"; "user"; "viewer"]]
     let! age   = Schema.optional "age"   Schema.int 0  [Schema.min 0; Schema.max 150]
     return {| Name = name; Email = email; Role = role; Age = age |}
 }

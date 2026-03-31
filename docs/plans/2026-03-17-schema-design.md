@@ -209,7 +209,7 @@ let createUser = schema {
 ```fsharp
 let createTask = schema {
     let! title    = Schema.required "title" Schema.string [ Schema.minLength 1 ]
-    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
+    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
     return {| Title = title; Priority = priority |}
 }
 ```
