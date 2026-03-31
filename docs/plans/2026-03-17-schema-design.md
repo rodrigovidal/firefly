@@ -218,8 +218,8 @@ let createTask = schema {
 
 ```fsharp
 let passwordSchema = schema {
-    let! password = Schema.req "password" Schema.string
-    let! confirm  = Schema.req "confirm" Schema.string
+    let! password = Schema.required "password" Schema.string []
+    let! confirm  = Schema.required "confirm" Schema.string []
     do! Schema.check (fun () ->
         if password = confirm then Ok ()
         else Error "confirm: must match password"
@@ -245,8 +245,8 @@ let userSchema = Schema.fromType<User>()
 
 ```fsharp
 let querySchema = schema {
-    let! page = Schema.opt "page" Schema.int 1
-    let! limit = Schema.opt "limit" Schema.int 20
+    let! page = Schema.optional "page" Schema.int 1 []
+    let! limit = Schema.optional "limit" Schema.int 20 []
     return {| Page = page; Limit = limit |}
 }
 

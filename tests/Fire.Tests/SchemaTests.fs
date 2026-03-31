@@ -1828,7 +1828,7 @@ let ``SchemaCompiler handles nullable nested values`` () =
 [<Fact>]
 let ``Fire re-exports Schema.req`` () =
     let s = schema {
-        let! name = Schema.req "name" Schema.string
+        let! name = Schema.required "name" Schema.string []
         return {| Name = name |}
     }
     match Schema.parseString s """{"name":"test"}""" with
@@ -1838,8 +1838,8 @@ let ``Fire re-exports Schema.req`` () =
 [<Fact>]
 let ``Fire re-exports Schema.opt`` () =
     let s = schema {
-        let! name = Schema.req "name" Schema.string
-        let! age = Schema.opt "age" Schema.int 0
+        let! name = Schema.required "name" Schema.string []
+        let! age = Schema.optional "age" Schema.int 0 []
         return {| Name = name; Age = age |}
     }
     match Schema.parseString s """{"name":"test"}""" with
@@ -1849,7 +1849,7 @@ let ``Fire re-exports Schema.opt`` () =
 [<Fact>]
 let ``Fire re-exports Schema.dateTime`` () =
     let s = schema {
-        let! date = Schema.req "date" Schema.dateTime
+        let! date = Schema.required "date" Schema.dateTime []
         return {| Date = date |}
     }
     match Schema.parseString s """{"date":"2026-03-17T12:00:00"}""" with
@@ -1864,7 +1864,7 @@ let ``Nested errors have dotted paths via Fire`` () =
         return {| Street = street; Zip = zip |}
     }
     let user = schema {
-        let! name = Schema.req "name" Schema.string
+        let! name = Schema.required "name" Schema.string []
         let! address = Schema.required "address" (Schema.nest address) []
         return {| Name = name; Address = address |}
     }
