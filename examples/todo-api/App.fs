@@ -19,17 +19,22 @@ type Todo =
       Title: string
       Completed: bool }
 
+type LoginRequest = { UserId: string }
+
+type UpdateTodoInput = { Title: string; Completed: bool option }
+
 // --- Schemas ---
 
-let createTodoSchema = schema {
-    let! title = Schema.required "Title" Schema.string [ Schema.minLength 1; Schema.maxLength 200 ]
-    return {| Title = title |}
-}
+// fromType: auto-generates schema from record type (cached, zero reflection after first call)
+let loginSchema = Schema.fromType<LoginRequest>()
 
-let updateTodoSchema = schema {
-    let! title = Schema.required "Title" Schema.string [ Schema.minLength 1 ]
-    let! completed = Schema.optional "Completed" Schema.bool false []
-    return {| Title = title; Completed = completed |}
+// fromType with option field: Completed becomes optional automatically
+let updateTodoSchema = Schema.fromType<UpdateTodoInput>()
+
+// Manual schema: when you need validation rules (nonempty, maxLength, trim, etc.)
+let createTodoSchema = schema {
+    let! title = Schema.required "Title" Schema.string [ Schema.nonempty; Schema.maxLength 200; Schema.trim ]
+    return {| Title = title |}
 }
 
 // --- Store interface ---
@@ -100,9 +105,12 @@ let routes =
 
     Route.start
     |> Route.post "/auth/token" (fun (req: Request) -> task {
-        let! body = req.Json<{| userId: string |}>()
-        let token = generateToken body.userId
-        return Response.json {| token = token |}
+        match! Schema.parseRequest loginSchema req with
+        | Ok login ->
+            let token = generateToken login.UserId
+            return Response.json {| token = token |}
+        | Error errors ->
+            return Response.json {| errors = errors |} |> Response.status 400
     })
     |> Route.group "/api/todos" (fun group ->
         group
@@ -129,11 +137,12 @@ let routes =
             | Error errors ->
                 return Response.json {| errors = errors |} |> Response.status 400
         })
-        // Update
+        // Update (fromType schema: Completed is option — omit to keep current value)
         |> Route.put "/%i" (fun (store: ITodoStore) (id: int) (req: Request) -> task {
             match! Schema.parseRequest updateTodoSchema req with
             | Ok input ->
-                let! result = store.Update(id, input.Title, input.Completed)
+                let completed = input.Completed |> Option.defaultValue false
+                let! result = store.Update(id, input.Title, completed)
                 match result with
                 | Some updated -> return Response.json updated
                 | None -> return Response.json {| error = "todo not found" |} |> Response.status 404

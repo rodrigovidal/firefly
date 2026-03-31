@@ -6,12 +6,12 @@ open Flame
 open Fire
 
 let createTodoSchema = schema {
-    let! title = Schema.required "title" Schema.string [ Schema.minLength 1; Schema.maxLength 200 ]
+    let! title = Schema.required "title" Schema.string [ Schema.nonempty; Schema.maxLength 200; Schema.trim ]
     return {| Title = title |}
 }
 
 let updateTodoSchema = schema {
-    let! title = Schema.required "title" Schema.string [ Schema.minLength 1 ]
+    let! title = Schema.required "title" Schema.string [ Schema.nonempty; Schema.trim ]
     let! completed = Schema.optional "completed" Schema.bool false []
     return {| Title = title; Completed = completed |}
 }

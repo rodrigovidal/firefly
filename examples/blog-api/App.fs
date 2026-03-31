@@ -23,16 +23,16 @@ type Comment =
       Body: string
       CreatedAt: DateTime }
 
-let createPostSchema = schema {
-    let! title = Schema.required "Title" Schema.string [ Schema.minLength 1; Schema.maxLength 200 ]
-    let! body = Schema.required "Body" Schema.string [ Schema.minLength 1 ]
-    let! tags = Schema.optional "Tags" (Schema.list Schema.string) [] []
-    return {| Title = title; Body = body; Tags = tags |}
-}
+// Input types for fromType — option fields become optional, lists are handled automatically
+type CreatePostInput = { Title: string; Body: string; Tags: string list option }
 
+// fromType: auto-generates schema from record type (Tags is optional list)
+let createPostSchema = Schema.fromType<CreatePostInput>()
+
+// Manual schema: when you need validation rules (maxLength, trim, etc.)
 let createCommentSchema = schema {
-    let! author = Schema.required "Author" Schema.string [ Schema.minLength 1 ]
-    let! body = Schema.required "Body" Schema.string [ Schema.minLength 1; Schema.maxLength 1000 ]
+    let! author = Schema.required "Author" Schema.string [ Schema.nonempty; Schema.maxLength 50; Schema.trim ]
+    let! body = Schema.required "Body" Schema.string [ Schema.nonempty; Schema.maxLength 1000 ]
     return {| Author = author; Body = body |}
 }
 
@@ -160,7 +160,7 @@ let create () =
                     { Id = id
                       Title = input.Title
                       Body = input.Body
-                      Tags = input.Tags
+                      Tags = input.Tags |> Option.defaultValue []
                       CreatedAt = DateTime.UtcNow }
 
                 posts.Add(post)

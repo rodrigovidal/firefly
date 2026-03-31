@@ -12,7 +12,7 @@ open Fire
 type ShortUrl = { Code: string; Url: string; Clicks: int; CreatedAt: DateTime }
 
 let createUrlSchema = schema {
-    let! url = Schema.required "Url" Schema.string [ Schema.minLength 1; Schema.url ]
+    let! url = Schema.required "Url" Schema.string [ Schema.nonempty; Schema.url; Schema.trim ]
     return {| Url = url |}
 }
 

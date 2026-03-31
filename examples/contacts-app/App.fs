@@ -16,10 +16,17 @@ type Contact =
       Phone: string
       CreatedAt: DateTime }
 
+// Input type for JSON API — Phone is optional (omit or null → None)
+type ContactInput = { Name: string; Email: string; Phone: string option }
+
+// fromType: auto-generates schema from record type (Phone becomes optional)
+let contactApiSchema = Schema.fromType<ContactInput>()
+
+// Manual schema: HTML forms need validation rules (email, trim, maxLength, etc.)
 let contactSchema = schema {
-    let! name = Schema.required "name" Schema.string [ Schema.minLength 1; Schema.maxLength 100 ]
-    let! email = Schema.required "email" Schema.string [ Schema.email ]
-    let! phone = Schema.optional "phone" Schema.string "" [ Schema.maxLength 20 ]
+    let! name = Schema.required "name" Schema.string [ Schema.nonempty; Schema.maxLength 100; Schema.trim ]
+    let! email = Schema.required "email" Schema.string [ Schema.email; Schema.trim; Schema.lowercase ]
+    let! phone = Schema.optional "phone" Schema.string "" [ Schema.maxLength 20; Schema.trim ]
     return {| Name = name; Email = email; Phone = phone |}
 }
 
@@ -293,6 +300,25 @@ let create () =
             |> View.render
     }
 
+    // JSON API using fromType schema (no validation rules, just type-safe parsing)
+    let apiListContacts (_req: Request) = task {
+        return Response.json (contacts |> Seq.toList)
+    }
+
+    let apiCreateContact (req: Request) = task {
+        match! Schema.parseRequest contactApiSchema req with
+        | Ok input ->
+            let id = nextId
+            nextId <- nextId + 1
+            let contact =
+                { Id = id; Name = input.Name; Email = input.Email
+                  Phone = input.Phone |> Option.defaultValue ""; CreatedAt = DateTime.UtcNow }
+            contacts.Add(contact)
+            return Response.json contact |> Response.status 201
+        | Error errors ->
+            return Response.json {| errors = errors |} |> Response.status 400
+    }
+
     let routes =
         Route.start
         |> Route.get "/" listContacts
@@ -303,6 +329,9 @@ let create () =
         |> Route.get "/contacts/%i/edit" editContact
         |> Route.post "/contacts/%i/edit" updateContact
         |> Route.post "/contacts/%i/delete" deleteContact
+        // JSON API using fromType schema
+        |> Route.get "/api/contacts" apiListContacts
+        |> Route.post "/api/contacts" apiCreateContact
 
     let config =
         App.defaults

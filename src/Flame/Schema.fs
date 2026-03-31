@@ -1115,12 +1115,15 @@ module Schema =
             fields |> Array.map (fun prop ->
                 let propType = prop.PropertyType
                 let isOptional = propType.IsGenericType && propType.GetGenericTypeDefinition() = typedefof<_ option>
+                let rules =
+                    if not isOptional && propType = typeof<string> then [ nonempty ]
+                    else []
                 {
                     SchemaCompiler.CompiledField.Name = prop.Name
                     SchemaCompiler.CompiledField.Type = compiledFieldTypeOf propType
                     SchemaCompiler.CompiledField.Required = not isOptional
                     SchemaCompiler.CompiledField.DefaultValue = if isOptional then box None else null
-                    SchemaCompiler.CompiledField.Rules = []
+                    SchemaCompiler.CompiledField.Rules = rules
                 })
         let ctorParams = t.GetConstructors() |> Array.find (fun c -> c.GetParameters().Length = fields.Length) |> fun c -> c.GetParameters()
         let paramMapping =
@@ -1205,7 +1208,12 @@ module Schema =
                 match el.TryGetProperty(field.Name) with
                 | true, prop ->
                     try
-                        values.[i] <- parseElementValue fields.[i].PropertyType prop
+                        let mutable v = parseElementValue fields.[i].PropertyType prop
+                        for rule in field.Rules do
+                            match rule.Apply field.Name v with
+                            | Ok transformed -> v <- transformed
+                            | Error e -> errors.Add(e)
+                        values.[i] <- v
                     with ex ->
                         errors.Add($"{field.Name}: {ex.Message}")
                 | _ ->
