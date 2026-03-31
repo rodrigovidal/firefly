@@ -23,7 +23,7 @@ module App =
         NotFound = None
         Middlewares = []
         ShutdownTimeout = None
-        DependencyInjection = None
+        Services = []
         Configure = None
     }
 
@@ -33,7 +33,7 @@ module App =
     let notFound handler config = { config with NotFound = Some handler }
     let middleware mw (config: FireConfig) = { config with Middlewares = config.Middlewares @ [mw] }
     let shutdownTimeout ts config = { config with ShutdownTimeout = Some ts }
-    let dependencyInjection fn config = { config with DependencyInjection = Some fn }
+    let services (registrations: ServiceRegistration list) config = { config with Services = config.Services @ registrations }
     let configure fn config = { config with Configure = Some fn }
 
     let private buildTrie (routes: RouteTable) : TrieNode =
@@ -78,9 +78,16 @@ module App =
                 opts.ShutdownTimeout <- ts
             ) |> ignore
         | None -> ()
-        match config.DependencyInjection with
-        | Some fn -> fn builder.Services
-        | None -> ()
+        for reg in config.Services do
+            match reg with
+            | Singleton (svc, impl) -> builder.Services.AddSingleton(svc, impl) |> ignore
+            | SingletonFactory (svc, factory) -> builder.Services.AddSingleton(svc, factory) |> ignore
+            | SingletonInstance (svc, inst) -> builder.Services.AddSingleton(svc, inst) |> ignore
+            | Transient (svc, impl) -> builder.Services.AddTransient(svc, impl) |> ignore
+            | TransientFactory (svc, factory) -> builder.Services.AddTransient(svc, factory) |> ignore
+            | Scoped (svc, impl) -> builder.Services.AddScoped(svc, impl) |> ignore
+            | ScopedFactory (svc, factory) -> builder.Services.AddScoped(svc, factory) |> ignore
+            | RawConfigure configure -> configure builder.Services
 
     let private isDevelopment () =
         let env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")

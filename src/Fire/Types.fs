@@ -24,6 +24,42 @@ module Pipeline =
     let empty : Pipeline =
         { Name = "empty"; Middlewares = [] }
 
+type ServiceRegistration =
+    | Singleton of serviceType: Type * implType: Type
+    | SingletonFactory of serviceType: Type * factory: (IServiceProvider -> obj)
+    | SingletonInstance of serviceType: Type * instance: obj
+    | Transient of serviceType: Type * implType: Type
+    | TransientFactory of serviceType: Type * factory: (IServiceProvider -> obj)
+    | Scoped of serviceType: Type * implType: Type
+    | ScopedFactory of serviceType: Type * factory: (IServiceProvider -> obj)
+    | RawConfigure of configure: (IServiceCollection -> unit)
+
+[<RequireQualifiedAccess>]
+module Service =
+    let singleton<'TService, 'TImpl> =
+        Singleton(typeof<'TService>, typeof<'TImpl>)
+
+    let singletonFactory (factory: IServiceProvider -> 'T) =
+        SingletonFactory(typeof<'T>, fun sp -> box (factory sp))
+
+    let instance (value: 'T) =
+        SingletonInstance(typeof<'T>, box value)
+
+    let transient<'TService, 'TImpl> =
+        Transient(typeof<'TService>, typeof<'TImpl>)
+
+    let transientFactory (factory: IServiceProvider -> 'T) =
+        TransientFactory(typeof<'T>, fun sp -> box (factory sp))
+
+    let scoped<'TService, 'TImpl> =
+        Scoped(typeof<'TService>, typeof<'TImpl>)
+
+    let scopedFactory (factory: IServiceProvider -> 'T) =
+        ScopedFactory(typeof<'T>, fun sp -> box (factory sp))
+
+    let raw (fn: IServiceCollection -> unit) =
+        RawConfigure fn
+
 type FireConfig = {
     Port: int
     Host: string
@@ -31,6 +67,6 @@ type FireConfig = {
     NotFound: (Request -> Task<Response>) option
     Middlewares: Middleware list
     ShutdownTimeout: TimeSpan option
-    DependencyInjection: (IServiceCollection -> unit) option
+    Services: ServiceRegistration list
     Configure: (IApplicationBuilder -> unit) option
 }

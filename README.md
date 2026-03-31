@@ -62,9 +62,7 @@ Route.get "/todos/%i" (fun (store: ITodoStore) (id: int) -> task {
 
 // Register services at startup
 App.defaults
-|> App.dependencyInjection (fun services ->
-    services.AddSingleton<ITodoStore, InMemoryTodoStore>() |> ignore
-)
+|> App.services [ Service.singleton<ITodoStore, InMemoryTodoStore> ]
 |> App.run routes
 ```
 

@@ -169,9 +169,7 @@ let create () =
         |> App.port 0
         |> App.middleware Cors.allowAll
         |> App.middleware (RateLimit.fixedWindow 100 (TimeSpan.FromMinutes 1.0) RateLimit.byIp)
-        |> App.dependencyInjection (fun services ->
-            services.AddSingleton<ITodoStore, InMemoryTodoStore>() |> ignore
-        )
+        |> App.services [ Service.singleton<ITodoStore, InMemoryTodoStore> ]
         |> App.notFound (fun (req: Request) -> task {
             return Response.json {| error = "not found"; path = req.Path |} |> Response.status 404
         })
@@ -183,9 +181,7 @@ let createWith (store: ITodoStore) =
         |> App.port 0
         |> App.middleware Cors.allowAll
         |> App.middleware (RateLimit.fixedWindow 100 (TimeSpan.FromMinutes 1.0) RateLimit.byIp)
-        |> App.dependencyInjection (fun services ->
-            services.AddSingleton<ITodoStore>(store) |> ignore
-        )
+        |> App.services [ Service.instance store ]
         |> App.notFound (fun (req: Request) -> task {
             return Response.json {| error = "not found"; path = req.Path |} |> Response.status 404
         })

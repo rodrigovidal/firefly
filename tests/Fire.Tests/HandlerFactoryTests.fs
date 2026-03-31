@@ -110,7 +110,7 @@ let ``Route.get with DI service resolves from container`` () = task {
         })
     let config =
         App.defaults |> App.port 0
-        |> App.dependencyInjection (fun s -> s.AddSingleton<ICounter, Counter>() |> ignore)
+        |> App.services [ Service.singleton<ICounter, Counter> ]
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
     let! r = client.GetAsync($"http://127.0.0.1:{port}/count")
@@ -305,7 +305,7 @@ let ``DI service + explicit Request param`` () = task {
         })
     let config =
         App.defaults |> App.port 0
-        |> App.dependencyInjection (fun s -> s.AddSingleton<ICounter, Counter>() |> ignore)
+        |> App.services [ Service.singleton<ICounter, Counter> ]
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
     let! r = client.GetAsync($"http://127.0.0.1:{port}/test")

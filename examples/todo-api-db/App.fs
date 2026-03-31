@@ -71,12 +71,7 @@ let create (dbPath: string) =
         |> App.port 0
         |> App.middleware Cors.allowAll
         |> App.middleware Log.toConsole
-        |> App.dependencyInjection (fun services ->
-            // Transient: each resolution gets a fresh, opened connection
-            services.AddTransient<IDbConnection>(fun _ ->
-                Db.connect connectionString
-            ) |> ignore
-        )
+        |> App.services [ Service.transientFactory (fun _ -> Db.connect connectionString) ]
         |> App.notFound (fun _ -> task {
             return Response.json {| error = "not found" |} |> Response.status 404
         })

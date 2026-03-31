@@ -36,12 +36,14 @@ let ``Evlog integration with App.configure and DI`` () = task {
     let config =
         App.defaults
         |> App.port 0
-        |> App.dependencyInjection (fun services ->
-            services.AddEvlog(fun opts ->
-                opts.Service <- "test-app"
-                opts.Pretty <- false
-            ) |> ignore
-        )
+        |> App.services [
+            Service.raw (fun services ->
+                services.AddEvlog(fun opts ->
+                    opts.Service <- "test-app"
+                    opts.Pretty <- false
+                ) |> ignore
+            )
+        ]
         |> App.configure (fun app -> app.UseEvlog() |> ignore)
     use cts = new CancellationTokenSource()
     let! (port, stop) = App.runTest routes config cts.Token
@@ -67,12 +69,14 @@ let ``Evlog captures request status`` () = task {
     let config =
         App.defaults
         |> App.port 0
-        |> App.dependencyInjection (fun services ->
-            services.AddEvlog(fun opts ->
-                opts.Service <- "test-app"
-                opts.Pretty <- false
-            ) |> ignore
-        )
+        |> App.services [
+            Service.raw (fun services ->
+                services.AddEvlog(fun opts ->
+                    opts.Service <- "test-app"
+                    opts.Pretty <- false
+                ) |> ignore
+            )
+        ]
         |> App.configure (fun app -> app.UseEvlog() |> ignore)
     use cts = new CancellationTokenSource()
     let! (port, stop) = App.runTest routes config cts.Token
@@ -97,15 +101,17 @@ let ``Evlog emits wide event with accumulated context via Drain`` () = task {
     let config =
         App.defaults
         |> App.port 0
-        |> App.dependencyInjection (fun services ->
-            services.AddEvlog(fun opts ->
-                opts.Service <- "test-drain"
-                opts.Pretty <- false
-                opts.Drain <- fun ctx ->
-                    drainedJson <- ctx.EventJson
-                    System.Threading.Tasks.Task.CompletedTask
-            ) |> ignore
-        )
+        |> App.services [
+            Service.raw (fun services ->
+                services.AddEvlog(fun opts ->
+                    opts.Service <- "test-drain"
+                    opts.Pretty <- false
+                    opts.Drain <- fun ctx ->
+                        drainedJson <- ctx.EventJson
+                        System.Threading.Tasks.Task.CompletedTask
+                ) |> ignore
+            )
+        ]
         |> App.configure (fun app -> app.UseEvlog() |> ignore)
     use cts = new CancellationTokenSource()
     let! (port, stop) = App.runTest routes config cts.Token

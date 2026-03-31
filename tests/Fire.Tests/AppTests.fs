@@ -303,7 +303,7 @@ let ``App.shutdownTimeout configures shutdown`` () = task {
 }
 
 [<Fact>]
-let ``App.dependencyInjection registers and resolves services`` () = task {
+let ``App.services registers and resolves services`` () = task {
     let routes =
         Route.start
         |> Route.get "/greet/:name" (fun (req: Request) -> task {
@@ -314,9 +314,7 @@ let ``App.dependencyInjection registers and resolves services`` () = task {
     let config =
         App.defaults
         |> App.port 0
-        |> App.dependencyInjection (fun services ->
-            services.AddSingleton<IGreeter, Greeter>() |> ignore
-        )
+        |> App.services [ Service.singleton<IGreeter, Greeter> ]
 
     let! (port, stop) = App.runTest routes config CancellationToken.None
     use client = new HttpClient()
