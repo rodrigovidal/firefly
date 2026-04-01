@@ -285,6 +285,64 @@ type MiddlewareBenchmark() =
         return! response.Content.ReadAsStringAsync()
     }
 
+// --- Route Matching Benchmarks ---
+
+[<MemoryDiagnoser>]
+type RouteMatchBenchmark() =
+    // Build a realistic route table
+    let routes =
+        Route.start
+        |> Route.get "/" (fun _ -> task { return Response.text "home" })
+        |> Route.get "/api/users" (fun _ -> task { return Response.text "users" })
+        |> Route.get "/api/users/%i" (fun (_id: int) -> task { return Response.text "user" })
+        |> Route.post "/api/users" (fun _ -> task { return Response.text "create" })
+        |> Route.get "/api/users/%i/posts" (fun (_id: int) -> task { return Response.text "posts" })
+        |> Route.get "/api/users/%i/posts/%i" (fun (_uid: int) (_pid: int) -> task { return Response.text "post" })
+        |> Route.get "/api/products" (fun _ -> task { return Response.text "products" })
+        |> Route.get "/api/products/%s" (fun (_slug: string) -> task { return Response.text "product" })
+        |> Route.get "/api/categories" (fun _ -> task { return Response.text "categories" })
+        |> Route.get "/api/categories/%i/products" (fun (_id: int) -> task { return Response.text "cat-products" })
+        |> Route.get "/static/*path" (fun _ -> task { return Response.text "static" })
+
+    let mutable trie = Trie.empty
+
+    [<GlobalSetup>]
+    member _.Setup() =
+        for entry in routes.Routes |> List.rev do
+            trie <- Trie.add entry.Method entry.Pattern entry.Middlewares entry.Handler trie
+
+    [<Benchmark(Description = "Static route: /")>]
+    member _.StaticRoot() =
+        Trie.lookup "GET" "/" trie
+
+    [<Benchmark(Description = "Static route: /api/users")>]
+    member _.StaticNested() =
+        Trie.lookup "GET" "/api/users" trie
+
+    [<Benchmark(Description = "Param route: /api/users/42")>]
+    member _.SingleParam() =
+        Trie.lookup "GET" "/api/users/42" trie
+
+    [<Benchmark(Description = "Two params: /api/users/42/posts/7")>]
+    member _.TwoParams() =
+        Trie.lookup "GET" "/api/users/42/posts/7" trie
+
+    [<Benchmark(Description = "String param: /api/products/widget-pro")>]
+    member _.StringParam() =
+        Trie.lookup "GET" "/api/products/widget-pro" trie
+
+    [<Benchmark(Description = "Wildcard: /static/css/style.css")>]
+    member _.Wildcard() =
+        Trie.lookup "GET" "/static/css/style.css" trie
+
+    [<Benchmark(Description = "Miss: /api/nonexistent")>]
+    member _.Miss() =
+        Trie.lookup "GET" "/api/nonexistent" trie
+
+    [<Benchmark(Description = "Wrong method: POST /api/users/42")>]
+    member _.WrongMethod() =
+        Trie.lookup "POST" "/api/users/42" trie
+
 [<EntryPoint>]
 let main args =
     let config = BenchmarkConfig()
