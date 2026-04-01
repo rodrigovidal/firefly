@@ -18,6 +18,7 @@
     <Compile Include="View/Query.fs" />
     <Compile Include="Request.fs" />
     <Compile Include="Response.fs" />
+    <Compile Include="ResponsePool.fs" />
     <Compile Include="Cookie.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="HandlerFactory.fs" />
