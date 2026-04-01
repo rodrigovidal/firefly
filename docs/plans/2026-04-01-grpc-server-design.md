@@ -2,108 +2,57 @@
 
 ## Overview
 
-Proto-first gRPC server support for Fire. Services are defined via `.proto` files (code-generated with `Grpc.Tools`), wrapped in an F# computation expression for ergonomic handler definition. Wire-compatible with Flare's gRPC client.
+Proto-first gRPC server support for Fire. Message types come from `.proto` files via `Grpc.Tools`. Services are defined as plain F# functions using a CE — no base class inheritance, no code generation beyond the standard protobuf messages.
 
-## Approach
-
-- `.proto` file is the source of truth
-- `Grpc.Tools` generates C# base class + message types
-- Fire's `grpc { }` CE wraps the generated base class — no manual inheritance
-- `App.grpc` registers the service with Kestrel's gRPC pipeline
-- Reflection enabled by default for `grpcurl` / service discovery
-
-## Dependencies
-
-```xml
-<PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
-<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.71.0" />
-```
+Uses `ServerServiceDefinition` directly instead of generated service base classes.
 
 ## API
 
 ### Defining a service
 
 ```fsharp
-// greeter.proto generates: GreeterBase, HelloRequest, HelloReply
-
-let greeterService = grpcService<Greeter.GreeterBase> {
-    unary "SayHello" (fun (req: HelloRequest) (ctx: ServerCallContext) -> task {
-        return HelloReply(Message = $"Hello, {req.Name}!")
-    })
-    serverStream "ListUsers" (fun (req: ListRequest) (writer: IServerStreamWriter<UserReply>) (ctx: ServerCallContext) -> task {
-        for user in users do
-            do! writer.WriteAsync(user)
-    })
-}
-```
-
-### Registering with Fire
-
-```fsharp
-App.defaults
-|> App.grpc greeterService
-|> App.grpc orderService
-|> App.services [ Service.singleton<IUserStore, UserStore> ]
-|> App.run routes
-```
-
-`App.grpc` adds the service to the gRPC pipeline. Multiple services can be registered. gRPC and REST routes coexist on the same port.
-
-### Full example
-
-```fsharp
-// Proto file: protos/greeter.proto
-// syntax = "proto3";
-// package greet;
-// service Greeter {
-//   rpc SayHello (HelloRequest) returns (HelloReply);
-//   rpc SayHelloStream (HelloRequest) returns (stream HelloReply);
-// }
-
 open Fire
-open Greet // generated namespace
+open Greet // generated message types from .proto
 
-let greeter = grpcService<Greeter.GreeterBase> {
+let greeter = grpcService "greet.Greeter" {
     unary "SayHello" (fun (req: HelloRequest) ctx -> task {
         return HelloReply(Message = $"Hello, {req.Name}!")
     })
     serverStream "SayHelloStream" (fun (req: HelloRequest) (writer: IServerStreamWriter<HelloReply>) ctx -> task {
         for i in 1..5 do
-            do! writer.WriteAsync(HelloReply(Message = $"Hello #{i}, {req.Name}!"))
-            do! System.Threading.Tasks.Task.Delay(500)
+            do! writer.WriteAsync(HelloReply(Message = $"#{i}, {req.Name}!"))
+            do! Task.Delay(500)
     })
 }
-
-[<EntryPoint>]
-let main _ =
-    let routes = Route.start |> Route.get "/health" (fun _ -> task { return Response.text "ok" })
-
-    App.defaults
-    |> App.port 5000
-    |> App.grpc greeter
-    |> App.services [ Service.singleton<IUserStore, InMemoryUserStore> ]
-    |> App.run routes (System.Threading.CancellationToken.None)
-    |> fun t -> t.Wait()
-    0
 ```
+
+No classes, no inheritance, just functions.
+
+### Registering with Fire
+
+```fsharp
+App.defaults
+|> App.grpc greeter
+|> App.grpc orderService
+|> App.run routes
+```
+
+gRPC and REST coexist on the same port.
 
 ### Consuming with Flare
 
 ```fsharp
+// Same .proto, same wire format
 match! grpc greeterClient {
     call (_.SayHelloAsync) (HelloRequest(Name = "Alice"))
-    deadline 5000
 } with
 | GrpcResponse.Ok reply -> printfn $"{reply.Message}"
-| GrpcResponse.Unavailable err -> printfn $"Down: {err.Detail}"
 | _ -> ...
 ```
 
-Same `.proto`, same wire format, both sides idiomatic F#.
-
 ## Implementation
 
-### Types — `src/Fire/Grpc.fs`
+### Core types — `src/Fire/Grpc.fs`
 
 ```fsharp
 namespace Fire
@@ -111,123 +60,142 @@ namespace Fire
 open System
 open System.Threading.Tasks
 open Grpc.Core
+open Google.Protobuf
 
-type GrpcMethodHandler =
-    | UnaryHandler of name: string * handler: (obj -> ServerCallContext -> Task<obj>)
-    | ServerStreamHandler of name: string * handler: (obj -> obj -> ServerCallContext -> Task)
+type GrpcMethod =
+    | Unary of name: string * handler: (obj -> ServerCallContext -> Task<obj>) * requestType: Type * responseType: Type
+    | ServerStream of name: string * handler: (obj -> obj -> ServerCallContext -> Task) * requestType: Type * responseType: Type
 
-type GrpcServiceDefinition = {
-    ServiceType: Type
-    Methods: GrpcMethodHandler list
+type GrpcServiceConfig = {
+    ServiceName: string
+    Methods: GrpcMethod list
 }
 ```
 
-### CE — `GrpcServiceBuilder`
+### Marshaller helper
+
+Protobuf messages implement `IMessage<T>`. We build marshallers from the type:
 
 ```fsharp
-type GrpcServiceBuilder<'TBase>() =
-    member _.Yield(_) = { ServiceType = typeof<'TBase>; Methods = [] }
+let private marshallerFor<'T when 'T :> IMessage<'T> and 'T: (new: unit -> 'T)> () =
+    Marshallers.Create(
+        (fun msg -> msg.ToByteArray()),
+        (fun bytes ->
+            let msg = Activator.CreateInstance<'T>()
+            msg.MergeFrom(bytes)
+            msg))
+```
+
+### CE builder
+
+```fsharp
+type GrpcServiceBuilder(serviceName: string) =
+    member _.Yield(_) = { ServiceName = serviceName; Methods = [] }
 
     [<CustomOperation("unary")>]
-    member _.Unary(state, name, handler: 'TReq -> ServerCallContext -> Task<'TResp>) =
+    member _.Unary(state, name: string, handler: 'TReq -> ServerCallContext -> Task<'TResp>) =
         let wrapped = fun (req: obj) (ctx: ServerCallContext) -> task {
             let! result = handler (req :?> 'TReq) ctx
             return box result
         }
-        { state with Methods = UnaryHandler(name, wrapped) :: state.Methods }
+        { state with Methods = Unary(name, wrapped, typeof<'TReq>, typeof<'TResp>) :: state.Methods }
 
     [<CustomOperation("serverStream")>]
-    member _.ServerStream(state, name, handler: 'TReq -> IServerStreamWriter<'TResp> -> ServerCallContext -> Task) =
+    member _.ServerStream(state, name: string, handler: 'TReq -> IServerStreamWriter<'TResp> -> ServerCallContext -> Task) =
         let wrapped = fun (req: obj) (writer: obj) (ctx: ServerCallContext) -> task {
             do! handler (req :?> 'TReq) (writer :?> IServerStreamWriter<'TResp>) ctx
         }
-        { state with Methods = ServerStreamHandler(name, wrapped) :: state.Methods }
+        { state with Methods = ServerStream(name, wrapped, typeof<'TReq>, typeof<'TResp>) :: state.Methods }
 
     member _.Run(state) = state
 
 [<AutoOpen>]
-module GrpcExtensions =
-    let grpcService<'TBase> = GrpcServiceBuilder<'TBase>()
+module GrpcCE =
+    let grpcService (serviceName: string) = GrpcServiceBuilder(serviceName)
+```
+
+### Building ServerServiceDefinition
+
+```fsharp
+module GrpcRuntime =
+
+    let private buildMarshaller (t: Type) =
+        // Use reflection to call Marshallers.Create with the correct protobuf type
+        let toBytes = t.GetMethod("ToByteArray")
+        let mergeFrom = t.GetMethod("MergeFrom", [| typeof<byte[]> |])
+        Marshallers.Create(
+            (fun (msg: obj) -> toBytes.Invoke(msg, [||]) :?> byte[]),
+            (fun (bytes: byte[]) ->
+                let msg = Activator.CreateInstance(t)
+                mergeFrom.Invoke(msg, [| box bytes |]) |> ignore
+                msg))
+
+    let build (config: GrpcServiceConfig) : ServerServiceDefinition =
+        let mutable builder = ServerServiceDefinition.CreateBuilder()
+        for method in config.Methods do
+            match method with
+            | Unary(name, handler, reqType, respType) ->
+                let fullName = $"/{config.ServiceName}/{name}"
+                let m = Method<obj, obj>(MethodType.Unary, config.ServiceName, name, buildMarshaller reqType, buildMarshaller respType)
+                builder <- builder.AddMethod(m, UnaryServerMethod<obj, obj>(fun req ctx -> handler req ctx))
+            | ServerStream(name, handler, reqType, respType) ->
+                let fullName = $"/{config.ServiceName}/{name}"
+                let m = Method<obj, obj>(MethodType.ServerStreaming, config.ServiceName, name, buildMarshaller reqType, buildMarshaller respType)
+                builder <- builder.AddMethod(m, ServerStreamingServerMethod<obj, obj>(fun req writer ctx -> handler req (box writer) ctx))
+        builder.Build()
 ```
 
 ### App integration
 
 ```fsharp
-// In Types.fs — add to FireConfig:
-type FireConfig = {
-    // ... existing fields ...
-    GrpcServices: GrpcServiceDefinition list
-}
+// FireConfig gets a new field:
+GrpcServices: GrpcServiceConfig list
 
-// In App module:
-let grpc (service: GrpcServiceDefinition) config =
+// App module:
+let grpc (service: GrpcServiceConfig) config =
     { config with GrpcServices = config.GrpcServices @ [service] }
-```
 
-### Server wiring — in `App.run`
-
-```fsharp
-// Add gRPC services to the builder
+// In App.run, after builder.Build():
 if config.GrpcServices.Length > 0 then
     builder.Services.AddGrpc() |> ignore
+    builder.Services.AddGrpcReflection() |> ignore
 
-// After app.Build(), map each service
-for service in config.GrpcServices do
-    // Use reflection to call app.MapGrpcService<TBase>()
-    let mapMethod = typeof<GrpcEndpointRouteBuilderExtensions>.GetMethod("MapGrpcService")
-    let generic = mapMethod.MakeGenericMethod(service.ServiceType)
-    generic.Invoke(null, [| app |]) |> ignore
+let app = builder.Build()
 
-// Enable reflection for grpcurl
 if config.GrpcServices.Length > 0 then
+    for service in config.GrpcServices do
+        let definition = GrpcRuntime.build service
+        // Register via UseRouting + endpoint mapping
+        app.UseRouting() |> ignore
+        app.UseEndpoints(fun endpoints ->
+            endpoints.MapGrpcService(definition) // needs custom extension
+        ) |> ignore
     app.MapGrpcReflectionService() |> ignore
 ```
 
-The tricky part: generating a concrete subclass of `GreeterBase` at runtime that delegates to the CE handlers. This requires either:
-- Runtime type generation (Reflection.Emit) — complex but works
-- A source generator — cleaner but requires build tooling
-- A simple code-gen step via `fire gen grpc` — pragmatic
+Note: `MapGrpcService` normally takes a type parameter for the service class. Since we're using `ServerServiceDefinition` directly, we need to register it differently — via `ServiceBinderBase` or a custom endpoint. The exact wiring depends on `Grpc.AspNetCore`'s internal API for definition-based registration.
 
-### Pragmatic approach: `fire gen grpc`
+Alternative: use Kestrel's raw HTTP/2 pipeline to serve gRPC without `Grpc.AspNetCore`'s service registration. `ServerServiceDefinition` can be served directly by handling the HTTP/2 request and dispatching to the right method handler.
 
-Rather than runtime type generation, `fire gen grpc` reads the `.proto` and generates an F# file with the base class override that delegates to the handler map:
+## Dependencies
 
-```fsharp
-// Generated: GreeterServiceImpl.fs
-type GreeterServiceImpl(handlers: Map<string, obj>) =
-    inherit Greeter.GreeterBase()
-
-    override _.SayHello(request, context) =
-        let handler = handlers.["SayHello"] :?> (HelloRequest -> ServerCallContext -> Task<HelloReply>)
-        handler request context
-
-    override _.SayHelloStream(request, responseStream, context) =
-        let handler = handlers.["SayHelloStream"] :?> (HelloRequest -> IServerStreamWriter<HelloReply> -> ServerCallContext -> Task)
-        handler request responseStream context
+```xml
+<PackageReference Include="Grpc.AspNetCore" Version="2.71.0" />
+<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.71.0" />
+<PackageReference Include="Google.Protobuf" Version="3.29.3" />
 ```
 
-The `grpcService { }` CE builds the handler map. The generated class delegates to it. No runtime codegen needed.
-
-## Implementation Order
-
-1. Add `Grpc.AspNetCore` dependency to Fire.fsproj
-2. Create `src/Fire/Grpc.fs` with types and CE
-3. Add `GrpcServices` to `FireConfig`
-4. Add `App.grpc` function
-5. Wire gRPC in `App.run` and `App.runTest`
-6. Add `fire gen grpc` to CLI
-7. Create example: greeter service with unary + server stream
-8. Test with `grpcurl`
+These are added to Fire.fsproj. Users also need `Grpc.Tools` in their app project for proto compilation.
 
 ## What stays the same
 
-- All existing REST routing, middleware, DI
-- gRPC and REST coexist on the same port
+- All REST routing, middleware, DI
+- gRPC and REST coexist on the same port (HTTP/2 multiplexing)
 - Existing tests unaffected
 
 ## Future
 
 - Client streaming and bidirectional in the CE
-- DI injection in handlers (like Fire's auto-DI for REST handlers)
-- `fire gen proto` to export .proto from service definition
+- DI injection in gRPC handlers (resolve from `ServerCallContext.GetHttpContext().RequestServices`)
 - Interceptor support in the CE
+- `fire gen proto` CLI command to export `.proto` from service definitions
