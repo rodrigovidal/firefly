@@ -61,8 +61,12 @@ let ``Trie distinguishes between methods on same path`` () =
     let (hPost, _) = (Trie.lookup "POST" "/items" trie).Value
     let rGet = hGet (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
     let rPost = hPost (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
-    rGet.Body |> should equal (ResponseBody.Text "get")
-    rPost.Body |> should equal (ResponseBody.Text "post")
+    match rGet.Body with
+    | ResponseBody.Text s -> s |> should equal "get"
+    | _ -> failwith "expected Text body"
+    match rPost.Body with
+    | ResponseBody.Text s -> s |> should equal "post"
+    | _ -> failwith "expected Text body"
 
 [<Fact>]
 let ``Trie matches root path`` () =
@@ -82,8 +86,12 @@ let ``Trie static segment takes priority over param`` () =
     let (hParam, _) = (Trie.lookup "GET" "/users/42" trie).Value
     let rMe = hMe (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
     let rParam = hParam (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
-    rMe.Body |> should equal (ResponseBody.Text "me")
-    rParam.Body |> should equal (ResponseBody.Text "param")
+    match rMe.Body with
+    | ResponseBody.Text s -> s |> should equal "me"
+    | _ -> failwith "expected Text body"
+    match rParam.Body with
+    | ResponseBody.Text s -> s |> should equal "param"
+    | _ -> failwith "expected Text body"
 
 // --- Coverage: tryWildcard with wrong method (line 101) ---
 
@@ -166,5 +174,9 @@ let ``Trie reuses existing param child node`` () =
     ps2.["id"] |> should equal "42"
     let rGet = hGet (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
     let rPost = hPost (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
-    rGet.Body |> should equal (ResponseBody.Text "get")
-    rPost.Body |> should equal (ResponseBody.Text "post")
+    match rGet.Body with
+    | ResponseBody.Text s -> s |> should equal "get"
+    | _ -> failwith "expected Text body"
+    match rPost.Body with
+    | ResponseBody.Text s -> s |> should equal "post"
+    | _ -> failwith "expected Text body"

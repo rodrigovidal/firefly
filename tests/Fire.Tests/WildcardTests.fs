@@ -42,7 +42,9 @@ let ``Static takes priority over wildcard`` () =
         |> Trie.add "GET" "/files/*path" [] (fun _ -> task { return Response.text "wildcard" })
     let (h, _) = (Trie.lookup "GET" "/files/special" trie).Value
     let r = h (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
-    r.Body |> should equal (ResponseBody.Text "static")
+    match r.Body with
+    | ResponseBody.Text s -> s |> should equal "static"
+    | _ -> failwith "expected Text body"
 
 [<Fact>]
 let ``Param takes priority over wildcard`` () =
@@ -52,7 +54,9 @@ let ``Param takes priority over wildcard`` () =
         |> Trie.add "GET" "/users/*rest" [] (fun _ -> task { return Response.text "wildcard" })
     let (h, _) = (Trie.lookup "GET" "/users/42" trie).Value
     let r = h (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
-    r.Body |> should equal (ResponseBody.Text "param")
+    match r.Body with
+    | ResponseBody.Text s -> s |> should equal "param"
+    | _ -> failwith "expected Text body"
 
 [<Fact>]
 let ``Wildcard returns None when no segments to capture`` () =
@@ -72,5 +76,9 @@ let ``Wildcard distinguishes methods`` () =
     let (hPost, _) = (Trie.lookup "POST" "/api/foo/bar" trie).Value
     let rGet = hGet (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
     let rPost = hPost (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
-    rGet.Body |> should equal (ResponseBody.Text "get")
-    rPost.Body |> should equal (ResponseBody.Text "post")
+    match rGet.Body with
+    | ResponseBody.Text s -> s |> should equal "get"
+    | _ -> failwith "expected Text body"
+    match rPost.Body with
+    | ResponseBody.Text s -> s |> should equal "post"
+    | _ -> failwith "expected Text body"

@@ -306,5 +306,7 @@ let ``View.errorBoundary passes successful responses through`` () = task {
     let handler = (View.errorBoundary fallback) inner
     let! response = handler (Unchecked.defaultof<Request>)
     response.Status |> should equal 200
-    response.Body |> should equal (ResponseBody.Text "ok")
+    match response.Body with
+    | ResponseBody.Text s -> s |> should equal "ok"
+    | _ -> failwith "expected Text body"
 }

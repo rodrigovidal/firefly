@@ -9,19 +9,25 @@ let ``Response.ok has status 200 and empty body`` () =
     let r = Response.ok
     r.Status |> should equal 200
     r.Headers |> should equal List.empty<string * string>
-    r.Body |> should equal ResponseBody.Empty
+    match r.Body with
+    | ResponseBody.Empty -> ()
+    | _ -> failwith "expected Empty body"
 
 [<Fact>]
 let ``Response.text sets Text body`` () =
     let r = Response.text "hello"
     r.Status |> should equal 200
-    r.Body |> should equal (ResponseBody.Text "hello")
+    match r.Body with
+    | ResponseBody.Text s -> s |> should equal "hello"
+    | _ -> failwith "expected Text body"
 
 [<Fact>]
 let ``Response.html sets HTML content type`` () =
     let r = Response.html "<h1>hello</h1>"
     r.Status |> should equal 200
-    r.Body |> should equal (ResponseBody.Text "<h1>hello</h1>")
+    match r.Body with
+    | ResponseBody.Text s -> s |> should equal "<h1>hello</h1>"
+    | _ -> failwith "expected Text body"
     r.Headers |> should contain ("Content-Type", "text/html; charset=utf-8")
 
 [<Fact>]
@@ -68,10 +74,14 @@ let ``Response.unauthorized has status 401`` () =
 [<Fact>]
 let ``Response.ofResult maps Ok`` () =
     let r = Ok "hello" |> Response.ofResult Response.text (fun _ -> Response.notFound)
-    r.Body |> should equal (ResponseBody.Text "hello")
+    match r.Body with
+    | ResponseBody.Text s -> s |> should equal "hello"
+    | _ -> failwith "expected Text body"
 
 [<Fact>]
 let ``Response.ofResult maps Error`` () =
     let r = Error "bad" |> Response.ofResult (fun _ -> Response.ok) (fun e -> Response.text e |> Response.status 400)
     r.Status |> should equal 400
-    r.Body |> should equal (ResponseBody.Text "bad")
+    match r.Body with
+    | ResponseBody.Text s -> s |> should equal "bad"
+    | _ -> failwith "expected Text body"

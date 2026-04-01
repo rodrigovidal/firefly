@@ -36,4 +36,6 @@ let ``caching headers compose with other builders`` () =
     r.Headers |> should contain ("ETag", "\"v1\"")
     r.Headers |> should contain ("Cache-Control", "public, max-age=600")
     r.Headers |> should contain ("X-Custom", "test")
-    r.Body |> should equal (ResponseBody.Text "hello")
+    match r.Body with
+    | ResponseBody.Text s -> s |> should equal "hello"
+    | _ -> failwith "expected Text body"

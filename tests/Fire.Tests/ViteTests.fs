@@ -91,5 +91,7 @@ let ``Vite.devMiddleware passes non-Vite requests through`` () = task {
     let mw = Vite.devMiddleware 5173
     let handler = mw inner
     let! response = handler (Unchecked.defaultof<Request>)
-    response.Body |> should equal (ResponseBody.Text "from fire")
+    match response.Body with
+    | ResponseBody.Text s -> s |> should equal "from fire"
+    | _ -> failwith "expected Text body"
 }

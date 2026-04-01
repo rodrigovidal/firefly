@@ -3,6 +3,7 @@ namespace Fire
 open System.IO
 open System.Text.Json
 
+[<NoComparison; NoEquality>]
 type ResponseBody =
     | Empty
     | Text of string
