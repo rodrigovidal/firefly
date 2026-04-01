@@ -70,6 +70,7 @@
     <Compile Include="IdempotentTests.fs" />
     <Compile Include="EvlogTests.fs" />
     <Compile Include="PipelineTests.fs" />
+    <Compile Include="EnvTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -53,6 +53,7 @@
     <Compile Include="Redirect.fs" />
     <Compile Include="Sse.fs" />
     <Compile Include="Partial.fs" />
+    <Compile Include="Env.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />
   </ItemGroup>
