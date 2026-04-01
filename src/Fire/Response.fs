@@ -8,6 +8,7 @@ type ResponseBody =
     | Text of string
     | Json of byte[]
     | Stream of Stream
+    | StreamCallback of (Microsoft.AspNetCore.Http.HttpContext -> System.Threading.Tasks.Task<unit>)
 
 type Response = {
     Status: int
@@ -73,6 +74,39 @@ module Response =
 
     let inline' (r: Response) =
         r |> header "Content-Disposition" "inline"
+
+    let streamJson (items: seq<'T>) : Response =
+        let callback (ctx: Microsoft.AspNetCore.Http.HttpContext) = task {
+            ctx.Response.ContentType <- "application/x-ndjson"
+            for item in items do
+                let line = JsonSerializer.Serialize(item)
+                let bytes = System.Text.Encoding.UTF8.GetBytes(line + "\n")
+                do! ctx.Response.Body.WriteAsync(System.ReadOnlyMemory(bytes), ctx.RequestAborted)
+                do! ctx.Response.Body.FlushAsync(ctx.RequestAborted)
+        }
+        { Status = 200; Headers = []; Body = StreamCallback callback }
+
+    let streamJsonAsync (items: System.Collections.Generic.IAsyncEnumerable<'T>) : Response =
+        let callback (ctx: Microsoft.AspNetCore.Http.HttpContext) = task {
+            ctx.Response.ContentType <- "application/x-ndjson"
+            let enumerator = items.GetAsyncEnumerator(ctx.RequestAborted)
+            try
+                let mutable hasNext = true
+                while hasNext do
+                    let! next = enumerator.MoveNextAsync()
+                    hasNext <- next
+                    if hasNext then
+                        let line = JsonSerializer.Serialize(enumerator.Current)
+                        let bytes = System.Text.Encoding.UTF8.GetBytes(line + "\n")
+                        do! ctx.Response.Body.WriteAsync(System.ReadOnlyMemory(bytes), ctx.RequestAborted)
+                        do! ctx.Response.Body.FlushAsync(ctx.RequestAborted)
+            finally
+                enumerator.DisposeAsync().AsTask().Wait()
+        }
+        { Status = 200; Headers = []; Body = StreamCallback callback }
+
+    let streamCallback (callback: Microsoft.AspNetCore.Http.HttpContext -> System.Threading.Tasks.Task<unit>) : Response =
+        { Status = 200; Headers = []; Body = StreamCallback callback }
 
     let ofResult (onOk: 'T -> Response) (onError: 'E -> Response) (result: Result<'T, 'E>) =
         match result with

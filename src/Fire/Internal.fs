@@ -29,6 +29,8 @@ module Internal =
         | Stream stream ->
             use stream = stream
             do! stream.CopyToAsync(ctx.Response.Body)
+        | StreamCallback callback ->
+            do! callback ctx
     }
 
     let dispatchRequest (trie: TrieNode) (config: FireConfig) (ctx: HttpContext) : Task<Response> = task {
