@@ -36,6 +36,7 @@
     <Compile Include="Jwt.fs" />
     <Compile Include="Negotiate.fs" />
     <Compile Include="Compress.fs" />
+    <Compile Include="Cache.fs" />
     <Compile Include="RequestId.fs" />
     <Compile Include="CorrelationId.fs" />
     <Compile Include="SecureHeaders.fs" />
