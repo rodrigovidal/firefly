@@ -51,6 +51,10 @@
     <Compile Include="Evlog.fs" />
     <Compile Include="Idempotent.fs" />
     <Compile Include="Redirect.fs" />
+    <Compile Include="Pagination.fs" />
+    <Compile Include="Version.fs" />
+    <Compile Include="Hateoas.fs" />
+    <Compile Include="Bulk.fs" />
     <Compile Include="Sse.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Partial.fs" />
