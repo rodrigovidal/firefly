@@ -108,6 +108,7 @@ module App =
         ) |> ignore
         applyConfig builder config
         let app = builder.Build()
+        app.UseWebSockets() |> ignore
         // In dev mode, register the SSE live reload endpoint
         if devMode then
             app.Map("/__fire/livereload", RequestDelegate(LiveReload.endpoint)) |> ignore
@@ -127,6 +128,7 @@ module App =
         ) |> ignore
         applyConfig builder config
         let app = builder.Build()
+        app.UseWebSockets() |> ignore
         match config.Configure with
         | Some configure -> configure (app :> IApplicationBuilder)
         | None -> ()
