@@ -29,6 +29,9 @@ let private usage () =
         "  fire dev [--project <path>]"
         "  fire gen html <Resource> field:type [field:type ...]"
         "  fire gen json <Resource> field:type [field:type ...]"
+        "  fire gen controller <Name>"
+        "  fire gen schema <Name> field:type [field:type ...]"
+        "  fire gen docker"
         "  fire openapi [--project <path>] [--output <path>] [--title <title>] [--version <version>] [--routes <name>]"
     ]
 
@@ -229,6 +232,18 @@ let main argv =
         | ["new"; name; "--force"; "--output"; outputDir] ->
             createNewProject { Name = name; OutputDir = outputDir; Force = true }
             0
+        | ["gen"; "controller"; name] ->
+            SimpleGenerator.generateController (Generator.capitalize name) Environment.CurrentDirectory
+            0
+        | ["gen"; "schema"; name] ->
+            eprintfn "Usage: fire gen schema <Name> field:type [field:type ...]"
+            1
+        | "gen" :: "schema" :: name :: fields when fields.Length > 0 ->
+            SimpleGenerator.generateSchema (Generator.capitalize name) (SimpleGenerator.parseFields fields) Environment.CurrentDirectory
+            0
+        | ["gen"; "docker"] ->
+            SimpleGenerator.generateDocker Environment.CurrentDirectory
+            0
         | "gen" :: kind :: resource :: fields when fields.Length > 0 ->
             let projectPath =
                 match findProjectFromCurrentDirectory () with
@@ -244,6 +259,9 @@ let main argv =
             0
         | ["gen"] | ["gen"; _] ->
             eprintfn "Usage: fire gen html|json <Resource> field:type [field:type ...]"
+            eprintfn "       fire gen controller <Name>"
+            eprintfn "       fire gen schema <Name> field:type [field:type ...]"
+            eprintfn "       fire gen docker"
             1
         | ["dev"] ->
             runDev None

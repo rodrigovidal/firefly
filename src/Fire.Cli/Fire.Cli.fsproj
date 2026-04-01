@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Generator.fs" />
+    <Compile Include="SimpleGenerator.fs" />
     <Compile Include="OpenApiGenerator.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
