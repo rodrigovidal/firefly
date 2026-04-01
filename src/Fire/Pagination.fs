@@ -42,7 +42,7 @@ module Pagination =
 
     let cursorMeta (basePath: string) (limit: int) (nextCursor: string option) : PageMeta =
         { Limit = limit; HasMore = nextCursor.IsSome
-          Next = nextCursor |> Option.map (fun c -> $"{basePath}?cursor={c}&limit={limit}")
+          Next = nextCursor |> Option.map (fun c -> $"{basePath}?cursor={System.Net.WebUtility.UrlEncode(c)}&limit={limit}")
           Previous = None; Total = None }
 
     let respond (meta: PageMeta) (items: 'T list) : Response =

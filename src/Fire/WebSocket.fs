@@ -22,15 +22,23 @@ type WsConn(ws: WebSocket, ct: CancellationToken) =
     }
 
     member _.Receive() : Task<WsMessage> = task {
+        use ms = new System.IO.MemoryStream()
         let buffer = Array.zeroCreate<byte> 4096
-        let! result = ws.ReceiveAsync(Memory(buffer), ct)
+        let mutable result = Unchecked.defaultof<ValueWebSocketReceiveResult>
+        let mutable cont = true
+        while cont do
+            let! r = ws.ReceiveAsync(Memory(buffer), ct)
+            result <- r
+            if r.MessageType = WebSocketMessageType.Close then
+                cont <- false
+            else
+                ms.Write(buffer, 0, r.Count)
+                if r.EndOfMessage then cont <- false
         match result.MessageType with
         | WebSocketMessageType.Text ->
-            return WsText(Encoding.UTF8.GetString(buffer, 0, result.Count))
+            return WsText(Encoding.UTF8.GetString(ms.ToArray()))
         | WebSocketMessageType.Binary ->
-            let data = Array.zeroCreate<byte> result.Count
-            Buffer.BlockCopy(buffer, 0, data, 0, result.Count)
-            return WsBinary data
+            return WsBinary(ms.ToArray())
         | _ ->
             return WsClose
     }
@@ -59,8 +67,9 @@ module WS =
                 with
                 | :? OperationCanceledException -> ()
                 | :? WebSocketException -> ()
-                if conn.IsOpen then
-                    do! conn.Close()
+                try
+                    if conn.IsOpen then do! conn.Close()
+                with _ -> ()
                 return { Status = 200; Headers = []; Body = Empty }
             else
                 return

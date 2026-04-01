@@ -22,6 +22,9 @@ module Bulk =
 
     let handler (op: 'TInput -> Task<Result<'TOutput, string>>) : Handler =
         fun req -> task {
-            let! items = req.Json<'TInput list>()
-            return! execute op items
+            try
+                let! items = req.Json<'TInput list>()
+                return! execute op items
+            with ex ->
+                return Response.json {| error = $"Invalid request body: {ex.Message}" |} |> Response.status 400
         }

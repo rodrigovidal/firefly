@@ -10,8 +10,8 @@ module Hateoas =
     let self (href: string) = link "self" "GET" href
 
     let resolve (paramMap: (string * string) list) (l: HateoasLink) : HateoasLink =
-        let href = paramMap |> List.fold (fun (acc: string) (k, v) -> acc.Replace($":{k}", v).Replace($"%%s", v)) l.Href
+        let href = paramMap |> List.fold (fun (acc: string) (k, v) -> acc.Replace($":{k}", v)) l.Href
         { l with Href = href }
 
     let respond (links: HateoasLink list) (data: 'T) : Response =
-        Response.json {| data = data; _links = links |> List.map (fun l -> {| rel = l.Rel; href = l.Href; method' = l.Method |}) |}
+        Response.json {| data = data; _links = links |> List.map (fun l -> {| rel = l.Rel; href = l.Href; httpMethod = l.Method |}) |}

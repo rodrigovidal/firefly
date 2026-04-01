@@ -10,8 +10,14 @@ module Env =
         let mutable result = System.Text.StringBuilder()
         for i in 0..name.Length-1 do
             let c = name.[i]
-            if Char.IsUpper(c) && i > 0 && Char.IsLower(name.[i-1]) then
-                result.Append('_').Append(c) |> ignore
+            if i > 0 && Char.IsUpper(c) then
+                let prev = name.[i-1]
+                if Char.IsLower(prev) then
+                    result.Append('_').Append(c) |> ignore
+                elif i + 1 < name.Length && Char.IsLower(name.[i+1]) then
+                    result.Append('_').Append(c) |> ignore
+                else
+                    result.Append(Char.ToUpperInvariant(c)) |> ignore
             else
                 result.Append(Char.ToUpperInvariant(c)) |> ignore
         result.ToString()
@@ -32,7 +38,11 @@ module Env =
                                 | -1 -> ()
                                 | i ->
                                     let key = trimmed.Substring(0, i).Trim()
-                                    let value = trimmed.Substring(i + 1).Trim()
+                                    let value =
+                                        let raw = trimmed.Substring(i + 1).Trim()
+                                        if (raw.StartsWith("\"") && raw.EndsWith("\"")) || (raw.StartsWith("'") && raw.EndsWith("'")) then
+                                            raw.Substring(1, raw.Length - 2)
+                                        else raw
                                     // Only set if not already in environment (env vars win)
                                     if Environment.GetEnvironmentVariable(key) = null then
                                         Environment.SetEnvironmentVariable(key, value)
@@ -65,8 +75,6 @@ module Env =
     let private buildOptionValue (optionType: Type) (value: obj) =
         let someCase = FSharp.Reflection.FSharpType.GetUnionCases(optionType) |> Array.find (fun c -> c.Name = "Some")
         FSharp.Reflection.FSharpValue.MakeUnion(someCase, [| value |])
-
-    let private fromTypeCache = Collections.Concurrent.ConcurrentDictionary<Type, obj>()
 
     /// Load typed configuration from .env file + environment variables.
     /// PascalCase fields map to SCREAMING_SNAKE_CASE env vars.
