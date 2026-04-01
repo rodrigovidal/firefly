@@ -22,9 +22,9 @@ module Telemetry =
             let path = req.Raw.Request.Path.Value
             use activity = source.StartActivity($"{method} {path}", ActivityKind.Server)
             if activity <> null then
-                activity.SetTag("http.method", method) |> ignore
-                activity.SetTag("http.url", path) |> ignore
-                activity.SetTag("http.scheme", req.Raw.Request.Scheme) |> ignore
+                activity.SetTag("http.request.method", method) |> ignore
+                activity.SetTag("url.path", path) |> ignore
+                activity.SetTag("url.scheme", req.Raw.Request.Scheme) |> ignore
                 match req.Header "X-Request-Id" with
                 | Some id -> activity.SetTag("http.request_id", id) |> ignore
                 | None -> ()
@@ -36,7 +36,7 @@ module Telemetry =
                 sw.Stop()
 
                 if activity <> null then
-                    activity.SetTag("http.status_code", response.Status) |> ignore
+                    activity.SetTag("http.response.status_code", response.Status) |> ignore
                     if response.Status >= 400 then
                         activity.SetStatus(ActivityStatusCode.Error) |> ignore
 
@@ -44,7 +44,12 @@ module Telemetry =
                 requestDuration.Record(float sw.ElapsedMilliseconds, tag "method" method, tag "path" path)
                 activeRequests.Add(-1L)
                 return response
-            with ex ->
+            with
+            | :? System.OperationCanceledException ->
+                sw.Stop()
+                activeRequests.Add(-1L)
+                return { Status = 200; Headers = []; Body = Empty }
+            | ex ->
                 sw.Stop()
                 activeRequests.Add(-1L)
                 if activity <> null then
@@ -53,7 +58,8 @@ module Telemetry =
 
                 requestCount.Add(1L, tag "method" method, tag "status" (box 500), tag "path" path)
                 requestDuration.Record(float sw.ElapsedMilliseconds, tag "method" method, tag "path" path)
-                return raise ex
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex).Throw()
+                return Unchecked.defaultof<_>
         }
 
     /// The ActivitySource name for configuring OpenTelemetry exporters.

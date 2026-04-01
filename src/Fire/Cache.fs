@@ -45,7 +45,10 @@ module Cache =
     let etag : Middleware =
         fun next req -> task {
             let! response = next req
-            if response.Status >= 200 && response.Status < 300 then
+            let method = req.Raw.Request.Method
+            if (method <> "GET" && method <> "HEAD") || response.Status < 200 || response.Status >= 300 then
+                return response
+            else
                 let bodyBytes =
                     match response.Body with
                     | Text s -> Some (System.Text.Encoding.UTF8.GetBytes(s))
@@ -59,12 +62,10 @@ module Cache =
 
                     match req.Header "If-None-Match" with
                     | Some clientTag when clientTag = tag ->
-                        return { Status = 304; Headers = [("ETag", tag)]; Body = Empty }
+                        return { response with Status = 304; Body = Empty } |> Response.etag tag
                     | _ ->
                         return response |> Response.etag tag
                 | None -> return response
-            else
-                return response
         }
 
     /// Middleware that combines max-age + ETag + Vary for common caching patterns.
