@@ -7,6 +7,27 @@ open System.Text.Json
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 
+type UploadedFile = {
+    Name: string
+    FileName: string
+    ContentType: string
+    Length: int64
+    Stream: Stream
+}
+
+[<RequireQualifiedAccess>]
+module UploadedFile =
+    let saveTo (path: string) (file: UploadedFile) : Task = task {
+        use output = File.Create(path)
+        do! file.Stream.CopyToAsync(output)
+    }
+
+    let readAllBytes (file: UploadedFile) : Task<byte[]> = task {
+        use ms = new MemoryStream(int file.Length)
+        do! file.Stream.CopyToAsync(ms)
+        return ms.ToArray()
+    }
+
 module internal RequestKeys =
     [<Literal>]
     let QueryCacheItemKey = "fire.query.cache"
@@ -107,5 +128,21 @@ type Request(ctx: HttpContext, routeParams: IReadOnlyDictionary<string, string>)
             match ctx.Request.Headers.TryGetValue("X-Correlation-Id") with
             | true, values -> Some (values.ToString())
             | false, _ -> None
+
+    member _.Files() : Task<UploadedFile list> =
+        let request = ctx.Request
+        task {
+            let! form = request.ReadFormAsync()
+            return [ for f in form.Files -> { Name = f.Name; FileName = f.FileName; ContentType = f.ContentType; Length = f.Length; Stream = f.OpenReadStream() } ]
+        }
+
+    member _.File(name: string) : Task<UploadedFile option> =
+        let request = ctx.Request
+        task {
+            let! form = request.ReadFormAsync()
+            match form.Files.GetFile(name) with
+            | null -> return None
+            | f -> return Some { Name = f.Name; FileName = f.FileName; ContentType = f.ContentType; Length = f.Length; Stream = f.OpenReadStream() }
+        }
 
     member _.Raw = ctx

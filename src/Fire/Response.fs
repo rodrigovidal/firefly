@@ -43,6 +43,37 @@ module Response =
 
     let cacheControl value r = r |> header "Cache-Control" value
 
+    let private getContentType (path: string) =
+        let ext = Path.GetExtension(path).ToLowerInvariant()
+        match ext with
+        | ".html" | ".htm" -> "text/html"
+        | ".css" -> "text/css"
+        | ".js" -> "application/javascript"
+        | ".json" -> "application/json"
+        | ".png" -> "image/png"
+        | ".jpg" | ".jpeg" -> "image/jpeg"
+        | ".gif" -> "image/gif"
+        | ".svg" -> "image/svg+xml"
+        | ".ico" -> "image/x-icon"
+        | ".woff" -> "font/woff"
+        | ".woff2" -> "font/woff2"
+        | ".ttf" -> "font/ttf"
+        | ".txt" -> "text/plain"
+        | ".xml" -> "application/xml"
+        | ".pdf" -> "application/pdf"
+        | _ -> "application/octet-stream"
+
+    let file (path: string) =
+        let fullPath = Path.GetFullPath(path)
+        { ok with Body = ResponseBody.Stream(File.OpenRead(fullPath)) }
+        |> header "Content-Type" (getContentType fullPath)
+
+    let download (filename: string) (r: Response) =
+        r |> header "Content-Disposition" $"attachment; filename=\"{filename}\""
+
+    let inline' (r: Response) =
+        r |> header "Content-Disposition" "inline"
+
     let ofResult (onOk: 'T -> Response) (onError: 'E -> Response) (result: Result<'T, 'E>) =
         match result with
         | Ok value -> onOk value
