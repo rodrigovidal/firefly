@@ -2,6 +2,7 @@ namespace Fire
 
 open System
 open System.Threading.Tasks
+open Grpc.Core
 open Microsoft.AspNetCore.Builder
 open Microsoft.Extensions.DependencyInjection
 
@@ -60,6 +61,15 @@ module Service =
     let raw (fn: IServiceCollection -> unit) =
         RawConfigure fn
 
+type GrpcMethod =
+    | GrpcUnary of name: string * handler: (obj -> ServerCallContext -> Task<obj>) * requestType: Type * responseType: Type
+    | GrpcServerStream of name: string * handler: (obj -> obj -> ServerCallContext -> Task) * requestType: Type * responseType: Type
+
+type GrpcServiceConfig = {
+    ServiceName: string
+    Methods: GrpcMethod list
+}
+
 type FireConfig = {
     Port: int
     Host: string
@@ -69,4 +79,5 @@ type FireConfig = {
     ShutdownTimeout: TimeSpan option
     Services: ServiceRegistration list
     Configure: (IApplicationBuilder -> unit) option
+    GrpcServices: GrpcServiceConfig list
 }

@@ -25,6 +25,7 @@ module App =
         ShutdownTimeout = None
         Services = []
         Configure = None
+        GrpcServices = []
     }
 
     let port p config = { config with Port = p }
@@ -35,6 +36,7 @@ module App =
     let shutdownTimeout ts config = { config with ShutdownTimeout = Some ts }
     let services (registrations: ServiceRegistration list) config = { config with Services = config.Services @ registrations }
     let configure fn config = { config with Configure = Some fn }
+    let grpc (service: GrpcServiceConfig) config = { config with GrpcServices = config.GrpcServices @ [service] }
 
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
@@ -88,6 +90,8 @@ module App =
             | Scoped (svc, impl) -> builder.Services.AddScoped(svc, impl) |> ignore
             | ScopedFactory (svc, factory) -> builder.Services.AddScoped(svc, factory) |> ignore
             | RawConfigure configure -> configure builder.Services
+        if config.GrpcServices.Length > 0 then
+            builder.Services.AddGrpc() |> ignore
 
     let private isDevelopment () =
         let env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
@@ -112,6 +116,10 @@ module App =
         // In dev mode, register the SSE live reload endpoint
         if devMode then
             app.Map("/__fire/livereload", RequestDelegate(LiveReload.endpoint)) |> ignore
+        if config.GrpcServices.Length > 0 then
+            app.UseRouting() |> ignore
+            for svc in config.GrpcServices do
+                GrpcRuntime.mapEndpoints app svc
         match config.Configure with
         | Some configure -> configure (app :> IApplicationBuilder)
         | None -> ()
@@ -129,6 +137,10 @@ module App =
         applyConfig builder config
         let app = builder.Build()
         app.UseWebSockets() |> ignore
+        if config.GrpcServices.Length > 0 then
+            app.UseRouting() |> ignore
+            for svc in config.GrpcServices do
+                GrpcRuntime.mapEndpoints app svc
         match config.Configure with
         | Some configure -> configure (app :> IApplicationBuilder)
         | None -> ()
