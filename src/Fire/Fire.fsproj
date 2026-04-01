@@ -32,6 +32,7 @@
     <Compile Include="OpenApi.fs" />
     <Compile Include="Validate.fs" />
     <Compile Include="Schema.fs" />
+    <Compile Include="Db.fs" />
     <Compile Include="Jwt.fs" />
     <Compile Include="Negotiate.fs" />
     <Compile Include="Compress.fs" />
