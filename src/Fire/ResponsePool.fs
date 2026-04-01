@@ -1,30 +1,11 @@
 namespace Fire
 
-open System.Buffers
-open System.Text.Json
-
+/// Pre-built common responses. These are allocated once and reused.
+/// F# records are immutable so `ResponsePool.ok |> Response.header "X" "Y"` creates
+/// a new record without mutating the original.
 [<RequireQualifiedAccess>]
 module ResponsePool =
 
-    let private jsonPool = ArrayPool<byte>.Shared
-
-    /// Serialize to JSON using a pooled buffer. Returns a Response with Json body.
-    /// The buffer is copied to a right-sized array for the response (pool buffers are oversized).
-    let json (value: 'T) : Response =
-        let buffer = jsonPool.Rent(4096)
-        try
-            use stream = new System.IO.MemoryStream(buffer, 0, buffer.Length, true, true)
-            use writer = new Utf8JsonWriter(stream)
-            JsonSerializer.Serialize(writer, value)
-            writer.Flush()
-            let length = int stream.Position
-            let result = Array.zeroCreate<byte> length
-            System.Buffer.BlockCopy(buffer, 0, result, 0, length)
-            { Status = 200; Headers = [("Content-Type", "application/json; charset=utf-8")]; Body = Json result }
-        finally
-            jsonPool.Return(buffer)
-
-    /// Pre-built common responses (allocated once, reused).
     let ok = { Status = 200; Headers = []; Body = Empty }
     let notFound = { Status = 404; Headers = []; Body = Empty }
     let noContent = { Status = 204; Headers = []; Body = Empty }
