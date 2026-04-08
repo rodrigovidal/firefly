@@ -160,6 +160,33 @@ let ``Trie pre-composes middleware chain`` () =
     h (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously |> ignore
     callOrder |> should equal ["mw1"; "mw2"; "handler"]
 
+// --- Coverage: Different param names at same level ---
+
+[<Fact>]
+let ``Trie routes with different param names at same level resolve correctly`` () =
+    let trie =
+        Trie.empty
+        |> Trie.add "POST" "/workflows/:name/run" [] (fun _ -> task { return Response.text "run" })
+        |> Trie.add "POST" "/workflows/:id/signal" [] (fun _ -> task { return Response.text "signal" })
+    // /workflows/test/run should match the run handler with :name param
+    let runResult = Trie.lookup "POST" "/workflows/test/run" trie
+    runResult |> Option.isSome |> should be True
+    let (hRun, psRun) = runResult.Value
+    psRun.["name"] |> should equal "test"
+    let rRun = hRun (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
+    match rRun.Body with
+    | ResponseBody.Text s -> s |> should equal "run"
+    | _ -> failwith "expected Text body"
+    // /workflows/test/signal should match the signal handler with :id param
+    let signalResult = Trie.lookup "POST" "/workflows/test/signal" trie
+    signalResult |> Option.isSome |> should be True
+    let (hSignal, psSignal) = signalResult.Value
+    psSignal.["id"] |> should equal "test"
+    let rSignal = hSignal (Unchecked.defaultof<Request>) |> Async.AwaitTask |> Async.RunSynchronously
+    match rSignal.Body with
+    | ResponseBody.Text s -> s |> should equal "signal"
+    | _ -> failwith "expected Text body"
+
 // --- Coverage: ParamChild reuse (line 50) ---
 
 [<Fact>]

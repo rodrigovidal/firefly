@@ -4,9 +4,9 @@ open System.Collections.Generic
 
 type TrieNode = {
     StaticChildren: Map<string, TrieNode>
-    ParamChild: (string * TrieNode) option
-    WildcardChild: (string * Map<string, Handler>) option
-    Handlers: Map<string, Handler>
+    ParamChild: TrieNode option
+    WildcardChild: Map<string, Handler * string list> option  // method -> (handler, paramNames for wildcard)
+    Handlers: Map<string, Handler * string list>              // method -> (handler, paramNames collected during add)
 }
 
 [<RequireQualifiedAccess>]
@@ -31,79 +31,83 @@ module Trie =
         let segments = splitPath pattern
         let composed = composeMiddleware middlewares handler
 
-        let rec insert (node: TrieNode) (idx: int) =
+        // Collect param names encountered on the path to the handler
+        let rec insert (node: TrieNode) (idx: int) (paramNames: string list) =
             if idx >= segments.Length then
-                { node with Handlers = node.Handlers |> Map.add method' composed }
+                { node with Handlers = node.Handlers |> Map.add method' (composed, List.rev paramNames) }
             else
                 let seg = segments.[idx]
                 if seg.[0] = '*' then
                     let paramName = seg.Substring(1)
                     let handlers =
                         match node.WildcardChild with
-                        | Some (_, existing) -> existing
+                        | Some existing -> existing
                         | None -> Map.empty
-                    { node with WildcardChild = Some (paramName, handlers |> Map.add method' composed) }
+                    { node with WildcardChild = Some (handlers |> Map.add method' (composed, List.rev (paramName :: paramNames))) }
                 elif seg.[0] = ':' then
                     let paramName = seg.Substring(1)
                     let child =
                         match node.ParamChild with
-                        | Some (_, existing) -> existing
+                        | Some existing -> existing
                         | None -> emptyNode ()
-                    let updated = insert child (idx + 1)
-                    { node with ParamChild = Some (paramName, updated) }
+                    let updated = insert child (idx + 1) (paramName :: paramNames)
+                    { node with ParamChild = Some updated }
                 else
                     let child =
                         match node.StaticChildren |> Map.tryFind seg with
                         | Some existing -> existing
                         | None -> emptyNode ()
-                    let updated = insert child (idx + 1)
+                    let updated = insert child (idx + 1) paramNames
                     { node with StaticChildren = node.StaticChildren |> Map.add seg updated }
 
-        insert root 0
+        insert root 0 []
 
     let lookup (method': string) (path: string) (root: TrieNode) : (Handler * IReadOnlyDictionary<string, string>) option =
         let segments = splitPath path
 
-        let rec search (node: TrieNode) (idx: int) (ps: (string * string) list) =
+        // During lookup, collect param segment values (positional) on the way down
+        let rec search (node: TrieNode) (idx: int) (paramValues: string list) =
             if idx >= segments.Length then
                 match node.Handlers |> Map.tryFind method' with
-                | Some h ->
+                | Some (h, paramNames) ->
                     let dict = Dictionary<string, string>()
-                    for (k, v) in ps do dict.[k] <- v
+                    let values = List.rev paramValues
+                    List.iter2 (fun name value -> dict.[name] <- value) paramNames values
                     Some (h, dict :> IReadOnlyDictionary<_, _>)
                 | None -> None
             else
                 let seg = segments.[idx]
                 match node.StaticChildren |> Map.tryFind seg with
                 | Some child ->
-                    match search child (idx + 1) ps with
+                    match search child (idx + 1) paramValues with
                     | Some _ as result -> result
-                    | None -> tryParam node seg idx ps
-                | None -> tryParam node seg idx ps
+                    | None -> tryParam node seg idx paramValues
+                | None -> tryParam node seg idx paramValues
 
-        and tryParam (node: TrieNode) (seg: string) (idx: int) (ps: (string * string) list) =
+        and tryParam (node: TrieNode) (seg: string) (idx: int) (paramValues: string list) =
             match node.ParamChild with
-            | Some (paramName, child) ->
-                match search child (idx + 1) ((paramName, seg) :: ps) with
+            | Some child ->
+                match search child (idx + 1) (seg :: paramValues) with
                 | Some _ as result -> result
-                | None -> tryWildcard node idx ps
-            | None -> tryWildcard node idx ps
+                | None -> tryWildcard node idx paramValues
+            | None -> tryWildcard node idx paramValues
 
-        and tryWildcard (node: TrieNode) (idx: int) (ps: (string * string) list) =
+        and tryWildcard (node: TrieNode) (idx: int) (paramValues: string list) =
             match node.WildcardChild with
-            | Some (paramName, handlers) ->
+            | Some handlers ->
                 match handlers |> Map.tryFind method' with
-                | Some h ->
+                | Some (h, paramNames) ->
                     let captured = System.String.Join("/", segments, idx, segments.Length - idx)
                     let dict = Dictionary<string, string>()
-                    for (k, v) in ((paramName, captured) :: ps) do dict.[k] <- v
+                    let values = List.rev (captured :: paramValues)
+                    List.iter2 (fun name value -> dict.[name] <- value) paramNames values
                     Some (h, dict :> IReadOnlyDictionary<_, _>)
                 | None -> None
             | None -> None
 
         if segments.Length = 0 then
             match root.Handlers |> Map.tryFind method' with
-            | Some h ->
+            | Some (h, _) ->
                 let dict = Dictionary<string, string>() :> IReadOnlyDictionary<_, _>
                 Some (h, dict)
             | None -> None
