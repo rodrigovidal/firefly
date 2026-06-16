@@ -32,7 +32,7 @@ let createUserSchema = schema {
 
 let taskSchema = schema {
     let! title = Schema.required "title" Schema.string []
-    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
+    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
     return {| Title = title; Priority = priority |}
 }
 
@@ -766,7 +766,7 @@ let ``Schema.optional field with parse error returns error`` () =
 let ``Schema.optional field with failing rule returns errors`` () =
     let s = schema {
         let! title = Schema.required "title" Schema.string []
-        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
+        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
         return {| Title = title; Priority = priority |}
     }
     let json = """{"title":"test","priority":"urgent"}"""
@@ -909,7 +909,7 @@ let ``Schema.required parse error via JsonElement`` () =
 let ``Schema.optional rule failure via JsonElement`` () =
     let s = schema {
         let! title = Schema.required "title" Schema.string []
-        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
+        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
         return {| Title = title; Priority = priority |}
     }
     let json = """{"title":"test","priority":"urgent"}"""
@@ -1659,7 +1659,7 @@ let ``Schema.validated returns 400 when body reader throws`` () = task {
     let handler = Schema.validated createTodoSchema (fun _ -> task { return Response.ok })
     let! response = handler req
     response.Status |> should equal 400
-    match response.Body with
+    match (Internal.materializeJson response).Body with
     | Json body -> System.Text.Encoding.UTF8.GetString(body) |> should haveSubstring "stream exploded"
     | _ -> failwith "expected JSON response"
 }
