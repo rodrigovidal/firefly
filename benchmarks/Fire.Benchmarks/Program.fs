@@ -405,6 +405,107 @@ type JsonDispatchBenchmark() =
         do! Internal.writeResponse ctx resp
     }
 
+// --- Large-payload JSON benchmarks ---
+// Response.json serializes eagerly into a payload-sized byte[]; ASP.NET serializes
+// through a pooled writer and stays flat. A tiny payload hides that, so measure a
+// realistic one (50 records) to see whether the byte[] scaling is worth optimizing.
+
+type LargeItem = { Id: int; Name: string; Email: string; Active: bool; Score: float }
+
+let largePayload =
+    [| for i in 1..50 ->
+        { Id = i; Name = $"user{i}"; Email = $"u{i}@example.io"; Active = (i % 2 = 0); Score = float i * 1.5 } |]
+
+[<MemoryDiagnoser>]
+type JsonLargeBenchmark() =
+    let mutable firePort = 0
+    let mutable aspnetPort = 0
+    let mutable fireStop : (unit -> Task) = fun () -> Task.CompletedTask
+    let mutable aspnetApp : WebApplication = null
+    let mutable client = Unchecked.defaultof<HttpClient>
+
+    [<GlobalSetup>]
+    member _.Setup() = task {
+        client <- new HttpClient()
+
+        // Fire server
+        let routes =
+            Route.start
+            |> Route.get "/json-large" (fun _ -> task { return Response.json largePayload })
+        let config = App.defaults |> App.port 0 |> App.services [silenceFireLogging]
+        let! (p, stop) = App.runTest routes config CancellationToken.None
+        firePort <- p
+        fireStop <- stop
+
+        // ASP.NET Core minimal API server
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
+        builder.WebHost.ConfigureKestrel(fun opts ->
+            opts.Listen(IPAddress.Loopback, 0)
+        ) |> ignore
+        let app = builder.Build()
+        app.MapGet("/json-large", Func<IResult>(fun () -> Results.Json(largePayload))) |> ignore
+        do! app.StartAsync()
+        let server = app.Services.GetRequiredService<IServer>()
+        let addresses = server.Features.Get<IServerAddressesFeature>()
+        let uri = Uri(addresses.Addresses |> Seq.head)
+        aspnetPort <- uri.Port
+        aspnetApp <- app
+    }
+
+    [<GlobalCleanup>]
+    member _.Cleanup() = task {
+        do! fireStop()
+        do! aspnetApp.StopAsync()
+        client.Dispose()
+    }
+
+    [<Benchmark(Description = "Fire: large JSON")>]
+    member _.FireJsonLarge() = task {
+        let! response = client.GetStringAsync($"http://127.0.0.1:{firePort}/json-large")
+        return response
+    }
+
+    [<Benchmark(Description = "ASP.NET Core: large JSON", Baseline = true)>]
+    member _.AspNetJsonLarge() = task {
+        let! response = client.GetStringAsync($"http://127.0.0.1:{aspnetPort}/json-large")
+        return response
+    }
+
+// In-process variant: isolates the byte[] vs pooled-writer allocation from HTTP noise.
+[<MemoryDiagnoser>]
+type JsonLargeDispatchBenchmark() =
+    let mutable trie = Trie.empty
+
+    [<GlobalSetup>]
+    member _.Setup() =
+        let routes =
+            Route.start
+            |> Route.get "/json-large" (fun _ -> task { return Response.json largePayload })
+        for entry in routes.Routes |> List.rev do
+            trie <- Trie.add entry.Method entry.Pattern entry.Middlewares entry.Handler trie
+
+    [<Benchmark(Description = "Raw serialize large (floor)", Baseline = true)>]
+    member _.RawSerializeLarge() = task {
+        let ctx = DefaultHttpContext()
+        ctx.Response.Body <- System.IO.Stream.Null
+        let bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(largePayload)
+        ctx.Response.ContentType <- "application/json; charset=utf-8"
+        ctx.Response.ContentLength <- Nullable(int64 bytes.Length)
+        do! ctx.Response.Body.WriteAsync(ReadOnlyMemory(bytes))
+    }
+
+    [<Benchmark(Description = "Fire dispatch large")>]
+    member _.FireDispatchLarge() = task {
+        let ctx = DefaultHttpContext()
+        ctx.Request.Path <- PathString("/json-large")
+        ctx.Request.Method <- "GET"
+        ctx.Response.Body <- System.IO.Stream.Null
+        let baseHandler : Handler = fun _req -> Internal.dispatchRequest trie App.defaults ctx
+        let req = Request(ctx, Internal.emptyParams)
+        let! resp = baseHandler req
+        do! Internal.writeResponse ctx resp
+    }
+
 [<EntryPoint>]
 let main args =
     let config = BenchmarkConfig()
