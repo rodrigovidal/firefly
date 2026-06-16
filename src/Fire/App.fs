@@ -49,7 +49,7 @@ module App =
 
         let composed = List.foldBack (fun (mw: Middleware) (h: Handler) -> mw h) config.Middlewares baseHandler
 
-        let req = Request(ctx, Dictionary<string, string>() :> IReadOnlyDictionary<_, _>)
+        let req = Request(ctx, Internal.emptyParams)
         try
             let! response = composed req
             do! Internal.writeResponse ctx response

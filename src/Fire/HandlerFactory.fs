@@ -120,6 +120,22 @@ module HandlerFactory =
 
         fun args -> compiled.Invoke(args)
 
+    /// Single-argument variant: compiles `(arg) => handler.Invoke(arg)` so the
+    /// common one-param handler path doesn't allocate an obj[] per request.
+    let private buildInvoker1 (handler: obj) : Func<obj, obj> =
+        let invokeMethod =
+            handler.GetType().GetMethods()
+            |> Array.find (fun m -> m.Name = "Invoke" && m.GetParameters().Length = 1)
+        let argParam = Expression.Parameter(typeof<obj>, "arg")
+        let paramType = invokeMethod.GetParameters().[0].ParameterType
+        let convertedArg =
+            if paramType.IsValueType then Expression.Unbox(argParam, paramType) :> Expression
+            else Expression.Convert(argParam, paramType) :> Expression
+        let handlerConst = Expression.Convert(Expression.Constant(handler), handler.GetType())
+        let call = Expression.Call(handlerConst, invokeMethod, convertedArg)
+        let boxedResult = Expression.Convert(call, typeof<obj>) :> Expression
+        Expression.Lambda<Func<obj, obj>>(boxedResult, argParam).Compile()
+
     /// Await a Task-like object and extract the Response.
     /// Handles both Task<Response> (concrete) and Task<obj> (erased generic).
     let awaitResponse (taskObj: obj) : Task<Response> =
@@ -215,6 +231,16 @@ module HandlerFactory =
                         routeParamIdx <- routeParamIdx + 1
                         (t, "route", name)
                     | _ -> (t, kind, ""))
+
+                match paramBindings with
+                | [ (_, ("request" | "request-obj"), _) ] ->
+                    // Single Request param (incl. erased-generic `fun _ -> ...`).
+                    // Skip the ResizeArray/args-array/extra-task machinery and the
+                    // per-request conversion loop — invoke directly with no obj[].
+                    let invoke1 = buildInvoker1 handler
+                    let h : Handler = fun req -> awaitResponse (invoke1.Invoke(box req))
+                    (triePattern, h)
+                | _ ->
 
                 let paramCount = paramBindings.Length
                 let invoker = buildInvoker handler paramCount
