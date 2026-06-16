@@ -32,7 +32,8 @@ let ``Response.html sets HTML content type`` () =
 
 [<Fact>]
 let ``Response.json serializes to UTF-8 bytes`` () =
-    let r = Response.json {| name = "fire" |}
+    // Response.json now defers serialization; materializeJson runs it to bytes.
+    let r = Response.json {| name = "fire" |} |> Internal.materializeJson
     r.Status |> should equal 200
     match r.Body with
     | Json bytes -> System.Text.Encoding.UTF8.GetString(bytes) |> should haveSubstring "fire"

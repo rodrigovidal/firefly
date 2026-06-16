@@ -45,6 +45,7 @@ module Cache =
     let etag : Middleware =
         fun next req -> task {
             let! response = next req
+            let response = Internal.materializeJson response
             let method = req.Raw.Request.Method
             if (method <> "GET" && method <> "HEAD") || response.Status < 200 || response.Status >= 300 then
                 return response

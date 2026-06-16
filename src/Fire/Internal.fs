@@ -14,6 +14,39 @@ module Internal =
     let emptyParams : IReadOnlyDictionary<string, string> =
         Dictionary<string, string>() :> IReadOnlyDictionary<_, _>
 
+    /// Per-thread reusable Utf8JsonWriter for the deferred-JSON write path, so
+    /// serializing a response doesn't allocate a writer per request. Reset onto
+    /// the target buffer on each rent. Mirrors the pooling spirit of Trie's
+    /// ArrayPool usage. Only used by writeResponse (single-threaded per request).
+    [<Sealed; AbstractClass>]
+    type private JsonWriterPool =
+        [<System.ThreadStatic; DefaultValue>]
+        static val mutable private writer : System.Text.Json.Utf8JsonWriter
+
+        static member Rent (bw: System.Buffers.IBufferWriter<byte>) : System.Text.Json.Utf8JsonWriter =
+            match JsonWriterPool.writer with
+            | null ->
+                let w = new System.Text.Json.Utf8JsonWriter(bw)
+                JsonWriterPool.writer <- w
+                w
+            | w ->
+                w.Reset(bw)
+                w
+
+    /// Runs a deferred-JSON closure into a byte[] so body-reading middleware
+    /// (compression, ETag, idempotency) can treat it as `Json bytes`. Uses the
+    /// same JsonSerializer.Serialize(writer, value) overload as the write path,
+    /// so the bytes are identical to what would be written to the wire.
+    let materializeJson (response: Response) : Response =
+        match response.Body with
+        | JsonDeferred serialize ->
+            let abw = System.Buffers.ArrayBufferWriter<byte>()
+            use w = new System.Text.Json.Utf8JsonWriter(abw)
+            serialize w
+            w.Flush()
+            { response with Body = Json (abw.WrittenSpan.ToArray()) }
+        | _ -> response
+
     let writeResponse (ctx: HttpContext) (response: Response) = task {
         ctx.Response.StatusCode <- response.Status
         for (key, value) in response.Headers do
@@ -32,6 +65,18 @@ module Internal =
                 ctx.Response.ContentType <- "application/json; charset=utf-8"
             ctx.Response.ContentLength <- Nullable(int64 bytes.Length)
             do! ctx.Response.Body.WriteAsync(ReadOnlyMemory(bytes))
+        | JsonDeferred serialize ->
+            // Serialize straight into the response PipeWriter via a pooled writer,
+            // avoiding a payload-sized byte[]. Content-Length is left to Kestrel
+            // (buffered + set for small responses, chunked for large) like ASP.NET.
+            if not hasContentType then
+                ctx.Response.ContentType <- "application/json; charset=utf-8"
+            let bw = ctx.Response.BodyWriter
+            let w = JsonWriterPool.Rent bw
+            serialize w
+            w.Flush()
+            let! _ = bw.FlushAsync()
+            ()
         | Stream stream ->
             use stream = stream
             do! stream.CopyToAsync(ctx.Response.Body)

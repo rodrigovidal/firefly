@@ -8,6 +8,10 @@ type ResponseBody =
     | Empty
     | Text of string
     | Json of byte[]
+    /// Serialize-at-write-time JSON: the closure writes the value into a pooled
+    /// Utf8JsonWriter, avoiding a per-request payload-sized byte[]. Body-reading
+    /// middleware call Internal.materializeJson to turn this back into `Json bytes`.
+    | JsonDeferred of (System.Text.Json.Utf8JsonWriter -> unit)
     | Stream of Stream
     | StreamCallback of (Microsoft.AspNetCore.Http.HttpContext -> System.Threading.Tasks.Task<unit>)
 
@@ -23,7 +27,7 @@ module Response =
     let text s = { ok with Body = ResponseBody.Text s }
 
     let json<'T> (value: 'T) =
-        { ok with Body = ResponseBody.Json (JsonSerializer.SerializeToUtf8Bytes(value)) }
+        { ok with Body = ResponseBody.JsonDeferred (fun writer -> JsonSerializer.Serialize(writer, value)) }
 
     let stream s = { ok with Body = ResponseBody.Stream s }
     let status code r = { r with Status = code }

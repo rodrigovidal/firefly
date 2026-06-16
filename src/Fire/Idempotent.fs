@@ -76,6 +76,7 @@ module Idempotent =
                         return toResponse cached |> Response.header "Idempotency-Replayed" "true"
                     | None ->
                         let! response = next req
+                        let response = Internal.materializeJson response
                         let cached = toCached response
                         do! store.Set(key, cached, ttl)
                         return response

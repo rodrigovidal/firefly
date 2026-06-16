@@ -35,6 +35,7 @@ module Compress =
     let gzip : Middleware =
         fun next req -> task {
             let! response = next req
+            let response = Internal.materializeJson response
             let acceptEncoding = req.Header "Accept-Encoding" |> Option.defaultValue ""
             if acceptsEncoding acceptEncoding "gzip" then
                 match response.Body with
@@ -75,6 +76,7 @@ module Compress =
     let brotli : Middleware =
         fun next req -> task {
             let! response = next req
+            let response = Internal.materializeJson response
             let acceptEncoding = req.Header "Accept-Encoding" |> Option.defaultValue ""
             if acceptsEncoding acceptEncoding "br" then
                 match response.Body with
