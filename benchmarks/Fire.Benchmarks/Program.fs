@@ -4,8 +4,11 @@ open System.Net.Http
 open System.Threading
 open System.Threading.Tasks
 open BenchmarkDotNet.Attributes
+open BenchmarkDotNet.Columns
 open BenchmarkDotNet.Configs
+open BenchmarkDotNet.Exporters
 open BenchmarkDotNet.Jobs
+open BenchmarkDotNet.Loggers
 open BenchmarkDotNet.Running
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
@@ -27,6 +30,11 @@ type BenchmarkConfig() as this =
                 .WithMsBuildArguments([| "/p:NuGetAudit=false" |])
         this.BuildTimeout <- TimeSpan.FromMinutes(5.0)
         this.AddJob(job) |> ignore
+        // ManualConfig starts empty: without these, the summary renders with
+        // "no columns to show" and results are never persisted to a report.
+        this.AddColumnProvider(DefaultColumnProviders.Instance) |> ignore
+        this.AddLogger(ConsoleLogger.Default) |> ignore
+        this.AddExporter(MarkdownExporter.GitHub) |> ignore
         this.WithOption(ConfigOptions.JoinSummary, true) |> ignore
         this.WithOption(ConfigOptions.DisableParallelBuild, true) |> ignore
 
@@ -34,6 +42,15 @@ let configureAspNetBuilder (builder: WebApplicationBuilder) =
     builder.Logging.ClearProviders() |> ignore
     builder.Logging.SetMinimumLevel(LogLevel.None) |> ignore
     builder
+
+// Fire's runTest builds its host with default logging providers, which write
+// request logs to stdout during measurement. That corrupts BenchmarkDotNet's
+// result protocol (reported as NA) and bloats the run log. Clear them.
+let silenceFireLogging : ServiceRegistration =
+    RawConfigure(fun services ->
+        services.AddLogging(fun logging ->
+            logging.ClearProviders().SetMinimumLevel(LogLevel.None) |> ignore)
+        |> ignore)
 
 [<MemoryDiagnoser>]
 type PlainTextBenchmark() =
@@ -51,7 +68,7 @@ type PlainTextBenchmark() =
         let routes =
             Route.start
             |> Route.get "/plaintext" (fun _ -> task { return Response.text "Hello, World!" })
-        let config = App.defaults |> App.port 0
+        let config = App.defaults |> App.port 0 |> App.services [silenceFireLogging]
         let! (p, stop) = App.runTest routes config CancellationToken.None
         firePort <- p
         fireStop <- stop
@@ -108,7 +125,7 @@ type JsonBenchmark() =
             |> Route.get "/json" (fun _ -> task {
                 return Response.json {| message = "Hello, World!"; count = 42 |}
             })
-        let config = App.defaults |> App.port 0
+        let config = App.defaults |> App.port 0 |> App.services [silenceFireLogging]
         let! (p, stop) = App.runTest routes config CancellationToken.None
         firePort <- p
         fireStop <- stop
@@ -167,7 +184,7 @@ type RouteParamBenchmark() =
             |> Route.get "/users/:id" (fun (req: Request) -> task {
                 return Response.json {| id = req.Params.["id"] |}
             })
-        let config = App.defaults |> App.port 0
+        let config = App.defaults |> App.port 0 |> App.services [silenceFireLogging]
         let! (p, stop) = App.runTest routes config CancellationToken.None
         firePort <- p
         fireStop <- stop
@@ -234,7 +251,7 @@ type MiddlewareBenchmark() =
                     return Response.json {| value = 1 |}
                 })
             )
-        let config = App.defaults |> App.port 0
+        let config = App.defaults |> App.port 0 |> App.services [silenceFireLogging]
         let! (p, stop) = App.runTest routes config CancellationToken.None
         firePort <- p
         fireStop <- stop
@@ -343,11 +360,59 @@ type RouteMatchBenchmark() =
     member _.WrongMethod() =
         Trie.lookup "POST" "/api/users/42" trie
 
+// --- In-process dispatch allocation micro-benchmark ---
+// Isolates Fire's per-request overhead (routing + handler wrapping + Response
+// build + write) from Kestrel/HTTP transport, so allocation deltas are precise
+// and iterate in seconds. 'Raw serialize' is the floor: the minimal work any
+// JSON endpoint must do. The gap between the two is Fire's framework overhead.
+
+[<MemoryDiagnoser>]
+type JsonDispatchBenchmark() =
+    let mutable trie = Trie.empty
+
+    [<GlobalSetup>]
+    member _.Setup() =
+        let routes =
+            Route.start
+            |> Route.get "/json" (fun _ -> task {
+                return Response.json {| message = "Hello, World!"; count = 42 |}
+            })
+        for entry in routes.Routes |> List.rev do
+            trie <- Trie.add entry.Method entry.Pattern entry.Middlewares entry.Handler trie
+
+    [<Benchmark(Description = "Raw serialize (floor)", Baseline = true)>]
+    member _.RawSerialize() = task {
+        let ctx = DefaultHttpContext()
+        ctx.Response.Body <- System.IO.Stream.Null
+        let bytes =
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes({| message = "Hello, World!"; count = 42 |})
+        ctx.Response.ContentType <- "application/json; charset=utf-8"
+        ctx.Response.ContentLength <- Nullable(int64 bytes.Length)
+        do! ctx.Response.Body.WriteAsync(ReadOnlyMemory(bytes))
+    }
+
+    [<Benchmark(Description = "Fire dispatch")>]
+    member _.FireDispatch() = task {
+        let ctx = DefaultHttpContext()
+        ctx.Request.Path <- PathString("/json")
+        ctx.Request.Method <- "GET"
+        ctx.Response.Body <- System.IO.Stream.Null
+        // Mirror App.handleRequest: throwaway pre-routing Request threads through
+        // (empty) middleware, then dispatch builds the real Request and runs the handler.
+        let baseHandler : Handler = fun _req -> Internal.dispatchRequest trie App.defaults ctx
+        let req = Request(ctx, Internal.emptyParams)
+        let! resp = baseHandler req
+        do! Internal.writeResponse ctx resp
+    }
+
 [<EntryPoint>]
 let main args =
     let config = BenchmarkConfig()
-    BenchmarkSwitcher
-        .FromAssembly(typeof<PlainTextBenchmark>.Assembly)
-        .RunAllJoined(config, args)
-    |> ignore
+    let switcher = BenchmarkSwitcher.FromAssembly(typeof<PlainTextBenchmark>.Assembly)
+    // Bare `dotnet run` runs the full joined suite; passing args (e.g. --filter)
+    // runs just the matching benchmarks (RunAllJoined ignores --filter).
+    if Array.isEmpty args then
+        switcher.RunAllJoined(config) |> ignore
+    else
+        switcher.Run(args, config) |> ignore
     0
