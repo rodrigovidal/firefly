@@ -34,6 +34,9 @@ jobs:
             exit 1
           fi
 
+      - name: Drop local-only dev package source (absent in CI)
+        run: dotnet nuget remove source local-flame --configfile nuget.config
+
       - name: Pack
         run: dotnet pack src/Fire/Fire.fsproj -c Release -o ./artifacts
 
