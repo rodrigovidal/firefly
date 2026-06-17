@@ -4,7 +4,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <ParallelCompilation>true</ParallelCompilation>
     <PackageId>Firefly.Server</PackageId>
-    <Version>0.1.0-alpha.2</Version>
+    <Version>0.1.0-alpha.3</Version>
     <Authors>Rodrigo Vidal</Authors>
     <Description>A minimal F# web framework built on Kestrel</Description>
     <PackageTags>fsharp;web;framework;kestrel;api</PackageTags>
