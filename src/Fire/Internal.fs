@@ -55,11 +55,15 @@ module Internal =
         match response.Body with
         | Empty -> ()
         | Text s ->
-            let bytes = System.Text.Encoding.UTF8.GetBytes(s)
             if not hasContentType then
                 ctx.Response.ContentType <- "text/plain; charset=utf-8"
-            ctx.Response.ContentLength <- Nullable(int64 bytes.Length)
-            do! ctx.Response.Body.WriteAsync(ReadOnlyMemory(bytes))
+            // Encode straight into the response PipeWriter — no intermediate byte[].
+            // Content-Length is left to Kestrel (buffered for small responses), as
+            // with the deferred-JSON path.
+            let bw = ctx.Response.BodyWriter
+            System.Text.EncodingExtensions.GetBytes(System.Text.Encoding.UTF8, s.AsSpan(), bw) |> ignore
+            let! _ = bw.FlushAsync()
+            ()
         | Json bytes ->
             if not hasContentType then
                 ctx.Response.ContentType <- "application/json; charset=utf-8"
