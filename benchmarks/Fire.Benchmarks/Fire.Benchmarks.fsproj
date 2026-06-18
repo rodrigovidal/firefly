@@ -22,4 +22,12 @@
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
   </ItemGroup>
 
+  <!-- Competing F# web frameworks, for head-to-head comparison -->
+  <ItemGroup>
+    <PackageReference Include="Giraffe" Version="8.2.0" />
+    <PackageReference Include="Falco" Version="5.2.0" />
+    <PackageReference Include="Saturn" Version="0.17.0" />
+    <PackageReference Include="Oxpecker" Version="2.0.1" />
+  </ItemGroup>
+
 </Project>

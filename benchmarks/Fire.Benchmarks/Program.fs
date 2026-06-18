@@ -506,6 +506,188 @@ type JsonLargeDispatchBenchmark() =
         do! Internal.writeResponse ctx resp
     }
 
+// --- Competing F# frameworks: head-to-head HTTP comparison ---
+// Each framework hosts the same two endpoints (/plaintext, /json) on Kestrel
+// (port 0) with logging silenced, so the only difference measured is the
+// framework's own request pipeline. JSON uses each framework's default serializer.
+
+let private serverPort (app: WebApplication) =
+    let addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()
+    Uri(addresses.Addresses |> Seq.head).Port
+
+let private kestrelPort0 (builder: WebApplicationBuilder) =
+    builder.WebHost.ConfigureKestrel(fun o -> o.Listen(IPAddress.Loopback, 0)) |> ignore
+
+module private GiraffeServer =
+    open Giraffe
+    let private webApp : HttpHandler =
+        choose [
+            route "/plaintext" >=> text "Hello, World!"
+            route "/json" >=> json {| message = "Hello, World!"; count = 42 |}
+        ]
+    let start () = task {
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
+        builder.Services.AddGiraffe() |> ignore
+        kestrelPort0 builder
+        let app = builder.Build()
+        app.UseGiraffe(webApp) |> ignore
+        do! app.StartAsync()
+        return app
+    }
+
+module private SaturnServer =
+    open Giraffe
+    open Saturn
+    // Saturn's router produces a Giraffe HttpHandler — host it on the same pipeline.
+    let private webApp =
+        router {
+            get "/plaintext" (text "Hello, World!")
+            get "/json" (json {| message = "Hello, World!"; count = 42 |})
+        }
+    let start () = task {
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
+        builder.Services.AddGiraffe() |> ignore
+        kestrelPort0 builder
+        let app = builder.Build()
+        app.UseGiraffe(webApp) |> ignore
+        do! app.StartAsync()
+        return app
+    }
+
+module private FalcoServer =
+    open Falco
+    open Falco.Routing
+    let private endpoints = [
+        get "/plaintext" (Response.ofPlainText "Hello, World!")
+        get "/json" (Response.ofJson {| message = "Hello, World!"; count = 42 |})
+    ]
+    let start () = task {
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
+        builder.Services.AddRouting() |> ignore
+        kestrelPort0 builder
+        let app = builder.Build()
+        app.UseRouting().UseFalco(endpoints) |> ignore
+        do! app.StartAsync()
+        return app
+    }
+
+module private OxpeckerServer =
+    open Oxpecker
+    let private endpoints : Endpoint list = [
+        route "/plaintext" (text "Hello, World!")
+        route "/json" (json {| message = "Hello, World!"; count = 42 |})
+    ]
+    let start () = task {
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
+        builder.Services.AddRouting().AddOxpecker() |> ignore
+        kestrelPort0 builder
+        let app = builder.Build()
+        app.UseRouting().UseOxpecker(endpoints) |> ignore
+        do! app.StartAsync()
+        return app
+    }
+
+[<MemoryDiagnoser>]
+type FrameworkComparisonBenchmark() =
+    let mutable client = Unchecked.defaultof<HttpClient>
+    let mutable firePort = 0
+    let mutable fireStop : (unit -> Task) = fun () -> Task.CompletedTask
+    let mutable aspnet : WebApplication = null
+    let mutable giraffe : WebApplication = null
+    let mutable saturn : WebApplication = null
+    let mutable falco : WebApplication = null
+    let mutable oxpecker : WebApplication = null
+    let mutable aspnetPort = 0
+    let mutable giraffePort = 0
+    let mutable saturnPort = 0
+    let mutable falcoPort = 0
+    let mutable oxpeckerPort = 0
+
+    [<GlobalSetup>]
+    member _.Setup() = task {
+        client <- new HttpClient()
+
+        // Fire
+        let routes =
+            Route.start
+            |> Route.get "/plaintext" (fun _ -> task { return Response.text "Hello, World!" })
+            |> Route.get "/json" (fun _ -> task { return Response.json {| message = "Hello, World!"; count = 42 |} })
+        let config = App.defaults |> App.port 0 |> App.services [silenceFireLogging]
+        let! (p, stop) = App.runTest routes config CancellationToken.None
+        firePort <- p
+        fireStop <- stop
+
+        // ASP.NET Core minimal API
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
+        kestrelPort0 builder
+        let app = builder.Build()
+        app.MapGet("/plaintext", Func<string>(fun () -> "Hello, World!")) |> ignore
+        app.MapGet("/json", Func<IResult>(fun () -> Results.Json({| message = "Hello, World!"; count = 42 |}))) |> ignore
+        do! app.StartAsync()
+        aspnet <- app
+        aspnetPort <- serverPort app
+
+        let! g = GiraffeServer.start ()
+        giraffe <- g
+        giraffePort <- serverPort g
+        let! s = SaturnServer.start ()
+        saturn <- s
+        saturnPort <- serverPort s
+        let! f = FalcoServer.start ()
+        falco <- f
+        falcoPort <- serverPort f
+        let! o = OxpeckerServer.start ()
+        oxpecker <- o
+        oxpeckerPort <- serverPort o
+    }
+
+    [<GlobalCleanup>]
+    member _.Cleanup() = task {
+        do! fireStop ()
+        do! aspnet.StopAsync()
+        do! giraffe.StopAsync()
+        do! saturn.StopAsync()
+        do! falco.StopAsync()
+        do! oxpecker.StopAsync()
+        client.Dispose()
+    }
+
+    [<Benchmark(Description = "Fire: JSON", Baseline = true)>]
+    member _.FireJson() = client.GetStringAsync($"http://127.0.0.1:{firePort}/json")
+
+    [<Benchmark(Description = "ASP.NET Core: JSON")>]
+    member _.AspNetJson() = client.GetStringAsync($"http://127.0.0.1:{aspnetPort}/json")
+
+    [<Benchmark(Description = "Giraffe: JSON")>]
+    member _.GiraffeJson() = client.GetStringAsync($"http://127.0.0.1:{giraffePort}/json")
+
+    [<Benchmark(Description = "Saturn: JSON")>]
+    member _.SaturnJson() = client.GetStringAsync($"http://127.0.0.1:{saturnPort}/json")
+
+    [<Benchmark(Description = "Falco: JSON")>]
+    member _.FalcoJson() = client.GetStringAsync($"http://127.0.0.1:{falcoPort}/json")
+
+    [<Benchmark(Description = "Oxpecker: JSON")>]
+    member _.OxpeckerJson() = client.GetStringAsync($"http://127.0.0.1:{oxpeckerPort}/json")
+
+    [<Benchmark(Description = "Fire: plaintext")>]
+    member _.FirePlain() = client.GetStringAsync($"http://127.0.0.1:{firePort}/plaintext")
+
+    [<Benchmark(Description = "ASP.NET Core: plaintext")>]
+    member _.AspNetPlain() = client.GetStringAsync($"http://127.0.0.1:{aspnetPort}/plaintext")
+
+    [<Benchmark(Description = "Giraffe: plaintext")>]
+    member _.GiraffePlain() = client.GetStringAsync($"http://127.0.0.1:{giraffePort}/plaintext")
+
+    [<Benchmark(Description = "Saturn: plaintext")>]
+    member _.SaturnPlain() = client.GetStringAsync($"http://127.0.0.1:{saturnPort}/plaintext")
+
+    [<Benchmark(Description = "Falco: plaintext")>]
+    member _.FalcoPlain() = client.GetStringAsync($"http://127.0.0.1:{falcoPort}/plaintext")
+
+    [<Benchmark(Description = "Oxpecker: plaintext")>]
+    member _.OxpeckerPlain() = client.GetStringAsync($"http://127.0.0.1:{oxpeckerPort}/plaintext")
+
 [<EntryPoint>]
 let main args =
     let config = BenchmarkConfig()
