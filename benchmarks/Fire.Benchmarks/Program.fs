@@ -369,9 +369,12 @@ type RouteMatchBenchmark() =
 [<MemoryDiagnoser>]
 type JsonDispatchBenchmark() =
     let mutable trie = Trie.empty
+    let mutable trieTyped = Trie.empty
 
     [<GlobalSetup>]
     member _.Setup() =
+        // Erased-generic handler: `fun _ -> ...` infers the param as obj, forcing
+        // Fire's reflection-invoker + struct boxing path.
         let routes =
             Route.start
             |> Route.get "/json" (fun _ -> task {
@@ -379,6 +382,15 @@ type JsonDispatchBenchmark() =
             })
         for entry in routes.Routes |> List.rev do
             trie <- Trie.add entry.Method entry.Pattern entry.Middlewares entry.Handler trie
+        // Typed handler: `Request -> Task<Response>` IS a Handler, so it hits the
+        // fast path — no boxing, no invoker indirection.
+        let routesTyped =
+            Route.start
+            |> Route.get "/json" (fun (_req: Request) -> task {
+                return Response.json {| message = "Hello, World!"; count = 42 |}
+            })
+        for entry in routesTyped.Routes |> List.rev do
+            trieTyped <- Trie.add entry.Method entry.Pattern entry.Middlewares entry.Handler trieTyped
 
     [<Benchmark(Description = "Raw serialize (floor)", Baseline = true)>]
     member _.RawSerialize() = task {
@@ -400,6 +412,18 @@ type JsonDispatchBenchmark() =
         // Mirror App.handleRequest: throwaway pre-routing Request threads through
         // (empty) middleware, then dispatch builds the real Request and runs the handler.
         let baseHandler : Handler = fun _req -> Internal.dispatchRequest trie App.defaults ctx
+        let req = Request(ctx, Internal.emptyParams)
+        let! resp = baseHandler req
+        do! Internal.writeResponse ctx resp
+    }
+
+    [<Benchmark(Description = "Fire dispatch (typed handler)")>]
+    member _.FireDispatchTyped() = task {
+        let ctx = DefaultHttpContext()
+        ctx.Request.Path <- PathString("/json")
+        ctx.Request.Method <- "GET"
+        ctx.Response.Body <- System.IO.Stream.Null
+        let baseHandler : Handler = fun _req -> Internal.dispatchRequest trieTyped App.defaults ctx
         let req = Request(ctx, Internal.emptyParams)
         let! resp = baseHandler req
         do! Internal.writeResponse ctx resp
@@ -515,8 +539,8 @@ let private serverPort (app: WebApplication) =
     let addresses = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()
     Uri(addresses.Addresses |> Seq.head).Port
 
-let private kestrelPort0 (builder: WebApplicationBuilder) =
-    builder.WebHost.ConfigureKestrel(fun o -> o.Listen(IPAddress.Loopback, 0)) |> ignore
+let private kestrelListen (port: int) (builder: WebApplicationBuilder) =
+    builder.WebHost.ConfigureKestrel(fun o -> o.Listen(IPAddress.Loopback, port)) |> ignore
 
 module private GiraffeServer =
     open Giraffe
@@ -525,10 +549,10 @@ module private GiraffeServer =
             route "/plaintext" >=> text "Hello, World!"
             route "/json" >=> json {| message = "Hello, World!"; count = 42 |}
         ]
-    let start () = task {
+    let start (port: int) = task {
         let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.Services.AddGiraffe() |> ignore
-        kestrelPort0 builder
+        kestrelListen port builder
         let app = builder.Build()
         app.UseGiraffe(webApp) |> ignore
         do! app.StartAsync()
@@ -544,10 +568,10 @@ module private SaturnServer =
             get "/plaintext" (text "Hello, World!")
             get "/json" (json {| message = "Hello, World!"; count = 42 |})
         }
-    let start () = task {
+    let start (port: int) = task {
         let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.Services.AddGiraffe() |> ignore
-        kestrelPort0 builder
+        kestrelListen port builder
         let app = builder.Build()
         app.UseGiraffe(webApp) |> ignore
         do! app.StartAsync()
@@ -561,10 +585,10 @@ module private FalcoServer =
         get "/plaintext" (Response.ofPlainText "Hello, World!")
         get "/json" (Response.ofJson {| message = "Hello, World!"; count = 42 |})
     ]
-    let start () = task {
+    let start (port: int) = task {
         let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.Services.AddRouting() |> ignore
-        kestrelPort0 builder
+        kestrelListen port builder
         let app = builder.Build()
         app.UseRouting().UseFalco(endpoints) |> ignore
         do! app.StartAsync()
@@ -577,10 +601,10 @@ module private OxpeckerServer =
         route "/plaintext" (text "Hello, World!")
         route "/json" (json {| message = "Hello, World!"; count = 42 |})
     ]
-    let start () = task {
+    let start (port: int) = task {
         let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
         builder.Services.AddRouting().AddOxpecker() |> ignore
-        kestrelPort0 builder
+        kestrelListen port builder
         let app = builder.Build()
         app.UseRouting().UseOxpecker(endpoints) |> ignore
         do! app.StartAsync()
@@ -619,7 +643,7 @@ type FrameworkComparisonBenchmark() =
 
         // ASP.NET Core minimal API
         let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
-        kestrelPort0 builder
+        kestrelListen 0 builder
         let app = builder.Build()
         app.MapGet("/plaintext", Func<string>(fun () -> "Hello, World!")) |> ignore
         app.MapGet("/json", Func<IResult>(fun () -> Results.Json({| message = "Hello, World!"; count = 42 |}))) |> ignore
@@ -627,16 +651,16 @@ type FrameworkComparisonBenchmark() =
         aspnet <- app
         aspnetPort <- serverPort app
 
-        let! g = GiraffeServer.start ()
+        let! g = GiraffeServer.start 0
         giraffe <- g
         giraffePort <- serverPort g
-        let! s = SaturnServer.start ()
+        let! s = SaturnServer.start 0
         saturn <- s
         saturnPort <- serverPort s
-        let! f = FalcoServer.start ()
+        let! f = FalcoServer.start 0
         falco <- f
         falcoPort <- serverPort f
-        let! o = OxpeckerServer.start ()
+        let! o = OxpeckerServer.start 0
         oxpecker <- o
         oxpeckerPort <- serverPort o
     }
@@ -688,14 +712,46 @@ type FrameworkComparisonBenchmark() =
     [<Benchmark(Description = "Oxpecker: plaintext")>]
     member _.OxpeckerPlain() = client.GetStringAsync($"http://127.0.0.1:{oxpeckerPort}/plaintext")
 
+// Serve mode for external throughput load tests: `serve <framework> <port>`
+// starts one framework's server on a fixed port and blocks. Used by a load
+// generator (oha) since BenchmarkDotNet's HTTP latency is transport-bound.
+let private blockForever () = System.Threading.Thread.Sleep(System.Threading.Timeout.Infinite)
+
+let private serve (framework: string) (port: int) =
+    match framework with
+    | "fire" ->
+        let routes =
+            Route.start
+            |> Route.get "/plaintext" (fun _ -> task { return Response.text "Hello, World!" })
+            |> Route.get "/json" (fun _ -> task { return Response.json {| message = "Hello, World!"; count = 42 |} })
+        let config = App.defaults |> App.host "127.0.0.1" |> App.port port |> App.services [silenceFireLogging]
+        (App.run routes config CancellationToken.None).GetAwaiter().GetResult()
+    | "aspnet" ->
+        let builder = WebApplication.CreateBuilder() |> configureAspNetBuilder
+        kestrelListen port builder
+        let app = builder.Build()
+        app.MapGet("/plaintext", Func<string>(fun () -> "Hello, World!")) |> ignore
+        app.MapGet("/json", Func<IResult>(fun () -> Results.Json({| message = "Hello, World!"; count = 42 |}))) |> ignore
+        app.Run()
+    | "giraffe"  -> (GiraffeServer.start port).GetAwaiter().GetResult() |> ignore; blockForever ()
+    | "saturn"   -> (SaturnServer.start port).GetAwaiter().GetResult() |> ignore; blockForever ()
+    | "falco"    -> (FalcoServer.start port).GetAwaiter().GetResult() |> ignore; blockForever ()
+    | "oxpecker" -> (OxpeckerServer.start port).GetAwaiter().GetResult() |> ignore; blockForever ()
+    | other -> eprintfn "unknown framework: %s" other
+
 [<EntryPoint>]
 let main args =
-    let config = BenchmarkConfig()
-    let switcher = BenchmarkSwitcher.FromAssembly(typeof<PlainTextBenchmark>.Assembly)
-    // Bare `dotnet run` runs the full joined suite; passing args (e.g. --filter)
-    // runs just the matching benchmarks (RunAllJoined ignores --filter).
-    if Array.isEmpty args then
-        switcher.RunAllJoined(config) |> ignore
-    else
-        switcher.Run(args, config) |> ignore
-    0
+    match args with
+    | [| "serve"; framework; port |] ->
+        serve framework (int port)
+        0
+    | _ ->
+        let config = BenchmarkConfig()
+        let switcher = BenchmarkSwitcher.FromAssembly(typeof<PlainTextBenchmark>.Assembly)
+        // Bare `dotnet run` runs the full joined suite; passing args (e.g. --filter)
+        // runs just the matching benchmarks (RunAllJoined ignores --filter).
+        if Array.isEmpty args then
+            switcher.RunAllJoined(config) |> ignore
+        else
+            switcher.Run(args, config) |> ignore
+        0
