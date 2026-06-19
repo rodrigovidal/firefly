@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import SiteHeader from "@/components/site-header";
+import { useTheme } from "@/components/use-theme";
 
 /* ----------------------------------------------------------------
    Firefly landing page
@@ -91,7 +93,7 @@ const QUOTES = [
   },
 ];
 
-const TAB_FILES = ["Routes.fs", "Todos.fs", "Greeter.fs", "Program.fs"];
+const TAB_FILES = ["Routes.fs", "Todos.fs", "Program.fs"];
 
 /* firefly glow particles in the hero */
 const FIREFLIES: Array<{
@@ -167,12 +169,11 @@ const codePane: CSSProperties = {
 };
 
 export default function FireflyLanding({
-  defaultTheme = "dark",
   githubStars = 1280,
   showComparison = true,
   showTestimonials = true,
 }: FireflyLandingProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const [theme, toggleTheme] = useTheme();
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState(0);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -186,12 +187,9 @@ export default function FireflyLanding({
     copyTimer.current = setTimeout(() => setCopied(false), 1600);
   };
 
-  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
-
   const tabBase: CSSProperties = { padding: "9px 16px", borderRadius: 9, fontFamily: monoFont, fontSize: 13, cursor: "pointer", border: "1px solid transparent", background: "transparent", color: "var(--fg-2)", transition: "all .15s", fontWeight: 500 };
   const tabActive: CSSProperties = { ...tabBase, background: "var(--surface-2)", color: "var(--fg)", border: "1px solid var(--border-strong)", fontWeight: 600 };
 
-  const navLink: CSSProperties = { color: "var(--fg-2)", textDecoration: "none", fontSize: 14, fontWeight: 500, padding: "7px 12px", borderRadius: 8 };
   const footLink: CSSProperties = { fontSize: 14, color: "var(--fg-2)", textDecoration: "none" };
 
   return (
@@ -208,27 +206,7 @@ export default function FireflyLanding({
         overflowX: "hidden",
       }}
     >
-      {/* NAV */}
-      <nav style={{ position: "sticky", top: 0, zIndex: 50, backdropFilter: "blur(12px)", background: "color-mix(in srgb, var(--bg) 80%, transparent)", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "14px 28px", display: "flex", alignItems: "center", gap: 28 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flex: "none" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/firefly-logo.png" alt="Firefly" style={{ height: 30, width: "auto", display: "block", filter: "drop-shadow(0 0 12px var(--glow-soft))" }} />
-            <span style={{ fontFamily: headingFont, fontWeight: 700, fontSize: 19, letterSpacing: "-0.02em" }}>Firefly</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-            <a href="/docs" className="ff-navlink" style={navLink}>Docs</a>
-            <a href="/guides" className="ff-navlink" style={navLink}>Guides</a>
-            <a href="#benchmarks" className="ff-navlink" style={navLink}>Benchmarks</a>
-            <a href={REPO_URL} className="ff-navlink" style={navLink}>GitHub</a>
-          </div>
-          <div style={{ flex: 1 }} />
-          <button onClick={toggleTheme} aria-label="Toggle theme" className="ff-iconbtn" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--fg-2)", cursor: "pointer" }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-          </button>
-          <a href="/docs/getting-started" className="ff-btn-primary" style={{ display: "flex", alignItems: "center", gap: 8, flex: "none", background: "var(--glow)", color: "#1a1305", textDecoration: "none", fontWeight: 700, fontSize: 14, padding: "9px 16px", borderRadius: 9, boxShadow: "0 0 0 1px rgba(255,255,255,0.12) inset, 0 8px 24px -8px var(--glow)" }}>Get started</a>
-        </div>
-      </nav>
+      <SiteHeader theme={theme} onToggleTheme={toggleTheme} />
 
       {/* HERO */}
       <header style={{ position: "relative", maxWidth: 1180, margin: "0 auto", padding: "84px 28px 70px" }}>
@@ -332,9 +310,9 @@ export default function FireflyLanding({
           <div>
             <div style={{ fontFamily: monoFont, fontSize: 13, color: "var(--glow)", fontWeight: 600, marginBottom: 14 }}>// the whole app</div>
             <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(30px,3.6vw,44px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: "0 0 16px", textWrap: "balance" }}>Eight lines to a running service.</h2>
-            <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 26px", maxWidth: "30em", textWrap: "pretty" }}>Typed route params, JSON in and out, JWT middleware, and DI — plus gRPC services on the very same server. HTTP and gRPC from one composable pipeline.</p>
+            <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 26px", maxWidth: "30em", textWrap: "pretty" }}>Typed route params, task-based handlers, JSON in and out, JWT middleware, and DI — all from the same composable pipeline. Here&apos;s a real todo API.</p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {["Routing", "JSON handlers", "gRPC", "Wire it up"].map((label, i) => (
+              {["Routing", "JSON handlers", "Wire it up"].map((label, i) => (
                 <button key={label} onClick={() => setTab(i)} style={tab === i ? tabActive : tabBase}>{label}</button>
               ))}
             </div>
@@ -373,23 +351,6 @@ export default function FireflyLanding({
               )}
               {tab === 2 && (
                 <div style={codePane}>
-                  <Line><K>open</K> <Ty>Firefly</Ty></Line>
-                  <Line><K>open</K> <Ty>Grpc.Core</Ty></Line>
-                  <Line />
-                  <Line><span style={tok("cc")}>{"// a gRPC service — served on the same server as HTTP"}</span></Line>
-                  <Line><K>let</K> greeter <Pn>=</Pn> <Fm>grpcService</Fm> <S>{'"greet.Greeter"'}</S> {"{"}</Line>
-                  <Line>{"    "}<Fm>unary</Fm> <S>{'"SayHello"'}</S> (<K>fun</K> (req<Pn>:</Pn> <Ty>HelloRequest</Ty>) _ctx <Op>{"->"}</Op> <K>task</K> {"{"}</Line>
-                  <Line>{"        "}<K>return</K> <Ty>HelloReply</Ty>(Message <Pn>=</Pn> <S>{'$"Hello, {req.Name}!"'}</S>)</Line>
-                  <Line>{"    }})"}</Line>
-                  <Line>{"}"}</Line>
-                  <Line />
-                  <Line><Fm>App</Fm>.defaults</Line>
-                  <Line><Op>{"|>"}</Op> <Fm>App</Fm>.grpc greeter      <span style={tok("cc")}>{"// gRPC"}</span></Line>
-                  <Line><Op>{"|>"}</Op> <Fm>App</Fm>.run routes        <span style={tok("cc")}>{"// + your HTTP routes"}</span></Line>
-                </div>
-              )}
-              {tab === 3 && (
-                <div style={codePane}>
                   <Line><Fm>App</Fm>.defaults</Line>
                   <Line><Op>{"|>"}</Op> <Fm>App</Fm>.services [ <Fm>Service</Fm>.singleton<Pn>{"<"}</Pn><Ty>ITodoStore</Ty>, <Ty>InMemoryTodoStore</Ty><Pn>{">"}</Pn> ]</Line>
                   <Line><Op>{"|>"}</Op> <Fm>App</Fm>.middleware <Fm>Log</Fm>.toConsole</Line>
@@ -397,6 +358,59 @@ export default function FireflyLanding({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* GRPC */}
+      <section style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 28px 56px" }}>
+        <div className="ff-showcase-grid" style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 48, alignItems: "center" }}>
+          {/* code window */}
+          <div style={{ borderRadius: 16, overflow: "hidden", border: "1px solid var(--border-strong)", background: "var(--code-bg)", boxShadow: "var(--card-shadow)" }}>
+            <WindowDots file="Greeter.fs" />
+            <div style={codePane}>
+              <Line><K>open</K> <Ty>Firefly</Ty></Line>
+              <Line><K>open</K> <Ty>Grpc.Core</Ty></Line>
+              <Line />
+              <Line><span style={tok("cc")}>{"// a service generated from greet.proto"}</span></Line>
+              <Line><K>let</K> greeter <Pn>=</Pn> <Fm>grpcService</Fm> <S>{'"greet.Greeter"'}</S> {"{"}</Line>
+              <Line>{"    "}<Fm>unary</Fm> <S>{'"SayHello"'}</S> (<K>fun</K> (req<Pn>:</Pn> <Ty>HelloRequest</Ty>) _ctx <Op>{"->"}</Op> <K>task</K> {"{"}</Line>
+              <Line>{"        "}<K>return</K> <Ty>HelloReply</Ty>(Message <Pn>=</Pn> <S>{'$"Hello, {req.Name}!"'}</S>)</Line>
+              <Line>{"    }})"}</Line>
+              <Line>{"    "}<Fm>serverStream</Fm> <S>{'"SayHelloStream"'}</S> (<K>fun</K> req writer _ctx <Op>{"->"}</Op> <K>task</K> {"{"}</Line>
+              <Line>{"        "}<K>for</K> i <K>in</K> <Nm>1</Nm>..<Nm>5</Nm> <K>do</K> <K>do!</K> writer.WriteAsync(reply i)</Line>
+              <Line>{"    }})"}</Line>
+              <Line>{"}"}</Line>
+              <Line />
+              <Line><Fm>App</Fm>.defaults</Line>
+              <Line><Op>{"|>"}</Op> <Fm>App</Fm>.grpc greeter      <span style={tok("cc")}>{"// gRPC"}</span></Line>
+              <Line><Op>{"|>"}</Op> <Fm>App</Fm>.run routes        <span style={tok("cc")}>{"// + the HTTP routes"}</span></Line>
+            </div>
+          </div>
+
+          {/* copy */}
+          <div>
+            <div style={{ fontFamily: monoFont, fontSize: 13, color: "var(--glow)", fontWeight: 600, marginBottom: 14 }}>// http + grpc</div>
+            <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(30px,3.6vw,44px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: "0 0 16px", textWrap: "balance" }}>Not just HTTP — gRPC too.</h2>
+            <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 24px", maxWidth: "30em", textWrap: "pretty" }}>
+              Define a service with the <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--cf)" }}>grpcService</span> builder — unary and server-streaming methods, typed from your <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--fg)" }}>.proto</span>. Register it on the same pipeline as your routes: <strong style={{ color: "var(--fg)", fontWeight: 600 }}>one Kestrel server speaks both protocols</strong>.
+            </p>
+            <ul style={{ listStyle: "none", margin: "0 0 26px", padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+              {[
+                "Unary and server-streaming methods",
+                "Shares DI, config, and the same port as HTTP",
+                "Strongly-typed messages generated from .proto",
+              ].map((item) => (
+                <li key={item} style={{ display: "flex", alignItems: "flex-start", gap: 11, fontSize: 15, color: "var(--fg-2)", lineHeight: 1.5 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--spark)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "none", marginTop: 2 }}><path d="M20 6 9 17l-5-5" /></svg>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <a href="/guides/grpc-greeter" className="ff-btn-surface" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--surface)", color: "var(--fg)", textDecoration: "none", fontWeight: 600, fontSize: 14.5, padding: "11px 18px", borderRadius: 11, border: "1px solid var(--border-strong)" }}>
+              Read the gRPC guide
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </a>
           </div>
         </div>
       </section>

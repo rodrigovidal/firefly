@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { NavGroup, TocItem } from "@/lib/content";
+import SiteHeader from "@/components/site-header";
+import { useTheme } from "@/components/use-theme";
 
-const headingFont = "var(--font-bricolage), sans-serif";
 const monoFont = "var(--font-fira), monospace";
 
 interface DocsShellProps {
@@ -19,6 +20,7 @@ interface DocsShellProps {
 
 export default function DocsShell({ section, nav, toc, children, bare = false }: DocsShellProps) {
   const pathname = usePathname();
+  const [theme, toggleTheme] = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -98,7 +100,7 @@ export default function DocsShell({ section, nav, toc, children, bare = false }:
   return (
     <div
       data-fire-root
-      data-theme="dark"
+      data-theme={theme}
       style={{
         minHeight: "100vh",
         background: "var(--bg)",
@@ -108,30 +110,7 @@ export default function DocsShell({ section, nav, toc, children, bare = false }:
         WebkitFontSmoothing: "antialiased",
       }}
     >
-      {/* top bar */}
-      <header style={{ position: "sticky", top: 0, zIndex: 50, backdropFilter: "blur(12px)", background: "color-mix(in srgb, var(--bg) 82%, transparent)", borderBottom: "1px solid var(--border)" }}>
-        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "12px 24px", display: "flex", alignItems: "center", gap: 20 }}>
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 9, textDecoration: "none", color: "var(--fg)", flex: "none" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/firefly-logo.png" alt="Firefly" style={{ height: 26, width: "auto", filter: "drop-shadow(0 0 10px var(--glow-soft))" }} />
-            <span style={{ fontFamily: headingFont, fontWeight: 700, fontSize: 17, letterSpacing: "-0.02em" }}>Firefly</span>
-          </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Link href="/docs" className="ff-navlink" style={{ ...linkBase, fontSize: 14, color: section === "docs" ? "var(--fg)" : "var(--fg-2)" }}>Docs</Link>
-            <Link href="/guides" className="ff-navlink" style={{ ...linkBase, fontSize: 14, color: section === "guides" ? "var(--fg)" : "var(--fg-2)" }}>Guides</Link>
-          </div>
-          <div style={{ flex: 1 }} />
-          <a href="https://github.com/rodrigovidal/firefly" target="_blank" rel="noreferrer" className="ff-navlink" style={{ ...linkBase, fontSize: 14, color: "var(--fg-2)" }}>GitHub</a>
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Toggle navigation"
-            className="ff-doc-menu-btn ff-iconbtn"
-            style={{ display: "none", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 8, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--fg-2)", cursor: "pointer" }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
-          </button>
-        </div>
-      </header>
+      <SiteHeader theme={theme} onToggleTheme={toggleTheme} onMenuToggle={() => setMenuOpen((v) => !v)} maxWidth={1320} />
 
       <div className="ff-docs-grid" style={{ maxWidth: 1320, margin: "0 auto", display: "grid", gridTemplateColumns: "232px minmax(0, 1fr) 220px", gap: 40, padding: "0 24px", alignItems: "start" }}>
         {/* left sidebar */}
