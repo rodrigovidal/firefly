@@ -258,17 +258,17 @@ The repo also includes `Firefly.Cli` with two workflow commands:
 
 ```bash
 dotnet run --project src/Firefly.Cli/Firefly.Cli.fsproj -- new MyApp
-fire dev --project src/MyApp/MyApp.fsproj
+firefly dev --project src/MyApp/MyApp.fsproj
 ```
 
-`fire new` generates an opinionated app layout with:
+`firefly new` generates an opinionated app layout with:
 
 - `App.fs`, `Endpoint.fs`, `Router.fs`
 - `Controllers/`, `Views/`, `Components/`, `Layouts/`
 - `Assets/`, `Static/`, `Config/`
 - `tests/<App>.Tests` with fixtures and smoke tests
 
-`fire dev` wraps `dotnet watch run` and the scaffold includes watch items for source, assets, and tests.
+`firefly dev` wraps `dotnet watch run` and the scaffold includes watch items for source, assets, and tests.
 
 ## Examples
 

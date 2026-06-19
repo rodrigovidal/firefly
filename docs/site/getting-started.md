@@ -9,10 +9,10 @@ This guide walks you through creating your first Fire application from scratch.
 
 ## Create a New Project
 
-The Fire CLI scaffolds a complete project with routing, configuration, and tests:
+The Firefly CLI scaffolds a complete project with routing, configuration, and tests:
 
 ```bash
-fire new MyApp
+firefly new MyApp
 cd MyApp
 ```
 
@@ -39,7 +39,7 @@ MyApp/
 ## Run in Development Mode
 
 ```bash
-fire dev
+firefly dev
 ```
 
 This starts the server with `dotnet watch run`, enabling live reload and auto-restart on file changes. The environment is set to `Development` automatically.

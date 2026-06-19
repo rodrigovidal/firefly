@@ -5,7 +5,7 @@
 Generate Docker files with the CLI:
 
 ```bash
-fire gen docker
+firefly gen docker
 ```
 
 Or create a `Dockerfile` manually:

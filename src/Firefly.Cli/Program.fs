@@ -22,17 +22,17 @@ let private templateConfigDirName = ".template.config"
 
 let private usage () =
     String.concat Environment.NewLine [
-        "Fire CLI"
+        "Firefly CLI"
         ""
         "Commands:"
-        "  fire new <Name> [--output <path>] [--force]"
-        "  fire dev [--project <path>]"
-        "  fire gen html <Resource> field:type [field:type ...]"
-        "  fire gen json <Resource> field:type [field:type ...]"
-        "  fire gen controller <Name>"
-        "  fire gen schema <Name> field:type [field:type ...]"
-        "  fire gen docker"
-        "  fire openapi [--project <path>] [--output <path>] [--title <title>] [--version <version>] [--routes <name>]"
+        "  firefly new <Name> [--output <path>] [--force]"
+        "  firefly dev [--project <path>]"
+        "  firefly gen html <Resource> field:type [field:type ...]"
+        "  firefly gen json <Resource> field:type [field:type ...]"
+        "  firefly gen controller <Name>"
+        "  firefly gen schema <Name> field:type [field:type ...]"
+        "  firefly gen docker"
+        "  firefly openapi [--project <path>] [--output <path>] [--title <title>] [--version <version>] [--routes <name>]"
     ]
 
 let private ensureDirectory path =
@@ -236,7 +236,7 @@ let main argv =
             SimpleGenerator.generateController (Generator.capitalize name) Environment.CurrentDirectory
             0
         | ["gen"; "schema"; name] ->
-            eprintfn "Usage: fire gen schema <Name> field:type [field:type ...]"
+            eprintfn "Usage: firefly gen schema <Name> field:type [field:type ...]"
             1
         | "gen" :: "schema" :: name :: fields when fields.Length > 0 ->
             SimpleGenerator.generateSchema (Generator.capitalize name) (SimpleGenerator.parseFields fields) Environment.CurrentDirectory
@@ -258,10 +258,10 @@ let main argv =
             }
             0
         | ["gen"] | ["gen"; _] ->
-            eprintfn "Usage: fire gen html|json <Resource> field:type [field:type ...]"
-            eprintfn "       fire gen controller <Name>"
-            eprintfn "       fire gen schema <Name> field:type [field:type ...]"
-            eprintfn "       fire gen docker"
+            eprintfn "Usage: firefly gen html|json <Resource> field:type [field:type ...]"
+            eprintfn "       firefly gen controller <Name>"
+            eprintfn "       firefly gen schema <Name> field:type [field:type ...]"
+            eprintfn "       firefly gen docker"
             1
         | ["dev"] ->
             runDev None

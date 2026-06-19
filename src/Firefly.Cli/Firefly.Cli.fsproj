@@ -3,6 +3,15 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>disable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>firefly</ToolCommandName>
+    <PackageId>Firefly.Cli</PackageId>
+    <Version>0.1.0-alpha.3</Version>
+    <Authors>Rodrigo Vidal</Authors>
+    <Description>CLI for the Firefly F# web framework — scaffolding, code generation, dev server, and OpenAPI.</Description>
+    <PackageTags>fsharp;web;framework;cli;firefly</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/rodrigovidal/fire</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Generator.fs" />

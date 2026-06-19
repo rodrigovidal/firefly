@@ -15,7 +15,7 @@ Fire is part of a cohesive F# ecosystem:
 ```bash
 dotnet new fire -n MyApp
 cd MyApp
-fire dev
+firefly dev
 ```
 
 ## Features
