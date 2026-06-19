@@ -50,12 +50,15 @@ const CHIPS = [
   "Hot reload",
 ];
 
-const BENCHES = [
-  { name: "Firefly", label: "1.03M", pct: 100, self: true },
-  { name: "Oxpecker", label: "742K", pct: 72, self: false },
-  { name: "Falco", label: "705K", pct: 69, self: false },
-  { name: "Giraffe", label: "548K", pct: 53, self: false },
-  { name: "Saturn", label: "402K", pct: 39, self: false },
+// Real numbers from benchmarks/Firefly.Benchmarks (BenchmarkDotNet, Apple M4
+// Pro, .NET 10). Mean response time (µs) and allocations (KB); lower is better.
+const BENCH_ROWS = [
+  { name: "Firefly", jsonUs: "45.5", jsonKb: "3.55", textUs: "44.0", textKb: "3.46", self: true },
+  { name: "ASP.NET Core", jsonUs: "46.3", jsonKb: "3.58", textUs: "41.9", textKb: "3.14", self: false },
+  { name: "Giraffe", jsonUs: "45.5", jsonKb: "3.82", textUs: "42.1", textKb: "3.47", self: false },
+  { name: "Saturn", jsonUs: "46.3", jsonKb: "3.82", textUs: "41.3", textKb: "3.47", self: false },
+  { name: "Falco", jsonUs: "45.5", jsonKb: "3.83", textUs: "42.0", textKb: "3.22", self: false },
+  { name: "Oxpecker", jsonUs: "47.9", jsonKb: "3.70", textUs: "42.0", textKb: "3.25", self: false },
 ];
 
 const ROWS = [
@@ -118,8 +121,8 @@ function fmtStars(n: number): string {
 }
 
 /* shared bits ---------------------------------------------------- */
-const headingFont = "'Bricolage Grotesque', sans-serif";
-const monoFont = "'Fira Code', monospace";
+const headingFont = "var(--font-bricolage), sans-serif";
+const monoFont = "var(--font-fira), monospace";
 
 function WindowDots({ file }: { file: string }) {
   return (
@@ -171,13 +174,7 @@ export default function FireflyLanding({
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState(0);
-  const [animated, setAnimated] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => setAnimated(true)));
-    return () => cancelAnimationFrame(id);
-  }, []);
 
   useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
 
@@ -205,7 +202,7 @@ export default function FireflyLanding({
         background: "var(--bg)",
         backgroundImage: "var(--bg-grad)",
         color: "var(--fg)",
-        fontFamily: "'Hanken Grotesk', system-ui, sans-serif",
+        fontFamily: "var(--font-hanken), system-ui, sans-serif",
         WebkitFontSmoothing: "antialiased",
         overflowX: "hidden",
       }}
@@ -394,19 +391,42 @@ export default function FireflyLanding({
               <div style={{ fontFamily: monoFont, fontSize: 13, color: "var(--glow)", fontWeight: 600, marginBottom: 12 }}>// benchmarks</div>
               <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(28px,3.4vw,40px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: 0, textWrap: "balance" }}>Fast where it counts.</h2>
             </div>
-            <p style={{ fontSize: 14, color: "var(--fg-3)", margin: 0, maxWidth: "26em", lineHeight: 1.5 }}>Plaintext responses, single node, requests/sec — higher is better. Illustrative figures; swap in your own.</p>
+            <p style={{ fontSize: 14, color: "var(--fg-3)", margin: 0, maxWidth: "28em", lineHeight: 1.5 }}>Response time and allocations measured in-process with BenchmarkDotNet — Apple M4 Pro, .NET 10. Lower is better.</p>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {BENCHES.map((b) => (
-              <div key={b.name} style={{ display: "grid", gridTemplateColumns: "96px 1fr 84px", alignItems: "center", gap: 18 }}>
-                <span style={{ fontWeight: b.self ? 700 : 500, fontSize: 14.5, color: b.self ? "var(--fg)" : "var(--fg-2)" }}>{b.name}</span>
-                <span style={{ position: "relative", height: 30, borderRadius: 8, background: "var(--surface-2)", overflow: "hidden" }}>
-                  <span style={{ position: "absolute", inset: "0 auto 0 0", borderRadius: 8, background: b.self ? "linear-gradient(90deg, var(--glow), var(--glow-2))" : "var(--fg-3)", width: animated ? `${b.pct}%` : "0%", transition: "width 1.1s cubic-bezier(.2,.7,.2,1)", boxShadow: b.self ? "0 0 18px -2px var(--glow)" : "none" }} />
-                </span>
-                <span style={{ fontFamily: monoFont, fontSize: 14, textAlign: "right", color: b.self ? "var(--fg)" : "var(--fg-2)", fontWeight: b.self ? 700 : 500 }}>{b.label}</span>
-              </div>
-            ))}
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560, fontFamily: monoFont }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "0 12px 12px", fontSize: 12, fontWeight: 600, color: "var(--fg-3)", fontFamily: "var(--font-hanken), sans-serif" }} />
+                  <th colSpan={2} style={{ padding: "0 12px 6px", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--fg-3)", textAlign: "center" }}>JSON</th>
+                  <th colSpan={2} style={{ padding: "0 12px 6px", fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--fg-3)", textAlign: "center" }}>Plaintext</th>
+                </tr>
+                <tr>
+                  <th style={{ borderBottom: "1px solid var(--border)" }} />
+                  {["µs", "KB", "µs", "KB"].map((h, i) => (
+                    <th key={i} style={{ padding: "0 12px 10px", fontSize: 12, fontWeight: 500, color: "var(--fg-3)", textAlign: "right", borderBottom: "1px solid var(--border)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {BENCH_ROWS.map((r) => (
+                  <tr key={r.name} style={{ background: r.self ? "var(--glow-soft)" : "transparent" }}>
+                    <td style={{ padding: "11px 12px", fontSize: 14, borderBottom: "1px solid var(--border)", color: r.self ? "var(--fg)" : "var(--fg-2)", fontWeight: r.self ? 700 : 500, fontFamily: "var(--font-hanken), sans-serif", whiteSpace: "nowrap" }}>
+                      {r.self && <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "var(--glow)", boxShadow: "0 0 8px 2px var(--glow)", marginRight: 8 }} />}
+                      {r.name}
+                    </td>
+                    {[r.jsonUs, r.jsonKb, r.textUs, r.textKb].map((v, i) => (
+                      <td key={i} style={{ padding: "11px 12px", fontSize: 13.5, textAlign: "right", borderBottom: "1px solid var(--border)", color: r.self ? "var(--fg)" : "var(--fg-2)", fontWeight: r.self ? 700 : 400 }}>{v}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          <p style={{ fontSize: 12.5, color: "var(--fg-3)", margin: "18px 0 0", lineHeight: 1.55 }}>
+            On par with hand-written ASP.NET Core and the established F# frameworks — with the lowest JSON allocations of the F# options. Reproduce it:{" "}
+            <span style={{ fontFamily: monoFont, color: "var(--fg-2)" }}>dotnet run -c Release --project benchmarks/Firefly.Benchmarks</span>.
+          </p>
         </div>
       </section>
 

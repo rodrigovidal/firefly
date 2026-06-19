@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { NavGroup, TocItem } from "@/lib/content";
 
-const headingFont = "'Bricolage Grotesque', sans-serif";
-const monoFont = "'Fira Code', monospace";
+const headingFont = "var(--font-bricolage), sans-serif";
+const monoFont = "var(--font-fira), monospace";
 
 interface DocsShellProps {
   section: "docs" | "guides";
@@ -104,7 +104,7 @@ export default function DocsShell({ section, nav, toc, children, bare = false }:
         background: "var(--bg)",
         backgroundImage: "var(--bg-grad)",
         color: "var(--fg)",
-        fontFamily: "'Hanken Grotesk', system-ui, sans-serif",
+        fontFamily: "var(--font-hanken), system-ui, sans-serif",
         WebkitFontSmoothing: "antialiased",
       }}
     >
