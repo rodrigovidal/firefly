@@ -247,3 +247,156 @@
     animation: none !important;
   }
 }
+
+/* ---- docs sidebar / toc ---- */
+.ff-doclink:hover {
+  color: var(--fg) !important;
+  background: var(--surface-2);
+}
+.ff-docs-toc a:hover {
+  color: var(--fg) !important;
+}
+
+@media (max-width: 1100px) {
+  .ff-docs-grid {
+    grid-template-columns: 232px minmax(0, 1fr) !important;
+  }
+  .ff-docs-toc {
+    display: none !important;
+  }
+}
+@media (max-width: 880px) {
+  .ff-docs-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .ff-doc-menu-btn {
+    display: flex !important;
+  }
+  .ff-docs-sidebar {
+    position: fixed !important;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    max-height: none !important;
+    padding: 20px 24px 40px !important;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: none;
+  }
+  .ff-docs-sidebar.ff-open {
+    display: block;
+  }
+}
+
+/* ---- prose (rendered markdown) ---- */
+.ff-prose {
+  color: var(--fg-2);
+  font-size: 15.5px;
+  line-height: 1.75;
+  max-width: 46rem;
+}
+.ff-prose > :first-child { margin-top: 0; }
+.ff-prose h1,
+.ff-prose h2,
+.ff-prose h3,
+.ff-prose h4 {
+  font-family: "Bricolage Grotesque", sans-serif;
+  color: var(--fg);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  scroll-margin-top: 76px;
+}
+.ff-prose h1 { font-size: 2.1rem; margin: 0 0 0.5em; letter-spacing: -0.03em; }
+.ff-prose h2 { font-size: 1.5rem; margin: 2em 0 0.7em; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+.ff-prose h3 { font-size: 1.2rem; margin: 1.7em 0 0.5em; }
+.ff-prose h4 { font-size: 1.02rem; margin: 1.5em 0 0.4em; }
+.ff-prose :where(h1, h2, h3, h4, h5, h6) a {
+  color: inherit;
+  text-decoration: none;
+}
+.ff-prose :where(h1, h2, h3, h4, h5, h6) a:hover::after {
+  content: " #";
+  color: var(--glow);
+  font-weight: 400;
+}
+.ff-prose p { margin: 0.9em 0; }
+.ff-prose a { color: var(--glow); text-decoration: none; }
+.ff-prose a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.ff-prose strong { color: var(--fg); font-weight: 700; }
+.ff-prose ul,
+.ff-prose ol { margin: 0.9em 0; padding-left: 1.4em; }
+.ff-prose li { margin: 0.35em 0; }
+.ff-prose li::marker { color: var(--fg-3); }
+.ff-prose blockquote {
+  margin: 1.3em 0;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--glow);
+  color: var(--fg-2);
+}
+.ff-prose hr { border: 0; border-top: 1px solid var(--border); margin: 2.2em 0; }
+.ff-prose img { max-width: 100%; border-radius: 10px; }
+
+/* inline code */
+.ff-prose :not(pre) > code {
+  font-family: "Fira Code", monospace;
+  font-size: 0.86em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1.5px 6px;
+  color: var(--glow-2);
+}
+
+/* fenced code (rehype-pretty-code, keepBackground:false) */
+.ff-prose figure[data-rehype-pretty-code-figure] { margin: 1.3em 0; }
+.ff-prose pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-family: "Fira Code", monospace;
+  font-size: 13.3px;
+  line-height: 1.7;
+  box-shadow: var(--card-shadow);
+}
+.ff-prose pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  display: grid; /* one row per line for line-level styling */
+}
+.ff-prose pre code [data-line] { padding: 0; }
+.ff-prose [data-rehype-pretty-code-title] {
+  font-family: "Fira Code", monospace;
+  font-size: 12.5px;
+  color: var(--fg-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  padding: 8px 14px;
+  margin-bottom: -6px;
+}
+
+/* tables */
+.ff-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 1.3em 0;
+  display: block;
+  overflow-x: auto;
+}
+.ff-prose th,
+.ff-prose td {
+  border: 1px solid var(--border);
+  padding: 8px 13px;
+  text-align: left;
+}
+.ff-prose th { background: var(--surface-2); color: var(--fg); font-weight: 600; }
+.ff-prose td { color: var(--fg-2); }

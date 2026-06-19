@@ -20,6 +20,7 @@ interface FireflyLandingProps {
 }
 
 const INSTALL_CMD = "dotnet add package Firefly.Server";
+const REPO_URL = "https://github.com/rodrigovidal/fire";
 
 /* ---- syntax-highlight token helpers (colors are CSS vars) ---- */
 const tok = (name: string, bold = false): CSSProperties => ({
@@ -217,16 +218,16 @@ export default function FireflyLanding({
             <span style={{ fontFamily: headingFont, fontWeight: 700, fontSize: 19, letterSpacing: "-0.02em" }}>Firefly</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 8 }}>
-            <a href="#" className="ff-navlink" style={navLink}>Docs</a>
-            <a href="#" className="ff-navlink" style={navLink}>Guides</a>
+            <a href="/docs" className="ff-navlink" style={navLink}>Docs</a>
+            <a href="/guides" className="ff-navlink" style={navLink}>Guides</a>
             <a href="#benchmarks" className="ff-navlink" style={navLink}>Benchmarks</a>
-            <a href="#" className="ff-navlink" style={navLink}>GitHub</a>
+            <a href={REPO_URL} className="ff-navlink" style={navLink}>GitHub</a>
           </div>
           <div style={{ flex: 1 }} />
           <button onClick={toggleTheme} aria-label="Toggle theme" className="ff-iconbtn" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 9, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--fg-2)", cursor: "pointer" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
           </button>
-          <a href="#" className="ff-btn-primary" style={{ display: "flex", alignItems: "center", gap: 8, flex: "none", background: "var(--glow)", color: "#1a1305", textDecoration: "none", fontWeight: 700, fontSize: 14, padding: "9px 16px", borderRadius: 9, boxShadow: "0 0 0 1px rgba(255,255,255,0.12) inset, 0 8px 24px -8px var(--glow)" }}>Get started</a>
+          <a href="/docs/getting-started" className="ff-btn-primary" style={{ display: "flex", alignItems: "center", gap: 8, flex: "none", background: "var(--glow)", color: "#1a1305", textDecoration: "none", fontWeight: 700, fontSize: 14, padding: "9px 16px", borderRadius: 9, boxShadow: "0 0 0 1px rgba(255,255,255,0.12) inset, 0 8px 24px -8px var(--glow)" }}>Get started</a>
         </div>
       </nav>
 
@@ -253,11 +254,11 @@ export default function FireflyLanding({
             </p>
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 30, flexWrap: "wrap" }}>
-              <a href="#" className="ff-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--glow)", color: "#1a1305", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: "13px 22px", borderRadius: 11, boxShadow: "0 0 0 1px rgba(255,255,255,0.14) inset, 0 12px 30px -10px var(--glow)" }}>
+              <a href="/docs/getting-started" className="ff-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--glow)", color: "#1a1305", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: "13px 22px", borderRadius: 11, boxShadow: "0 0 0 1px rgba(255,255,255,0.14) inset, 0 12px 30px -10px var(--glow)" }}>
                 Get started
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
               </a>
-              <a href="#" className="ff-btn-surface" style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "var(--surface)", color: "var(--fg)", textDecoration: "none", fontWeight: 600, fontSize: 15, padding: "13px 18px", borderRadius: 11, border: "1px solid var(--border-strong)" }}>
+              <a href={REPO_URL} target="_blank" rel="noreferrer" className="ff-btn-surface" style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "var(--surface)", color: "var(--fg)", textDecoration: "none", fontWeight: 600, fontSize: 15, padding: "13px 18px", borderRadius: 11, border: "1px solid var(--border-strong)" }}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49l-.01-1.7c-2.78.62-3.37-1.22-3.37-1.22-.46-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.89 1.57 2.34 1.12 2.91.85.09-.66.35-1.12.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.4 9.4 0 0 1 5 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.35 4.79-4.58 5.05.36.32.68.94.68 1.9l-.01 2.82c0 .27.18.6.69.49A10.02 10.02 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z" /></svg>
                 Star on GitHub
                 <span style={{ fontFamily: monoFont, fontSize: 13, color: "var(--fg-2)" }}>{fmtStars(githubStars)}</span>
@@ -489,8 +490,8 @@ export default function FireflyLanding({
               <CopyButton copied={copied} onCopy={copy} />
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
-              <a href="#" className="ff-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--glow)", color: "#1a1305", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: "13px 24px", borderRadius: 11, boxShadow: "0 0 0 1px rgba(255,255,255,0.14) inset, 0 12px 30px -10px var(--glow)" }}>Read the docs</a>
-              <a href="#" className="ff-btn-surface" style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "transparent", color: "var(--fg)", textDecoration: "none", fontWeight: 600, fontSize: 15, padding: "13px 20px", borderRadius: 11, border: "1px solid var(--border-strong)" }}>View on GitHub</a>
+              <a href="/docs" className="ff-btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "var(--glow)", color: "#1a1305", textDecoration: "none", fontWeight: 700, fontSize: 15, padding: "13px 24px", borderRadius: 11, boxShadow: "0 0 0 1px rgba(255,255,255,0.14) inset, 0 12px 30px -10px var(--glow)" }}>Read the docs</a>
+              <a href={REPO_URL} target="_blank" rel="noreferrer" className="ff-btn-surface" style={{ display: "inline-flex", alignItems: "center", gap: 9, background: "transparent", color: "var(--fg)", textDecoration: "none", fontWeight: 600, fontSize: 15, padding: "13px 20px", borderRadius: 11, border: "1px solid var(--border-strong)" }}>View on GitHub</a>
             </div>
           </div>
         </div>
@@ -507,9 +508,36 @@ export default function FireflyLanding({
             </div>
             <p style={{ fontSize: 13.5, color: "var(--fg-3)", margin: 0, maxWidth: "24em", lineHeight: 1.6 }}>A minimal F# web framework built straight on Kestrel. Open source, MIT licensed.</p>
           </div>
-          <FooterCol title="Docs" links={["Getting started", "Routing", "Middleware", "API reference"]} linkStyle={footLink} />
-          <FooterCol title="Community" links={["GitHub", "Discord", "Discussions", "Changelog"]} linkStyle={footLink} />
-          <FooterCol title="Project" links={["Benchmarks", "Roadmap", "Contributing", "License"]} linkStyle={footLink} />
+          <FooterCol
+            title="Docs"
+            links={[
+              { label: "Getting started", href: "/docs/getting-started" },
+              { label: "Routing", href: "/docs/routing" },
+              { label: "Middleware", href: "/docs/middleware" },
+              { label: "API patterns", href: "/docs/api-patterns" },
+            ]}
+            linkStyle={footLink}
+          />
+          <FooterCol
+            title="Community"
+            links={[
+              { label: "GitHub", href: REPO_URL },
+              { label: "Guides", href: "/guides" },
+              { label: "Discussions", href: `${REPO_URL}/discussions` },
+              { label: "Changelog", href: `${REPO_URL}/releases` },
+            ]}
+            linkStyle={footLink}
+          />
+          <FooterCol
+            title="Project"
+            links={[
+              { label: "Benchmarks", href: "#benchmarks" },
+              { label: "Ecosystem", href: "/docs/ecosystem" },
+              { label: "Contributing", href: REPO_URL },
+              { label: "License", href: `${REPO_URL}/blob/main/LICENSE` },
+            ]}
+            linkStyle={footLink}
+          />
         </div>
         <div style={{ borderTop: "1px solid var(--border)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto", padding: "18px 28px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -534,13 +562,24 @@ function FeatureCard({ icon, iconBg, iconColor, title, children }: { icon: React
   );
 }
 
-function FooterCol({ title, links, linkStyle }: { title: string; links: string[]; linkStyle: CSSProperties }) {
+function FooterCol({ title, links, linkStyle }: { title: string; links: { label: string; href: string }[]; linkStyle: CSSProperties }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
       <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--fg-3)", marginBottom: 3 }}>{title}</span>
-      {links.map((l) => (
-        <a key={l} href="#" className="ff-footlink" style={linkStyle}>{l}</a>
-      ))}
+      {links.map((l) => {
+        const external = l.href.startsWith("http");
+        return (
+          <a
+            key={l.label}
+            href={l.href}
+            className="ff-footlink"
+            style={linkStyle}
+            {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
+          >
+            {l.label}
+          </a>
+        );
+      })}
     </div>
   );
 }
