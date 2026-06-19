@@ -2,7 +2,7 @@ module Fire.Tests.RedirectTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let findHeader (name: string) (headers: (string * string) list) =
     headers |> List.find (fun (k, _) -> k = name) |> snd

@@ -13,5 +13,5 @@ printfn "  DELETE /api/todos/:id   - Delete todo"
 printfn "  Database: %s" dbPath
 
 let config' = { config with Port = 3000 }
-Fire.App.run routes config' CancellationToken.None
+Firefly.App.run routes config' CancellationToken.None
 |> fun t -> t.GetAwaiter().GetResult()

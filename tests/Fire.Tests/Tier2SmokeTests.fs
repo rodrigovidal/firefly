@@ -6,7 +6,7 @@ open System.Net.Http
 open System.Threading
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Tier 2 integration smoke test`` () = task {

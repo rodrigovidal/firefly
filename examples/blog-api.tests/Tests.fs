@@ -2,7 +2,7 @@ module BlogApi.Tests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 open BlogApi
 
 [<Fact>]

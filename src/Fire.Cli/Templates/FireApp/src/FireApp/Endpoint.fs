@@ -1,7 +1,7 @@
 namespace FireApp
 
 open System
-open Fire
+open Firefly
 
 module Endpoint =
 
@@ -21,13 +21,13 @@ module Endpoint =
 
     let config =
         let baseConfig =
-            Fire.App.defaults
-            |> Fire.App.port 3000
-            |> Fire.App.middleware RequestId.middleware
-            |> Fire.App.middleware CorrelationId.middleware
-            |> Fire.App.middleware Log.toConsole
+            Firefly.App.defaults
+            |> Firefly.App.port 3000
+            |> Firefly.App.middleware RequestId.middleware
+            |> Firefly.App.middleware CorrelationId.middleware
+            |> Firefly.App.middleware Log.toConsole
 
         if isDevelopment () then
-            baseConfig |> Fire.App.onError DevErrorPage.handler
+            baseConfig |> Firefly.App.onError DevErrorPage.handler
         else
             baseConfig

@@ -5,7 +5,7 @@ open System.Net.Http
 open System.Text
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Full API smoke test`` () = task {

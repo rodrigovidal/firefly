@@ -4,7 +4,7 @@ open System.Collections.Generic
 open Microsoft.AspNetCore.Http
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let makeCtx (method': string) (path: string) (headers: (string * string) list) (contentType: string option) =
     let ctx = DefaultHttpContext()

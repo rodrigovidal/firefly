@@ -2,7 +2,7 @@ module Fire.Tests.SessionTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 open System.Collections.Concurrent
 
 let private findHeader name (headers: (string * string) list) =

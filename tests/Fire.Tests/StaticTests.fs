@@ -6,7 +6,7 @@ open System.Net.Http
 open System.Threading
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let setupTestDir () =
     let dir = Path.Combine(Path.GetTempPath(), "fire-static-test-" + System.Guid.NewGuid().ToString("N"))

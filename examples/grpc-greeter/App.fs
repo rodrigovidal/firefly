@@ -3,7 +3,7 @@ module GrpcGreeter.App
 open System.Threading.Tasks
 open Grpc.Core
 open Greet
-open Fire
+open Firefly
 
 let greeter = grpcService "greet.Greeter" {
     unary "SayHello" (fun (req: HelloRequest) (_ctx: ServerCallContext) -> task {

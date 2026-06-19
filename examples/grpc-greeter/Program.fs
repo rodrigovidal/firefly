@@ -1,5 +1,5 @@
 open System.Threading
-open Fire
+open Firefly
 open GrpcGreeter.App
 
 let (routes, config) = create ()

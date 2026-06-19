@@ -2,7 +2,7 @@ module UrlShortener.Tests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 open UrlShortener
 
 let mutable codeCounter = 0

@@ -36,7 +36,7 @@ let generateController (name: string) (projectRoot: string) =
     let nameLower = lower name
     let content = $"""module MyApp.Controllers.{name}Controller
 
-open Fire
+open Firefly
 open Flame
 
 let list (req: Request) = task {{

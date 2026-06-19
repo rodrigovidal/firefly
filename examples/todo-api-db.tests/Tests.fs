@@ -4,7 +4,7 @@ open System
 open System.IO
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 open TodoApiDb
 
 let createTestApp () =

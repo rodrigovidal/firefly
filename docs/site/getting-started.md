@@ -49,7 +49,7 @@ This starts the server with `dotnet watch run`, enabling live reload and auto-re
 If you prefer to start from an empty project:
 
 ```fsharp
-open Fire
+open Firefly
 open System.Threading
 
 [<EntryPoint>]

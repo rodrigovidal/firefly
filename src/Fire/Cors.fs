@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 type CorsConfig = {
     Origins: string list

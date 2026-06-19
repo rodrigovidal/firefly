@@ -17,7 +17,7 @@ Fire is part of a cohesive set of F# libraries designed to work together.
 Fire integrates directly with Flame for request validation. The `Schema` module in Fire bridges the two:
 
 ```fsharp
-open Fire
+open Firefly
 open Flame
 
 type CreateUser = { Name: string; Email: string; Age: int }
@@ -122,7 +122,7 @@ let listUsers (db: IDbContext) (req: Request) = task {
 A complete application using the entire ecosystem:
 
 ```fsharp
-open Fire
+open Firefly
 open Flame
 
 // --- Schema (Flame) ---

@@ -19,7 +19,7 @@ interface FireflyLandingProps {
   showTestimonials?: boolean;
 }
 
-const INSTALL_CMD = "dotnet add package Fire";
+const INSTALL_CMD = "dotnet add package Firefly.Server";
 
 /* ---- syntax-highlight token helpers (colors are CSS vars) ---- */
 const tok = (name: string, bold = false): CSSProperties => ({
@@ -270,7 +270,7 @@ export default function FireflyLanding({
                 <span style={{ color: "var(--ctxt)" }}>{INSTALL_CMD}</span>
                 <CopyButton copied={copied} onCopy={copy} />
               </div>
-              <span style={{ fontSize: 12.5, color: "var(--fg-3)" }}>the <span style={{ fontFamily: monoFont }}>Fire</span> package</span>
+              <span style={{ fontSize: 12.5, color: "var(--fg-3)" }}>the <span style={{ fontFamily: monoFont }}>Firefly.Server</span> package</span>
             </div>
           </div>
 
@@ -280,7 +280,7 @@ export default function FireflyLanding({
               <div style={{ position: "absolute", inset: 0, borderRadius: 16, pointerEvents: "none", boxShadow: "0 0 60px -10px var(--glow-soft) inset" }} />
               <WindowDots file="Program.fs" />
               <div style={{ ...codePane, padding: "22px 22px 24px", fontSize: 14, lineHeight: 1.75 }}>
-                <Line><K>open</K> <Ty>Fire</Ty></Line>
+                <Line><K>open</K> <Ty>Firefly</Ty></Line>
                 <Line><Fm>Route</Fm>.start</Line>
                 <Line><Op>{"|>"}</Op> <Fm>Route</Fm>.get <S>{'"/"'}</S> (<K>fun</K> _ <Op>{"->"}</Op> <K>task</K> {"{"}</Line>
                 <Line>{"       "}<K>return</K> <Fm>Response</Fm>.text <S>{'"Hello, firefly!"'}</S> {"})"}</Line>
@@ -357,7 +357,7 @@ export default function FireflyLanding({
               )}
               {tab === 1 && (
                 <div style={codePane}>
-                  <Line><K>open</K> <Ty>Fire</Ty></Line>
+                  <Line><K>open</K> <Ty>Firefly</Ty></Line>
                   <Line />
                   <Line><K>let</K> getTodo (store<Pn>:</Pn> <Ty>ITodoStore</Ty>) (id<Pn>:</Pn> <Ty>int</Ty>) <Pn>=</Pn> <K>task</K> {"{"}</Line>
                   <Line>{"    "}<K>let!</K> todo <Pn>=</Pn> store.GetById id</Line>

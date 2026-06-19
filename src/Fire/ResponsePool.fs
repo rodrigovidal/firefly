@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 /// Pre-built common responses. These are allocated once and reused.
 /// F# records are immutable so `ResponsePool.ok |> Response.header "X" "Y"` creates

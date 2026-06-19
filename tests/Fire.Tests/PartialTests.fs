@@ -2,7 +2,7 @@ module Fire.Tests.PartialTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let findHeader (name: string) (headers: (string * string) list) =
     headers |> List.tryFind (fun (k, _) -> k = name) |> Option.map snd

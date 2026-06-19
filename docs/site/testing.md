@@ -7,7 +7,7 @@ Fire provides two testing modes: **Direct** (in-process, no HTTP overhead) and *
 `TestClient.create` builds a test client that dispatches requests through the trie router without starting an HTTP server. Fast and ideal for unit-style tests.
 
 ```fsharp
-open Fire
+open Firefly
 
 let routes =
     Route.start

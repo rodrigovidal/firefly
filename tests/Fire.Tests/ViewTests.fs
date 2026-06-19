@@ -2,7 +2,7 @@ module Fire.Tests.ViewTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``View.page creates ViewConfig with title and content`` () =

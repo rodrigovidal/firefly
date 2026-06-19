@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 type CookieOptions = {
     MaxAge: int option

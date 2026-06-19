@@ -3,7 +3,7 @@ module TodoApiDb.App
 open System.Data
 open Microsoft.Extensions.DependencyInjection
 open Flame
-open Fire
+open Firefly
 
 let createTodoSchema = schema {
     let! title = Schema.required "title" Schema.string [ Schema.nonempty; Schema.maxLength 200; Schema.trim ]

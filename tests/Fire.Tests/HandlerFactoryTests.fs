@@ -8,7 +8,7 @@ open System.Threading
 open Microsoft.Extensions.DependencyInjection
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 // Test service
 type ICounter =

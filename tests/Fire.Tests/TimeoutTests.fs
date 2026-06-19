@@ -7,7 +7,7 @@ open System.Threading
 open System.Threading.Tasks
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Timeout.after returns 504 when handler exceeds timeout`` () = task {

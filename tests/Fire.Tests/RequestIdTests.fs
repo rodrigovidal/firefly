@@ -2,7 +2,7 @@ module Fire.Tests.RequestIdTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``RequestId adds X-Request-Id to response`` () = task {

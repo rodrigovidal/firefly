@@ -5,7 +5,7 @@ open System.Net.Http
 open System.Threading
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``App.shutdownTimeout sets config`` () =

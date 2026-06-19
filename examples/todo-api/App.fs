@@ -10,7 +10,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.IdentityModel.JsonWebTokens
 open Microsoft.IdentityModel.Tokens
 open Flame
-open Fire
+open Firefly
 
 // --- Types ---
 

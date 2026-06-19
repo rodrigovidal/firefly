@@ -2,7 +2,7 @@ module Fire.Tests.ValidateTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 type CreateUser = { Name: string; Email: string }
 

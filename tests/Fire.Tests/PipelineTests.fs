@@ -2,7 +2,7 @@ module Fire.Tests.PipelineTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Pipeline.create sets name and empty middlewares`` () =

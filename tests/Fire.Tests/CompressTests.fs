@@ -4,7 +4,7 @@ open System.IO
 open System.IO.Compression
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Compress.gzip compresses response when Accept-Encoding gzip`` () = task {

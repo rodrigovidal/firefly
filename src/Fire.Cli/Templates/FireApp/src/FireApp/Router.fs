@@ -1,6 +1,6 @@
 namespace FireApp
 
-open Fire
+open Firefly
 open FireApp.Controllers
 
 module Router =

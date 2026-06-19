@@ -2,7 +2,7 @@ module Fire.Tests.DevErrorPageTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``DevErrorPage returns HTML response with request context`` () = task {

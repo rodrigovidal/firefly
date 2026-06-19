@@ -8,7 +8,7 @@ open System.Threading
 open System.Threading.Tasks
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Tier 3 integration smoke test`` () = task {

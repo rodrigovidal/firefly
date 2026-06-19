@@ -2,7 +2,7 @@ module Fire.Tests.ResponseTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Response.ok has status 200 and empty body`` () =

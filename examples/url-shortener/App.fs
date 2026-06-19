@@ -3,7 +3,7 @@ module UrlShortener.App
 open System
 open System.Collections.Concurrent
 open Flame
-open Fire
+open Firefly
 
 // ---------------------------------------------------------------------------
 // Types

@@ -17,7 +17,7 @@ open Microsoft.AspNetCore.Hosting.Server.Features
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
-open Fire
+open Firefly
 
 [<Sealed>]
 type BenchmarkConfig() as this =

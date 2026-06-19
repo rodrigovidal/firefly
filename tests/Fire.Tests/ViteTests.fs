@@ -2,7 +2,7 @@ module Fire.Tests.ViteTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Vite.loadManifest parses manifest JSON`` () =

@@ -2,7 +2,7 @@ module Fire.Tests.QueryTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``QueryCache starts empty`` () =

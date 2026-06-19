@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 [<RequireQualifiedAccess>]
 type PageParams =

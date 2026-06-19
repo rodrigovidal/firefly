@@ -6,7 +6,7 @@ open System.Net.Http
 open System.Threading
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``RateLimit allows requests within limit`` () = task {
@@ -83,7 +83,7 @@ let ``RateLimit.byIp returns unknown for null IP`` () =
     // Test the byIp function with a request that has no remote IP
     let ctx = Microsoft.AspNetCore.Http.DefaultHttpContext()
     ctx.Connection.RemoteIpAddress <- null
-    let req = Fire.Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
+    let req = Firefly.Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
     let key = RateLimit.byIp req
     key |> should equal "unknown"
 
@@ -91,7 +91,7 @@ let ``RateLimit.byIp returns unknown for null IP`` () =
 let ``RateLimit.byIp returns IP string for set IP`` () =
     let ctx = Microsoft.AspNetCore.Http.DefaultHttpContext()
     ctx.Connection.RemoteIpAddress <- System.Net.IPAddress.Loopback
-    let req = Fire.Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
+    let req = Firefly.Request(ctx, System.Collections.Generic.Dictionary<string, string>() :> System.Collections.Generic.IReadOnlyDictionary<_, _>)
     let key = RateLimit.byIp req
     key |> should equal "127.0.0.1"
 

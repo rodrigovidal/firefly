@@ -44,7 +44,7 @@ message HelloReply {
 Use the `grpcService` computation expression:
 
 ```fsharp
-open Fire
+open Firefly
 open Grpc.Core
 open Greeter  // generated from .proto
 

@@ -7,7 +7,7 @@ open Microsoft.IdentityModel.JsonWebTokens
 open Microsoft.IdentityModel.Tokens
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 type NewUser = { Name: string; Email: string }
 

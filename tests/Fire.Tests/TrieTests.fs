@@ -2,7 +2,7 @@ module Fire.Tests.TrieTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Trie matches static route`` () =

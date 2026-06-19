@@ -8,7 +8,7 @@ open Microsoft.IdentityModel.JsonWebTokens
 open Microsoft.IdentityModel.Tokens
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let testSecret = "this-is-a-test-secret-key-at-least-32-chars!!"
 

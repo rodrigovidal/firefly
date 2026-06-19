@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 type ViewConfig = {
     Title: string

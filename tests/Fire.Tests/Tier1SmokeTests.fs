@@ -6,7 +6,7 @@ open System.Text
 open System.Threading
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Tier 1 integration smoke test`` () = task {

@@ -5,7 +5,7 @@ open System.Diagnostics
 open System.IO
 open System.Reflection
 open System.Runtime.Loader
-open Fire
+open Firefly
 
 type private ProjectLoadContext(assemblyPath: string) =
     inherit AssemblyLoadContext(isCollectible = true)

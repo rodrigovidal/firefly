@@ -2,7 +2,7 @@ module Fire.Tests.WildcardTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Wildcard captures remaining path segments`` () =

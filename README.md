@@ -5,13 +5,13 @@ A minimal F# web framework built on Kestrel.
 ## Install
 
 ```bash
-dotnet add package Fire
+dotnet add package Firefly.Server
 ```
 
 ## Quick Start
 
 ```fsharp
-open Fire
+open Firefly
 
 let routes =
     Route.start
@@ -221,7 +221,7 @@ let allRoutes =
 Two modes: **direct** (in-process, no HTTP overhead) and **integration** (real HTTP server on a random port):
 
 ```fsharp
-open Fire
+open Firefly
 
 // Direct mode — fast unit tests
 let client = TestClient.create routes

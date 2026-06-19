@@ -2,7 +2,7 @@ module Fire.Tests.CookieTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Request.Cookie reads cookie from request`` () = task {

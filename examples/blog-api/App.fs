@@ -3,7 +3,7 @@ module BlogApi.App
 open System
 open System.Collections.Generic
 open Flame
-open Fire
+open Firefly
 
 // ---------------------------------------------------------------------------
 // Types

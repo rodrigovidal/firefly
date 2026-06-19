@@ -1,5 +1,5 @@
 open System.Threading
-open Fire
+open Firefly
 open ContactsApp
 
 let (routes, config) = App.create ()

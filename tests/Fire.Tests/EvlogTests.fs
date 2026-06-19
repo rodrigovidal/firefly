@@ -3,7 +3,7 @@ module Fire.Tests.EvlogTests
 open System.Threading
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 open Evlog
 
 [<Fact>]

@@ -2,7 +2,7 @@ module Fire.Tests.SignedCookieTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``sign produces value.signature format`` () =

@@ -2,7 +2,7 @@ module Fire.Tests.ResponseHelpersTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``redirect sets Location header and status 302`` () =

@@ -1,6 +1,6 @@
 namespace FireApp.Layouts
 
-open Fire
+open Firefly
 
 module RootLayout =
 

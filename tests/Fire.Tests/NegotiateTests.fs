@@ -2,7 +2,7 @@ module Fire.Tests.NegotiateTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Negotiate returns 406 for unsupported Accept type`` () = task {

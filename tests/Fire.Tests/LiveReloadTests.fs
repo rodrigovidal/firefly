@@ -2,7 +2,7 @@ module Fire.Tests.LiveReloadTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 // --- Script injection tests ---
 

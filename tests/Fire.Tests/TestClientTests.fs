@@ -2,7 +2,7 @@ module Fire.Tests.TestClientTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let routes =
     Route.start

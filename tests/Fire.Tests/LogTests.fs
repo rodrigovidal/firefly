@@ -6,7 +6,7 @@ open System.Threading
 open Microsoft.Extensions.Logging
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 type FakeLogger() =
     let mutable lastMessage = ""

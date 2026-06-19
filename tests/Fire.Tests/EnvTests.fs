@@ -3,7 +3,7 @@ module Fire.Tests.EnvTests
 open System
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 type SimpleConfig = { DatabaseUrl: string; Port: int; Debug: bool }
 type OptionalConfig = { Host: string; ApiKey: string option; Timeout: int option }

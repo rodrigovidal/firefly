@@ -5,7 +5,7 @@ open System.Threading
 open Microsoft.Extensions.DependencyInjection
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``App serves a simple GET route`` () = task {

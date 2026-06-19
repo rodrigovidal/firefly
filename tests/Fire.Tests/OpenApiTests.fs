@@ -3,7 +3,7 @@ module Fire.Tests.OpenApiTests
 open System.Text.Json
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let dummyHandler : Handler = fun _ -> task { return Response.ok }
 

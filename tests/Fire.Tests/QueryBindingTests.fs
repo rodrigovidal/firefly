@@ -2,7 +2,7 @@ module Fire.Tests.QueryBindingTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 type UserFilters = { search: string; limit: int; offset: int }
 type OptionalFilters = { search: string }

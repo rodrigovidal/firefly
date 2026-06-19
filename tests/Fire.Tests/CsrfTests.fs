@@ -2,7 +2,7 @@ module Fire.Tests.CsrfTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let private findHeader name (headers: (string * string) list) =
     headers |> List.tryFind (fun (k, _) -> k = name) |> Option.map snd

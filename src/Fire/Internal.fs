@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 open System
 open System.Collections.Generic

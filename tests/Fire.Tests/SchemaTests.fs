@@ -6,7 +6,7 @@ open System.Text.Json
 open Xunit
 open FsUnit.Xunit
 open Flame
-open Fire
+open Firefly
 
 // --- Schema definitions ---
 

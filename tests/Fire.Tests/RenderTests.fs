@@ -2,7 +2,7 @@ module Fire.Tests.RenderTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Render Text HTML-encodes content`` () =

@@ -188,7 +188,7 @@ let private generateHtmlController (opts: GeneratorOptions) =
     $"""namespace {opts.Namespace}.Controllers
 
 open System
-open Fire
+open Firefly
 open Flame
 open {opts.Namespace}.Domain
 open {opts.Namespace}.Views
@@ -309,7 +309,7 @@ let private generateHtmlView (opts: GeneratorOptions) =
     $"""namespace {opts.Namespace}.Views
 
 open System
-open Fire
+open Firefly
 open {opts.Namespace}.Domain
 
 module {entity}View =
@@ -370,7 +370,7 @@ let private generateJsonApi (opts: GeneratorOptions) =
     $"""namespace {opts.Namespace}.Api
 
 open System
-open Fire
+open Firefly
 open Flame
 open {opts.Namespace}.Domain
 
@@ -466,7 +466,7 @@ let private printDiRegistration (opts: GeneratorOptions) =
     $"""
 Register the repository in Endpoint.fs:
 
-    |> Fire.App.di (fun services ->
+    |> Firefly.App.di (fun services ->
         services.AddSingleton<I{entity}Repository, InMemory{entity}Repository>() |> ignore)
 """
 

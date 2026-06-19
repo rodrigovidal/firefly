@@ -8,7 +8,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let makeHttpContext (method': string) (path: string) (query: string) (headers: (string * string) list) (body: string option) =
     let ctx = DefaultHttpContext()

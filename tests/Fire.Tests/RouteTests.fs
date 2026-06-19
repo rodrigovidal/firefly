@@ -2,7 +2,7 @@ module Fire.Tests.RouteTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 let dummyHandler : Handler = fun _ -> task { return Response.ok }
 let textHandler (t: string) : Handler = fun _ -> task { return Response.text t }

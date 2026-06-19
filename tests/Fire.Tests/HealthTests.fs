@@ -3,7 +3,7 @@ module Fire.Tests.HealthTests
 open System.Threading.Tasks
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Health.handler returns 200 when all checks pass`` () = task {

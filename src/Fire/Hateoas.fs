@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 type HateoasLink = { Rel: string; Href: string; Method: string }
 

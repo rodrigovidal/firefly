@@ -2,7 +2,7 @@ module Fire.Tests.ComponentTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Component.client creates Element with data-fire-component attr`` () =

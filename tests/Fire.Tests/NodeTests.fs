@@ -2,7 +2,7 @@ module Fire.Tests.NodeTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``Text node holds string`` () =

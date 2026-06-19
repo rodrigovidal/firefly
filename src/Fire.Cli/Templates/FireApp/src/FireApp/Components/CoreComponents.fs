@@ -1,6 +1,6 @@
 namespace FireApp.Components
 
-open Fire
+open Firefly
 
 module CoreComponents =
 

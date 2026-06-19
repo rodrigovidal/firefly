@@ -1,6 +1,6 @@
 namespace FireApp.Views
 
-open Fire
+open Firefly
 open FireApp.Components
 open FireApp.Layouts
 

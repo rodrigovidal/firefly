@@ -2,7 +2,7 @@ module Fire.Tests.CorrelationIdTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``CorrelationId adds X-Correlation-Id to response`` () = task {

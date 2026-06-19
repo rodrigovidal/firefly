@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 type Node =
     | Element of tag: string * attrs: Attr list * children: Node list

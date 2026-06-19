@@ -2,7 +2,7 @@ module Fire.Tests.MiddlewareTests
 
 open Xunit
 open FsUnit.Xunit
-open Fire
+open Firefly
 
 [<Fact>]
 let ``applies middleware when predicate is true`` () = task {

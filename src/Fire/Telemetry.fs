@@ -1,4 +1,4 @@
-namespace Fire
+namespace Firefly
 
 open System.Collections.Generic
 open System.Diagnostics

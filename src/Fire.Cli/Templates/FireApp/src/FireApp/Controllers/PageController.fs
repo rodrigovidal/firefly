@@ -1,6 +1,6 @@
 namespace FireApp.Controllers
 
-open Fire
+open Firefly
 open FireApp.Views
 
 module PageController =
