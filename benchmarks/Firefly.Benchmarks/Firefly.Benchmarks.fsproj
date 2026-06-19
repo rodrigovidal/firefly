@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+    <!-- The validation stack the other frameworks would reach for -->
+    <PackageReference Include="FluentValidation" Version="11.11.0" />
   </ItemGroup>
 
   <!-- Competing F# web frameworks, for head-to-head comparison -->

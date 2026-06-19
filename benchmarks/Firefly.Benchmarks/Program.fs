@@ -712,6 +712,53 @@ type FrameworkComparisonBenchmark() =
     [<Benchmark(Description = "Oxpecker: plaintext")>]
     member _.OxpeckerPlain() = client.GetStringAsync($"http://127.0.0.1:{oxpeckerPort}/plaintext")
 
+// --- Real-world JSON validation: parse a request body and validate it ---
+// Firefly validates with Flame in a single pass straight off the bytes. The
+// other F# frameworks don't ship validation, so the idiomatic stack is
+// System.Text.Json to deserialize plus FluentValidation to check. Same payload,
+// same rules (required, email, range, allowed values) for both.
+module ValidationBenchmark =
+    open Flame
+    open FluentValidation
+    module S = Flame.Schema
+
+    [<CLIMutable>]
+    type UserDto =
+        { Name: string
+          Email: string
+          Age: int }
+
+    type UserValidator() as this =
+        inherit AbstractValidator<UserDto>()
+        do
+            this.RuleFor(fun u -> u.Name).NotEmpty().MaximumLength(100) |> ignore
+            this.RuleFor(fun u -> u.Email).NotEmpty().EmailAddress() |> ignore
+            this.RuleFor(fun u -> u.Age).InclusiveBetween(0, 150) |> ignore
+
+    let private userSchema =
+        schema {
+            let! name = S.required "Name" S.string [ S.nonempty; S.maxLength 100 ]
+            let! email = S.required "Email" S.string [ S.email ]
+            let! age = S.required "Age" S.int [ S.min 0; S.max 150 ]
+            return { Name = name; Email = email; Age = age }
+        }
+
+    [<MemoryDiagnoser>]
+    type JsonValidationBenchmark() =
+        let jsonBytes =
+            System.Text.Encoding.UTF8.GetBytes
+                """{"Name":"Alice Johnson","Email":"alice@example.com","Age":30}"""
+        let validator = UserValidator()
+
+        [<Benchmark(Description = "Firefly + Flame: parse + validate", Baseline = true)>]
+        member _.Flame() =
+            S.parseBuffer userSchema (System.Buffers.ReadOnlySequence<byte>(jsonBytes))
+
+        [<Benchmark(Description = "System.Text.Json + FluentValidation")>]
+        member _.StjFluentValidation() =
+            let dto = System.Text.Json.JsonSerializer.Deserialize<UserDto>(System.ReadOnlySpan<byte>(jsonBytes))
+            validator.Validate(dto)
+
 // Serve mode for external throughput load tests: `serve <framework> <port>`
 // starts one framework's server on a fixed port and blocks. Used by a load
 // generator (oha) since BenchmarkDotNet's HTTP latency is transport-bound.
