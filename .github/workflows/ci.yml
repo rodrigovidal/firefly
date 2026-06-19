@@ -18,9 +18,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Drop local-only dev package source (absent in CI)
-        run: dotnet nuget remove source local-flame --configfile nuget.config
-
       - name: Restore
         run: dotnet restore
 
