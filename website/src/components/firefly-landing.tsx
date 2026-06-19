@@ -74,7 +74,7 @@ const ROWS = [
 
 const QUOTES = [
   {
-    text: "“Porting our Giraffe routes was almost mechanical — the pipeline composes the way we already think in F#, and the JSON path allocates less. There’s no magic to unlearn.”",
+    text: "“The pipeline composes exactly the way we already think in F# — routes, middleware, and DI read top to bottom. And the JSON path is genuinely lean on allocations. No magic to unlearn.”",
     initials: "RC",
     name: "Rodrigo Couto",
     role: "Staff Engineer @ Stone",
