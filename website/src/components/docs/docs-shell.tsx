@@ -121,7 +121,7 @@ export default function DocsShell({ section, nav, toc, children, bare = false }:
             <Link href="/guides" className="ff-navlink" style={{ ...linkBase, fontSize: 14, color: section === "guides" ? "var(--fg)" : "var(--fg-2)" }}>Guides</Link>
           </div>
           <div style={{ flex: 1 }} />
-          <a href="https://github.com/rodrigovidal/fire" target="_blank" rel="noreferrer" className="ff-navlink" style={{ ...linkBase, fontSize: 14, color: "var(--fg-2)" }}>GitHub</a>
+          <a href="https://github.com/rodrigovidal/firefly" target="_blank" rel="noreferrer" className="ff-navlink" style={{ ...linkBase, fontSize: 14, color: "var(--fg-2)" }}>GitHub</a>
           <button
             onClick={() => setMenuOpen((v) => !v)}
             aria-label="Toggle navigation"

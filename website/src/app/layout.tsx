@@ -13,9 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fire — a minimal F# web framework",
+  title: "Firefly — a minimal F# web framework",
   description:
-    "Fire is a minimal, fast F# web framework built straight on Kestrel. An elegant pipeline-style API, zero ceremony.",
+    "Firefly is a minimal, fast F# web framework built straight on Kestrel. An elegant pipeline-style API, zero ceremony.",
+  metadataBase: new URL("https://www.fireflyframework.dev"),
 };
 
 export default function RootLayout({

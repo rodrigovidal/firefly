@@ -11,7 +11,7 @@
     <Description>A minimal F# web framework built on Kestrel</Description>
     <PackageTags>fsharp;web;framework;kestrel;api</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/rodrigovidal/fire</RepositoryUrl>
+    <RepositoryUrl>https://github.com/rodrigovidal/firefly</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>

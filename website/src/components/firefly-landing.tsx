@@ -20,7 +20,7 @@ interface FireflyLandingProps {
 }
 
 const INSTALL_CMD = "dotnet add package Firefly.Server";
-const REPO_URL = "https://github.com/rodrigovidal/fire";
+const REPO_URL = "https://github.com/rodrigovidal/firefly";
 
 /* ---- syntax-highlight token helpers (colors are CSS vars) ---- */
 const tok = (name: string, bold = false): CSSProperties => ({
