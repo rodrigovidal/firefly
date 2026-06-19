@@ -14,14 +14,14 @@ Firefly is part of a cohesive set of F# libraries designed to work together.
 | Library | Purpose | Key Feature |
 |---------|---------|-------------|
 | **Firefly** | Web framework | Routing, middleware, DI, gRPC |
-| **Flame** | Schema validation | Typed parsing, rules, JSON Schema |
+| **[Flame](/docs/flame)** | Schema validation | Typed parsing, rules, JSON Schema |
 | **Flare** | HTTP client | Typed requests, resilience |
 | **Evlog** | Structured logging | Wide events, drains |
 | **Rhinox** | Database conventions | Query building, migrations |
 
 ## Firefly + Flame
 
-Firefly integrates directly with Flame for request validation. The `Schema` module in Firefly bridges the two:
+Firefly integrates directly with Flame for request validation. The `Schema` module in Firefly bridges the two. For the full Flame API see [Flame](/docs/flame), [Validation Rules](/docs/flame-rules), [Parsing & Errors](/docs/flame-parsing), and [Advanced](/docs/flame-advanced) — or follow the [Validation with Flame](/guides/validation-with-flame) guide.
 
 ```fsharp
 open Firefly

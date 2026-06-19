@@ -43,6 +43,7 @@ const CHIPS = [
   "Typed route params",
   "Task-based handlers",
   "Built-in JSON",
+  "Flame validation",
   "JWT middleware",
   "DI via Service",
   "Console logging",
@@ -514,7 +515,7 @@ export default function FireflyLanding({
               { label: "Getting started", href: "/docs/getting-started" },
               { label: "Routing", href: "/docs/routing" },
               { label: "Middleware", href: "/docs/middleware" },
-              { label: "API patterns", href: "/docs/api-patterns" },
+              { label: "Validation (Flame)", href: "/docs/flame" },
             ]}
             linkStyle={footLink}
           />

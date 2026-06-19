@@ -31,8 +31,9 @@ const GROUP_ORDER: Record<string, number> = {
   Introduction: 0,
   Core: 1,
   Features: 2,
-  Production: 3,
-  Reference: 4,
+  Flame: 3,
+  Production: 4,
+  Reference: 5,
   Guides: 0,
 };
 
