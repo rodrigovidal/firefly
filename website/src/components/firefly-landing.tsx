@@ -74,13 +74,13 @@ const ROWS = [
 
 const QUOTES = [
   {
-    text: "“The pipeline composes exactly the way we already think in F# — routes, middleware, and DI read top to bottom. And the JSON path is genuinely lean on allocations. No magic to unlearn.”",
+    text: "“The pipeline composes exactly the way we already think in F#. Routes, middleware, and DI read top to bottom, and the JSON path is genuinely lean on allocations. No magic to unlearn.”",
     initials: "RC",
     name: "Rodrigo Couto",
     role: "Staff Engineer @ Stone",
   },
   {
-    text: "“Eight lines and I had a JSON API with JWT auth — no reflection, no hidden middleware. I can read the entire request path end to end. That’s rare.”",
+    text: "“Eight lines and I had a JSON API with JWT auth. No reflection, no hidden middleware. I can read the entire request path end to end. That’s rare.”",
     initials: "AG",
     name: "Allan Garcez",
     role: "Senior Software Engineer @ Deel",
@@ -226,7 +226,7 @@ export default function FireflyLanding({
               Web apps in F#,<br /><span style={{ color: "var(--glow)", textShadow: "0 0 38px var(--glow-soft)" }}>light</span> as a firefly.
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.6, color: "var(--fg-2)", margin: "22px 0 0", maxWidth: "30em", textWrap: "pretty" }}>
-              Firefly is a tiny web framework built straight on Kestrel — responses go right to the{" "}
+              Firefly is a tiny web framework built straight on Kestrel. Responses go right to the{" "}
               <span style={{ fontFamily: monoFont, fontSize: "0.92em", color: "var(--fg)" }}>PipeWriter</span>. Idiomatic, composable, fast. A full app in about eight lines.
             </p>
 
@@ -278,7 +278,7 @@ export default function FireflyLanding({
             icon={<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />}
             title="Built on raw Kestrel"
           >
-            Text responses write straight to the <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--fg)" }}>PipeWriter</span> — no middleware tax, no reflection. The shortest path from request to bytes.
+            Text responses write straight to the <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--fg)" }}>PipeWriter</span>, with no middleware tax and no reflection. The shortest path from request to bytes.
           </FeatureCard>
           <FeatureCard
             iconBg="rgba(127,178,255,0.12)" iconColor="var(--cf)"
@@ -292,7 +292,7 @@ export default function FireflyLanding({
             icon={<><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5l6.74-6.76Z" /><path d="M16 8 2 22" /></>}
             title="Minimal by design"
           >
-            One package, a tiny surface area, instant startup. Learn it in an afternoon, keep it for years. Only what you need — nothing you don&apos;t.
+            One package, a tiny surface area, instant startup. Learn it in an afternoon, keep it for years. Only what you need, nothing you don&apos;t.
           </FeatureCard>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 20 }}>
@@ -310,7 +310,7 @@ export default function FireflyLanding({
           <div>
             <div style={{ fontFamily: monoFont, fontSize: 13, color: "var(--glow)", fontWeight: 600, marginBottom: 14 }}>// the whole app</div>
             <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(30px,3.6vw,44px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: "0 0 16px", textWrap: "balance" }}>Eight lines to a running service.</h2>
-            <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 26px", maxWidth: "30em", textWrap: "pretty" }}>Typed route params, task-based handlers, JSON in and out, JWT middleware, and DI — all from the same composable pipeline. Here&apos;s a real todo API.</p>
+            <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 26px", maxWidth: "30em", textWrap: "pretty" }}>Typed route params, task-based handlers, JSON in and out, JWT middleware, and DI, all from the same composable pipeline. Here&apos;s a real todo API.</p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {["Routing", "JSON handlers", "Wire it up"].map((label, i) => (
                 <button key={label} onClick={() => setTab(i)} style={tab === i ? tabActive : tabBase}>{label}</button>
@@ -391,9 +391,9 @@ export default function FireflyLanding({
           {/* copy */}
           <div>
             <div style={{ fontFamily: monoFont, fontSize: 13, color: "var(--glow)", fontWeight: 600, marginBottom: 14 }}>// http + grpc</div>
-            <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(30px,3.6vw,44px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: "0 0 16px", textWrap: "balance" }}>Not just HTTP — gRPC too.</h2>
+            <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(30px,3.6vw,44px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: "0 0 16px", textWrap: "balance" }}>Not just HTTP. gRPC too.</h2>
             <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 24px", maxWidth: "30em", textWrap: "pretty" }}>
-              Define a service with the <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--cf)" }}>grpcService</span> builder — unary and server-streaming methods, typed from your <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--fg)" }}>.proto</span>. Register it on the same pipeline as your routes: <strong style={{ color: "var(--fg)", fontWeight: 600 }}>one Kestrel server speaks both protocols</strong>.
+              Define a service with the <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--cf)" }}>grpcService</span> builder: unary and server-streaming methods, typed from your <span style={{ fontFamily: monoFont, fontSize: "0.9em", color: "var(--fg)" }}>.proto</span>. Register it on the same pipeline as your routes: <strong style={{ color: "var(--fg)", fontWeight: 600 }}>one Kestrel server speaks both protocols</strong>.
             </p>
             <ul style={{ listStyle: "none", margin: "0 0 26px", padding: 0, display: "flex", flexDirection: "column", gap: 12 }}>
               {[
@@ -423,7 +423,7 @@ export default function FireflyLanding({
               <div style={{ fontFamily: monoFont, fontSize: 13, color: "var(--glow)", fontWeight: 600, marginBottom: 12 }}>// benchmarks</div>
               <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(28px,3.4vw,40px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: 0, textWrap: "balance" }}>Fast where it counts.</h2>
             </div>
-            <p style={{ fontSize: 14, color: "var(--fg-3)", margin: 0, maxWidth: "28em", lineHeight: 1.5 }}>Response time and allocations measured in-process with BenchmarkDotNet — Apple M4 Pro, .NET 10. Lower is better.</p>
+            <p style={{ fontSize: 14, color: "var(--fg-3)", margin: 0, maxWidth: "28em", lineHeight: 1.5 }}>Response time and allocations measured in-process with BenchmarkDotNet on an Apple M4 Pro, .NET 10. Lower is better.</p>
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560, fontFamily: monoFont }}>
@@ -456,7 +456,7 @@ export default function FireflyLanding({
             </table>
           </div>
           <p style={{ fontSize: 12.5, color: "var(--fg-3)", margin: "18px 0 0", lineHeight: 1.55 }}>
-            On par with hand-written ASP.NET Core and the established F# frameworks — with the lowest JSON allocations of the F# options. Reproduce it:{" "}
+            On par with hand-written ASP.NET Core and the established F# frameworks, with the lowest JSON allocations of the F# options. Reproduce it:{" "}
             <span style={{ fontFamily: monoFont, color: "var(--fg-2)" }}>dotnet run -c Release --project benchmarks/Firefly.Benchmarks</span>.
           </p>
         </div>
@@ -498,7 +498,7 @@ export default function FireflyLanding({
               </tbody>
             </table>
           </div>
-          <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--fg-3)", margin: "16px 0 0" }}>A rough orientation, not a scorecard — every framework here is excellent. Numbers are illustrative.</p>
+          <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--fg-3)", margin: "16px 0 0" }}>A rough orientation, not a scorecard. Every framework here is excellent. Numbers are illustrative.</p>
         </section>
       )}
 
