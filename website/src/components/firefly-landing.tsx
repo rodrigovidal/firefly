@@ -43,6 +43,7 @@ const CHIPS = [
   "Typed route params",
   "Task-based handlers",
   "Built-in JSON",
+  "HTTP + gRPC",
   "Flame validation",
   "JWT middleware",
   "DI via Service",
@@ -90,7 +91,7 @@ const QUOTES = [
   },
 ];
 
-const TAB_FILES = ["Routes.fs", "Todos.fs", "Program.fs"];
+const TAB_FILES = ["Routes.fs", "Todos.fs", "Greeter.fs", "Program.fs"];
 
 /* firefly glow particles in the hero */
 const FIREFLIES: Array<{
@@ -331,9 +332,9 @@ export default function FireflyLanding({
           <div>
             <div style={{ fontFamily: monoFont, fontSize: 13, color: "var(--glow)", fontWeight: 600, marginBottom: 14 }}>// the whole app</div>
             <h2 style={{ fontFamily: headingFont, fontWeight: 700, fontSize: "clamp(30px,3.6vw,44px)", lineHeight: 1.06, letterSpacing: "-0.03em", margin: "0 0 16px", textWrap: "balance" }}>Eight lines to a running service.</h2>
-            <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 26px", maxWidth: "30em", textWrap: "pretty" }}>Typed route params, task-based handlers, JSON in and out, JWT middleware, and DI — all from the same composable pipeline. Here&apos;s a real todo API.</p>
+            <p style={{ fontSize: 16.5, lineHeight: 1.6, color: "var(--fg-2)", margin: "0 0 26px", maxWidth: "30em", textWrap: "pretty" }}>Typed route params, JSON in and out, JWT middleware, and DI — plus gRPC services on the very same server. HTTP and gRPC from one composable pipeline.</p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {["Routing", "JSON handlers", "Wire it up"].map((label, i) => (
+              {["Routing", "JSON handlers", "gRPC", "Wire it up"].map((label, i) => (
                 <button key={label} onClick={() => setTab(i)} style={tab === i ? tabActive : tabBase}>{label}</button>
               ))}
             </div>
@@ -371,6 +372,23 @@ export default function FireflyLanding({
                 </div>
               )}
               {tab === 2 && (
+                <div style={codePane}>
+                  <Line><K>open</K> <Ty>Firefly</Ty></Line>
+                  <Line><K>open</K> <Ty>Grpc.Core</Ty></Line>
+                  <Line />
+                  <Line><span style={tok("cc")}>{"// a gRPC service — served on the same server as HTTP"}</span></Line>
+                  <Line><K>let</K> greeter <Pn>=</Pn> <Fm>grpcService</Fm> <S>{'"greet.Greeter"'}</S> {"{"}</Line>
+                  <Line>{"    "}<Fm>unary</Fm> <S>{'"SayHello"'}</S> (<K>fun</K> (req<Pn>:</Pn> <Ty>HelloRequest</Ty>) _ctx <Op>{"->"}</Op> <K>task</K> {"{"}</Line>
+                  <Line>{"        "}<K>return</K> <Ty>HelloReply</Ty>(Message <Pn>=</Pn> <S>{'$"Hello, {req.Name}!"'}</S>)</Line>
+                  <Line>{"    }})"}</Line>
+                  <Line>{"}"}</Line>
+                  <Line />
+                  <Line><Fm>App</Fm>.defaults</Line>
+                  <Line><Op>{"|>"}</Op> <Fm>App</Fm>.grpc greeter      <span style={tok("cc")}>{"// gRPC"}</span></Line>
+                  <Line><Op>{"|>"}</Op> <Fm>App</Fm>.run routes        <span style={tok("cc")}>{"// + your HTTP routes"}</span></Line>
+                </div>
+              )}
+              {tab === 3 && (
                 <div style={codePane}>
                   <Line><Fm>App</Fm>.defaults</Line>
                   <Line><Op>{"|>"}</Op> <Fm>App</Fm>.services [ <Fm>Service</Fm>.singleton<Pn>{"<"}</Pn><Ty>ITodoStore</Ty>, <Ty>InMemoryTodoStore</Ty><Pn>{">"}</Pn> ]</Line>
