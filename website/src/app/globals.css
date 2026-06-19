@@ -1,0 +1,249 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ============================================================
+   Firefly landing page — design tokens, fonts, animations
+   Ported from the Claude design (Firefly.dc.html).
+   Scoped under [data-fire-root] so it never leaks into shadcn.
+   ============================================================ */
+
+[data-fire-root] {
+  --bg: #0a0b10;
+  --bg-grad: radial-gradient(1200px 600px at 70% -10%, rgba(255, 182, 39, 0.1), transparent 60%),
+    radial-gradient(900px 500px at 10% 10%, rgba(198, 242, 78, 0.06), transparent 55%);
+  --surface: #13151e;
+  --surface-2: #1a1d28;
+  --surface-3: #20232f;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --fg: #f5f2e9;
+  --fg-2: #aea99c;
+  --fg-3: #757064;
+  --glow: #ffb627;
+  --glow-2: #ffd36b;
+  --spark: #c6f24e;
+  --spark-2: #d6ff6a;
+  --glow-soft: rgba(255, 182, 39, 0.14);
+  --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+  --code-bg: #0b0d14;
+  /* syntax colors — intentionally constant across themes (code window stays dark) */
+  --ck: #ff9d5c;
+  --cs: #c6ef72;
+  --cf: #7fb2ff;
+  --ct: #5fd6c4;
+  --cc: #6b7280;
+  --co: #ffd36b;
+  --cn: #e89bff;
+  --cp: #c9c5ba;
+  --ctxt: #d8d4c8;
+}
+
+[data-fire-root][data-theme="light"] {
+  --bg: #f9f6ee;
+  --bg-grad: radial-gradient(1100px 560px at 72% -8%, rgba(255, 182, 39, 0.16), transparent 60%),
+    radial-gradient(820px 460px at 6% 8%, rgba(122, 170, 40, 0.08), transparent 55%);
+  --surface: #ffffff;
+  --surface-2: #fbf7ec;
+  --surface-3: #f4eedd;
+  --border: rgba(26, 24, 18, 0.1);
+  --border-strong: rgba(26, 24, 18, 0.18);
+  --fg: #1a1812;
+  --fg-2: #5d574a;
+  --fg-3: #8c8675;
+  --glow: #e08a00;
+  --glow-2: #c47400;
+  --spark: #5f8f1a;
+  --spark-2: #6fa31f;
+  --glow-soft: rgba(224, 138, 0, 0.12);
+  --card-shadow: 0 1px 2px rgba(26, 24, 18, 0.05), 0 18px 40px -22px rgba(26, 24, 18, 0.22);
+}
+
+[data-fire-root] ::selection {
+  background: rgba(255, 182, 39, 0.28);
+  color: #fff;
+}
+
+@keyframes ffDrift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(22px, -34px); }
+  50% { transform: translate(-16px, -58px); }
+  75% { transform: translate(26px, -24px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes ffFlicker {
+  0%, 100% { opacity: 0.12; }
+  35% { opacity: 1; }
+  55% { opacity: 0.4; }
+  75% { opacity: 0.9; }
+}
+@keyframes ffPulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+@keyframes ffFloaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* hover behaviors (the design used a non-standard style-hover attribute) */
+.ff-navlink { transition: color 0.15s, background 0.15s; }
+.ff-navlink:hover { color: var(--fg); background: var(--surface-2); }
+.ff-iconbtn { transition: color 0.15s, border-color 0.15s; }
+.ff-iconbtn:hover { color: var(--fg); border-color: var(--border-strong); }
+.ff-btn-primary { transition: background 0.15s; }
+.ff-btn-primary:hover { background: var(--glow-2); }
+.ff-btn-surface { transition: background 0.15s; }
+.ff-btn-surface:hover { background: var(--surface-2); }
+.ff-copybtn { transition: color 0.15s; }
+.ff-copybtn:hover { color: var(--fg); }
+.ff-footlink { transition: color 0.15s; }
+.ff-footlink:hover { color: var(--glow); }
+
+@media (max-width: 880px) {
+  .ff-hero-grid,
+  .ff-showcase-grid,
+  .ff-features-grid,
+  .ff-quotes-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .ff-footer-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fire-root] *,
+  [data-fire-root] *::before,
+  [data-fire-root] *::after {
+    animation: none !important;
+  }
+}
