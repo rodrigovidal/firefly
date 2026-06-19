@@ -15,3 +15,6 @@ node_modules/
 packages/*/dist/
 coverage/
 TestResults/
+
+## Local-only docs (planning notes + docs source; published docs live in website/content)
+docs/
