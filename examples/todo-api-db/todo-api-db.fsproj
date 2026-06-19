@@ -9,7 +9,7 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Fire/Fire.fsproj" />
+    <ProjectReference Include="../../src/Firefly/Firefly.fsproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.35" />

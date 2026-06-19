@@ -28,9 +28,9 @@ jobs:
         env:
           TAG_VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          PROJECT_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/Fire/Fire.fsproj)
+          PROJECT_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' src/Firefly/Firefly.fsproj)
           if [ "$PROJECT_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::Tag version ($TAG_VERSION) does not match Fire.fsproj (<Version>$PROJECT_VERSION</Version>)"
+            echo "::error::Tag version ($TAG_VERSION) does not match Firefly.fsproj (<Version>$PROJECT_VERSION</Version>)"
             exit 1
           fi
 
@@ -38,7 +38,7 @@ jobs:
         run: dotnet nuget remove source local-flame --configfile nuget.config
 
       - name: Pack
-        run: dotnet pack src/Fire/Fire.fsproj -c Release -o ./artifacts
+        run: dotnet pack src/Firefly/Firefly.fsproj -c Release -o ./artifacts
 
       - name: NuGet login (OIDC)
         id: login

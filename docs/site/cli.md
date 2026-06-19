@@ -5,7 +5,7 @@ The Fire CLI (`fire`) provides project scaffolding, code generation, development
 ## Installation
 
 ```bash
-dotnet tool install --global Fire.Cli
+dotnet tool install --global Firefly.Cli
 ```
 
 ## Commands

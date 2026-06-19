@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Fire\Fire.fsproj" />
+    <ProjectReference Include="..\..\src\Firefly\Firefly.fsproj" />
     <ProjectReference Include="..\blog-api\blog-api.fsproj" />
   </ItemGroup>
 

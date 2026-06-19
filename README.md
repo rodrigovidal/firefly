@@ -254,10 +254,10 @@ let config =
 
 `DevErrorPage.handler` returns a structured HTML error page in development with request metadata, route params, request ID, correlation ID, and stack trace.
 
-The repo also includes `Fire.Cli` with two workflow commands:
+The repo also includes `Firefly.Cli` with two workflow commands:
 
 ```bash
-dotnet run --project src/Fire.Cli/Fire.Cli.fsproj -- new MyApp
+dotnet run --project src/Firefly.Cli/Firefly.Cli.fsproj -- new MyApp
 fire dev --project src/MyApp/MyApp.fsproj
 ```
 

@@ -1,0 +1,80 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+<ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Evlog" Version="0.0.1-beta" />
+    <PackageReference Include="FsUnit.xUnit" Version="7.1.1" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.16.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="RequestTests.fs" />
+    <Compile Include="RequestExtensionsTests.fs" />
+    <Compile Include="ContentNegotiationTests.fs" />
+    <Compile Include="ResponseTests.fs" />
+    <Compile Include="DevErrorPageTests.fs" />
+    <Compile Include="CookieTests.fs" />
+    <Compile Include="ResponseHelpersTests.fs" />
+    <Compile Include="TrieTests.fs" />
+    <Compile Include="WildcardTests.fs" />
+    <Compile Include="RouteTests.fs" />
+    <Compile Include="HandlerFactoryTests.fs" />
+    <Compile Include="AppTests.fs" />
+    <Compile Include="ShutdownTests.fs" />
+    <Compile Include="TimeoutTests.fs" />
+    <Compile Include="RateLimitTests.fs" />
+    <Compile Include="OpenApiTests.fs" />
+    <Compile Include="CorsTests.fs" />
+    <Compile Include="LogTests.fs" />
+    <Compile Include="StaticTests.fs" />
+    <Compile Include="SmokeTests.fs" />
+    <Compile Include="Tier1SmokeTests.fs" />
+    <Compile Include="Tier2SmokeTests.fs" />
+    <Compile Include="Tier3SmokeTests.fs" />
+    <Compile Include="TestClientTests.fs" />
+    <Compile Include="ValidateTests.fs" />
+    <Compile Include="SchemaTests.fs" />
+    <Compile Include="JwtTests.fs" />
+    <Compile Include="NegotiateTests.fs" />
+    <Compile Include="CompressTests.fs" />
+    <Compile Include="RequestIdTests.fs" />
+    <Compile Include="CorrelationIdTests.fs" />
+    <Compile Include="HealthTests.fs" />
+    <Compile Include="LiveReloadTests.fs" />
+    <Compile Include="SecureHeadersTests.fs" />
+    <Compile Include="CsrfTests.fs" />
+    <Compile Include="SessionTests.fs" />
+    <Compile Include="SignedCookieTests.fs" />
+    <Compile Include="AutoETagTests.fs" />
+    <Compile Include="Tier4SmokeTests.fs" />
+    <Compile Include="NodeTests.fs" />
+    <Compile Include="RenderTests.fs" />
+    <Compile Include="ViewTests.fs" />
+    <Compile Include="ComponentTests.fs" />
+    <Compile Include="QueryTests.fs" />
+    <Compile Include="ViteTests.fs" />
+    <Compile Include="RedirectTests.fs" />
+    <Compile Include="SseTests.fs" />
+    <Compile Include="PartialTests.fs" />
+    <Compile Include="CsrfPolishTests.fs" />
+    <Compile Include="MiddlewareTests.fs" />
+    <Compile Include="QueryBindingTests.fs" />
+    <Compile Include="IdempotentTests.fs" />
+    <Compile Include="EvlogTests.fs" />
+    <Compile Include="PipelineTests.fs" />
+    <Compile Include="EnvTests.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Firefly\Firefly.fsproj" />
+  </ItemGroup>
+
+</Project>

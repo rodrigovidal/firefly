@@ -8,7 +8,7 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/Fire/Fire.fsproj" />
+    <ProjectReference Include="../../src/Firefly/Firefly.fsproj" />
     <ProjectReference Include="Protos.Generated/Protos.Generated.csproj" />
   </ItemGroup>
 </Project>

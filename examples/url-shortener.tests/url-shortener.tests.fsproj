@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Fire\Fire.fsproj" />
+    <ProjectReference Include="..\..\src\Firefly\Firefly.fsproj" />
     <ProjectReference Include="..\url-shortener\url-shortener.fsproj" />
   </ItemGroup>
 
