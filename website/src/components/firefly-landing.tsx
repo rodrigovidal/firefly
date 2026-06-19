@@ -74,19 +74,19 @@ const ROWS = [
 
 const QUOTES = [
   {
-    text: "“We swapped a Giraffe service over in an afternoon and shaved real latency off p99. The pipeline API just clicks if you already think in F#.”",
+    text: "“Porting our Giraffe routes was almost mechanical — the pipeline composes the way we already think in F#, and the JSON path allocates less. There’s no magic to unlearn.”",
     initials: "RC",
     name: "Rodrigo Couto",
     role: "Staff Engineer @ Stone",
   },
   {
-    text: "“Eight lines and I had a JSON API with JWT auth. No magic, no reflection — I can read the whole request path. That’s rare.”",
+    text: "“Eight lines and I had a JSON API with JWT auth — no reflection, no hidden middleware. I can read the entire request path end to end. That’s rare.”",
     initials: "AG",
     name: "Allan Garcez",
     role: "Senior Software Engineer @ Deel",
   },
   {
-    text: "“Firefly is the first .NET framework that feels as light as the F# it’s written in. Startup is instant and the surface area fits in my head.”",
+    text: "“It feels as light as the F# it’s written in: instant startup, a surface area that fits in my head, and HTTP and gRPC from the very same server.”",
     initials: "RA",
     name: "Rodrigo Andrade",
     role: "Principal Engineer @ VTEX",
