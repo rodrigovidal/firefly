@@ -179,8 +179,10 @@ Response.json {| name = "fire" |}
 Response.stream fileStream
 Response.ok |> Response.status 201
 Response.noContent
-Response.notFound
+Response.badRequest
 Response.unauthorized
+Response.forbidden
+Response.notFound
 
 // Headers, caching, redirects
 Response.json data

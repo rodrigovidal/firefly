@@ -39,6 +39,8 @@ module Response =
 
     let notFound = { ok with Status = 404 }
     let unauthorized = { ok with Status = 401 }
+    let forbidden = { ok with Status = 403 }
+    let badRequest = { ok with Status = 400 }
     let created = { ok with Status = 201 }
     let noContent = { ok with Status = 204 }
 

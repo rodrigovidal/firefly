@@ -39,3 +39,19 @@ let ``caching headers compose with other builders`` () =
     match r.Body with
     | ResponseBody.Text s -> s |> should equal "hello"
     | _ -> failwith "expected Text body"
+
+[<Fact>]
+let ``badRequest has status 400`` () =
+    Response.badRequest.Status |> should equal 400
+
+[<Fact>]
+let ``forbidden has status 403`` () =
+    Response.forbidden.Status |> should equal 403
+
+[<Fact>]
+let ``status helpers attach a json body`` () =
+    let r = Response.json {| errors = [ "bad" ] |} |> Response.status 400
+    r.Status |> should equal 400
+    match r.Body with
+    | ResponseBody.JsonDeferred _ -> ()
+    | _ -> failwith "expected JsonDeferred body"
