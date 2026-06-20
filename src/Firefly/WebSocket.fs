@@ -1,9 +1,12 @@
 namespace Firefly
 
 open System
+open System.Collections.Concurrent
 open System.Net.WebSockets
 open System.Text
+open System.Text.Json
 open System.Threading
+open System.Threading.Channels
 open System.Threading.Tasks
 
 type WsMessage =
@@ -53,6 +56,59 @@ type WsConn(ws: WebSocket, ct: CancellationToken) =
     member _.IsOpen = ws.State = WebSocketState.Open
     member _.CancellationToken = ct
 
+/// Multi-client WebSocket hub with rooms. Each connected client subscribes to a
+/// room and is backed by its own channel, so a socket is only ever written by its
+/// own pump task (WebSocket.SendAsync is not safe under concurrent writers).
+/// Messages of type 'T are JSON-serialized on the wire by the WS.hub handler.
+type WsHub<'T>() =
+    // connId -> (room, outgoing writer)
+    let subscribers = ConcurrentDictionary<Guid, string * ChannelWriter<'T>>()
+
+    /// Register a new subscriber in the given room (default room is "").
+    /// Returns the connection id and the reader the WS.hub pump drains to the socket.
+    member _.Subscribe(?room: string) : Guid * ChannelReader<'T> =
+        let r = defaultArg room ""
+        let ch = Channel.CreateUnbounded<'T>()
+        let id = Guid.NewGuid()
+        subscribers.TryAdd(id, (r, ch.Writer)) |> ignore
+        (id, ch.Reader)
+
+    /// Remove a subscriber and complete its channel (its pump loop ends).
+    member _.Unsubscribe(id: Guid) =
+        match subscribers.TryRemove(id) with
+        | true, (_, writer) -> writer.TryComplete() |> ignore
+        | false, _ -> ()
+
+    /// Send a message to every member of a room.
+    member _.Broadcast(room: string, msg: 'T) =
+        for kvp in subscribers do
+            let (r, writer) = kvp.Value
+            if r = room && not (writer.TryWrite(msg)) then
+                subscribers.TryRemove(kvp.Key) |> ignore
+
+    /// Send a message to every connected member of every room.
+    member _.BroadcastAll(msg: 'T) =
+        for kvp in subscribers do
+            let (_, writer) = kvp.Value
+            if not (writer.TryWrite(msg)) then
+                subscribers.TryRemove(kvp.Key) |> ignore
+
+    /// Send a message to a single connection.
+    member _.Send(connId: Guid, msg: 'T) =
+        match subscribers.TryGetValue(connId) with
+        | true, (_, writer) -> writer.TryWrite(msg) |> ignore
+        | false, _ -> ()
+
+    /// Number of connections currently in a room.
+    member _.RoomCount(room: string) =
+        let mutable n = 0
+        for kvp in subscribers do
+            if fst kvp.Value = room then n <- n + 1
+        n
+
+    /// Total number of connected subscribers across all rooms.
+    member _.Count = subscribers.Count
+
 [<RequireQualifiedAccess>]
 module WS =
 
@@ -67,6 +123,65 @@ module WS =
                 with
                 | :? OperationCanceledException -> ()
                 | :? WebSocketException -> ()
+                try
+                    if conn.IsOpen then do! conn.Close()
+                with _ -> ()
+                return { Status = 200; Headers = []; Body = Empty }
+            else
+                return
+                    Response.text "WebSocket connection expected"
+                    |> Response.status 400
+        }
+
+    /// Multi-client WebSocket handler backed by a WsHub. The connecting socket
+    /// joins `room`, receives every 'T broadcast to that room (JSON-serialized),
+    /// and each inbound text frame is JSON-deserialized to 'T and passed to
+    /// `onMessage hub connId value` (malformed frames are ignored).
+    let hub (h: WsHub<'T>) (room: string) (onMessage: WsHub<'T> -> Guid -> 'T -> Task<unit>) : Handler =
+        fun (req: Request) -> task {
+            let ctx = req.Raw
+            if ctx.WebSockets.IsWebSocketRequest then
+                let! ws = ctx.WebSockets.AcceptWebSocketAsync()
+                let ct = ctx.RequestAborted
+                let conn = WsConn(ws, ct)
+                let (id, reader) = h.Subscribe(room)
+                // Pump outgoing messages from this connection's channel to the socket.
+                let pump = task {
+                    try
+                        let mutable cont = true
+                        while cont && not ct.IsCancellationRequested do
+                            match! reader.WaitToReadAsync(ct) with
+                            | true ->
+                                let mutable item = Unchecked.defaultof<'T>
+                                while reader.TryRead(&item) do
+                                    do! conn.Send(JsonSerializer.Serialize(item))
+                            | false -> cont <- false
+                    with
+                    | :? OperationCanceledException -> ()
+                    | :? WebSocketException -> ()
+                }
+                // Receive loop: deserialize inbound frames and dispatch to onMessage.
+                try
+                    try
+                        let mutable cont = true
+                        while cont do
+                            let! msg = conn.Receive()
+                            match msg with
+                            | WsText text ->
+                                let parsed =
+                                    try Some(JsonSerializer.Deserialize<'T>(text))
+                                    with _ -> None
+                                match parsed with
+                                | Some value -> do! onMessage h id value
+                                | None -> ()
+                            | WsBinary _ -> ()
+                            | WsClose -> cont <- false
+                    with
+                    | :? OperationCanceledException -> ()
+                    | :? WebSocketException -> ()
+                finally
+                    h.Unsubscribe(id)
+                do! pump
                 try
                     if conn.IsOpen then do! conn.Close()
                 with _ -> ()

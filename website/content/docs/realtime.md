@@ -43,6 +43,37 @@ Route.start
 
 The handler automatically accepts the WebSocket upgrade, manages the connection lifecycle, and closes the socket when the function returns. Non-WebSocket requests receive a 400 response.
 
+### Rooms and broadcast (`WsHub<'T>`)
+
+For chat, notifications, or presence, use a `WsHub<'T>` to broadcast a typed message to many clients. Each connection joins a room; messages of type `'T` are JSON-serialized on the wire automatically.
+
+```fsharp
+type ChatMsg = { User: string; Text: string }
+
+let chat = WsHub<ChatMsg>()
+
+let routes =
+    Route.start
+    |> Route.get "/ws/chat" (WS.hub chat "lobby" (fun hub _connId msg -> task {
+        // Re-broadcast every inbound message to everyone in the room
+        hub.Broadcast("lobby", msg)
+    }))
+```
+
+Every client connected to `/ws/chat` joins the `"lobby"` room. When one sends a JSON frame (e.g. `{"user":"ada","text":"hi"}`), `onMessage` runs and `hub.Broadcast` fans it out to all members.
+
+The hub is safe to share across connections — each socket is written only by its own pump, so concurrent broadcasts never interleave on a single connection.
+
+| Member | Description |
+|--------|-------------|
+| `hub.Broadcast(room, msg)` | Send `msg` to every connection in `room` |
+| `hub.BroadcastAll(msg)` | Send `msg` to every connection in every room |
+| `hub.Send(connId, msg)` | Send `msg` to one connection |
+| `hub.RoomCount(room)` | Number of connections in `room` |
+| `hub.Count` | Total connected clients |
+
+The `onMessage` callback receives `(hub, connId, msg)`; malformed inbound frames are ignored. Use the same hub instance across multiple routes to model multiple rooms.
+
 ## Server-Sent Events (SSE)
 
 ### Handler-Driven SSE

@@ -40,13 +40,24 @@ Firefly is part of a cohesive F# ecosystem:
 - [x] Vite dev proxy + asset helpers, Live reload
 
 ### Real-time
-- [x] WebSocket — basic send/receive
+- [x] WebSocket — basic send/receive (`WS.handler` / `WsConn`)
+- [x] WebSocket rooms / broadcast — typed `WsHub<'T>` + `WS.hub` (room/channel/broadcast)
 - [x] SSE — server-sent events with broadcast
 
 ### API patterns
 - [x] Pagination (cursor + offset, `Pagination.parse`)
 - [x] HATEOAS link generation
 - [x] Bulk operations (batch endpoints, partial success)
+- [x] API versioning — `Version.url` (URL prefix) + `Version.header` / `Version.headerRequired`
+- [x] Router pipelines — `Route.pipe` (prefix + pipeline + nested routes)
+
+### File handling
+- [x] Multipart parsing — `req.Files()` returning `UploadedFile list`
+- [x] File downloads — `Response.file "path"` with Content-Disposition
+- [x] Upload size limits — `Upload.maxSize` middleware (apply globally or per route group)
+
+### Real-time (responses)
+- [x] Streaming responses — `Response.streamJson` / `streamJsonAsync` for NDJSON / large datasets
 
 ### Caching
 - [x] Response-caching middleware (`Cache.maxAge`, `Cache.varyBy`)
@@ -70,30 +81,14 @@ Firefly is part of a cohesive F# ecosystem:
 
 > Auth lives in the separate **Fireproof** repo/project and is tracked there.
 
-### File handling
-- [ ] Multipart parsing — `req.Files()`
-- [ ] File downloads — `Response.file "path"` with Content-Disposition
-- [ ] Per-route upload size limits (have `Upload.maxSize`; make it per-route)
-
-### Real-time depth
-- [ ] WebSocket ergonomics — room / channel / broadcast patterns
-- [ ] Streaming responses — `Response.streamJson` for NDJSON / large datasets
-
 ### Ecosystem integrations — optional, not batteries-included
 > Flare and Rhinox are separate opt-in packages, not bundled with the core framework. Firefly stays minimal; these are integrations users add only if they want them.
 - [ ] Flare — `Flare.get/post` with Flame schemas + an example
 - [ ] Rhinox — connection/transaction middleware maturity, `firefly gen migration`, full Firefly+Rhinox CRUD example
 
-### Observability
-- [x] Structured request logging — `Log.structured` (JSON per request) + Evlog request-scoped logger
-- [x] OpenTelemetry traces + metrics built in — `Telemetry.middleware` emits `ActivitySource` spans and `Meter` counters/histograms; wire exporters via `Telemetry.sourceName` / `Telemetry.meterName`
-- [x] One-line OTLP exporter helper — `Telemetry.otlp "service-name"` (reads `OTEL_EXPORTER_OTLP_*` env vars)
-
 ### Smaller items
-- [ ] API versioning — `Route.version "v1"` (URL or header based)
 - [ ] Distributed cache / session backend (Redis abstraction); session store is in-memory only
-- [ ] Dev-loop: router pipelines (`Route.pipe`, named middleware stacks), wire generators into `firefly dev`, fill Dev/Prod config profiles, Vite dev-server auto-discovery
-- [ ] Tests for `Bulk` and `DevErrorPage`
+- [ ] Dev-loop polish — wire generators into `firefly dev`, Dev/Prod config profiles, Vite dev-server auto-discovery (have `Route.pipe` / named middleware stacks)
 
 ### Performance (future)
 - [ ] Source-generated DI (F# source generator)
