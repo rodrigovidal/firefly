@@ -68,10 +68,7 @@ Firefly is part of a cohesive F# ecosystem:
 
 ## Next Up
 
-### Auth (Fireproof) — designed, not built
-- [ ] Cookie auth — login/logout with encrypted cookies (no JWT)
-- [ ] OAuth helpers — GitHub, Google, generic OAuth2
-- [ ] Auth middleware — `Auth.requireRole "admin"`, `Auth.requireClaim`
+> Auth lives in the separate **Fireproof** repo/project and is tracked there.
 
 ### File handling
 - [ ] Multipart parsing — `req.Files()`
@@ -82,13 +79,15 @@ Firefly is part of a cohesive F# ecosystem:
 - [ ] WebSocket ergonomics — room / channel / broadcast patterns
 - [ ] Streaming responses — `Response.streamJson` for NDJSON / large datasets
 
-### Ecosystem integrations
+### Ecosystem integrations — optional, not batteries-included
+> Flare and Rhinox are separate opt-in packages, not bundled with the core framework. Firefly stays minimal; these are integrations users add only if they want them.
 - [ ] Flare — `Flare.get/post` with Flame schemas + an example
 - [ ] Rhinox — connection/transaction middleware maturity, `firefly gen migration`, full Firefly+Rhinox CRUD example
 
 ### Observability
-- [ ] Structured request logging — JSON per request (method, path, status, duration)
-- [ ] OpenTelemetry exporters + metrics (request count, latency histograms, error rates)
+- [x] Structured request logging — `Log.structured` (JSON per request) + Evlog request-scoped logger
+- [x] OpenTelemetry traces + metrics built in — `Telemetry.middleware` emits `ActivitySource` spans and `Meter` counters/histograms; wire exporters via `Telemetry.sourceName` / `Telemetry.meterName`
+- [ ] Optional convenience helper to register OTLP exporters in one line
 
 ### Smaller items
 - [ ] API versioning — `Route.version "v1"` (URL or header based)

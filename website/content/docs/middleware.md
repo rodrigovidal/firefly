@@ -334,9 +334,9 @@ Records metrics:
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `fire.http.requests` | Counter | Total HTTP requests |
-| `fire.http.duration` | Histogram | Request duration in ms |
-| `fire.http.active_requests` | UpDownCounter | Currently active requests |
+| `firefly.http.requests` | Counter | Total HTTP requests |
+| `firefly.http.duration` | Histogram | Request duration in ms |
+| `firefly.http.active_requests` | UpDownCounter | Currently active requests |
 
 Configure exporters using the source name `"Firefly"` and meter name `"Firefly"`:
 

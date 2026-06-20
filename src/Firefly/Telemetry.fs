@@ -7,11 +7,11 @@ open System.Diagnostics.Metrics
 [<RequireQualifiedAccess>]
 module Telemetry =
 
-    let private source = new ActivitySource("Fire")
-    let private meter = new Meter("Fire")
-    let private requestCount = meter.CreateCounter<int64>("fire.http.requests", "requests", "Total HTTP requests")
-    let private requestDuration = meter.CreateHistogram<float>("fire.http.duration", "ms", "HTTP request duration")
-    let private activeRequests = meter.CreateUpDownCounter<int64>("fire.http.active_requests", "requests", "Active HTTP requests")
+    let private source = new ActivitySource("Firefly")
+    let private meter = new Meter("Firefly")
+    let private requestCount = meter.CreateCounter<int64>("firefly.http.requests", "requests", "Total HTTP requests")
+    let private requestDuration = meter.CreateHistogram<float>("firefly.http.duration", "ms", "HTTP request duration")
+    let private activeRequests = meter.CreateUpDownCounter<int64>("firefly.http.active_requests", "requests", "Active HTTP requests")
 
     let inline private tag (k: string) (v: obj) = KeyValuePair<string, obj>(k, v)
 
@@ -63,7 +63,7 @@ module Telemetry =
         }
 
     /// The ActivitySource name for configuring OpenTelemetry exporters.
-    let sourceName = "Fire"
+    let sourceName = "Firefly"
 
     /// The Meter name for configuring OpenTelemetry metrics exporters.
-    let meterName = "Fire"
+    let meterName = "Firefly"
