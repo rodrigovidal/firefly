@@ -133,6 +133,56 @@ let createOrder
 Route.post "/orders" createOrder
 ```
 
+## AOT and Trim-Safe Wiring
+
+F# has no Roslyn source generators, so there is no "source-generated DI" the way C# libraries (Jab, Pure.DI) provide. The idiomatic — and fully AOT/trim-safe — alternative is a hand-written **composition root**: build the object graph yourself and capture dependencies in handler closures. You get the same payoff source generators chase, with zero tooling.
+
+Why prefer it for NativeAOT / trimming / fast startup:
+
+- **No reflective construction.** `Service.singleton<'S, 'I>` (and `transient` / `scoped`) hand the implementation type to the container, which builds it by reflection (`ActivatorUtilities`). `Service.singletonFactory` / `Service.instance` construct it explicitly, so nothing is reflected.
+- **Compile-time graph validation.** If you write `Foo(bar)` and `bar` isn't in scope, it does not compile. Missing dependencies become build errors instead of runtime *"No service for type…"* exceptions — exactly the guarantee a source generator would add.
+- **Faster startup**, and no `RequiresDynamicCode`/`RequiresUnreferencedCode` from the registration path.
+
+### Composition root + closures
+
+Compose the graph once, by hand, and capture the services in plain `Request -> Task<Response>` handlers:
+
+```fsharp
+// Composition root — the compiler checks every edge of the graph.
+let config : AppConfig = Env.load<AppConfig>()
+let repo   : IUserRepository = UserRepository(config.ConnectionString)
+let email  : IEmailService   = EmailService(config.SmtpHost)
+
+// Dependencies are captured by closure — no container lookup, no reflection.
+let listUsers : Handler = fun _req -> task {
+    let! users = repo.GetAll()
+    return Response.json users
+}
+
+let routes = Route.start |> Route.get "/users" listUsers
+```
+
+### Container lifetimes without reflective construction
+
+If you still want per-request (`scoped`) lifetimes from the container, register **factories** (which spell out construction) and resolve them explicitly inside plain handlers:
+
+```fsharp
+App.defaults
+|> App.services [
+    Service.scopedFactory (fun sp ->
+        new AppDbContext(sp.GetRequiredService<AppConfig>().ConnectionString) :> IDbContext)
+]
+
+let getUser (id: int) : Handler = fun req -> task {
+    let db = req.Raw.RequestServices.GetRequiredService<IDbContext>()
+    // ...
+}
+```
+
+### Note on auto-injection
+
+The interface-parameter [auto-injection](#auto-injection-in-handlers) above is convenient, but it compiles an expression tree at startup to classify and invoke handler parameters — runtime code generation that **is not NativeAOT-compatible**. It is the right default for normal (JIT) deployments; for a NativeAOT or fully trimmed build, use plain `Request -> Task<Response>` handlers with a composition root or explicit `GetRequiredService` as shown here.
+
 ## Accessing Services Manually
 
 If you need to resolve services outside of auto-injection:

@@ -37,24 +37,34 @@ type ServiceRegistration =
 
 [<RequireQualifiedAccess>]
 module Service =
+    /// Singleton registered by type. The container constructs 'TImpl by
+    /// reflection (ActivatorUtilities). For NativeAOT/trim, prefer singletonFactory.
     let singleton<'TService, 'TImpl> =
         Singleton(typeof<'TService>, typeof<'TImpl>)
 
+    /// Singleton built by an explicit factory — reflection-free, AOT/trim-safe.
     let singletonFactory (factory: IServiceProvider -> 'T) =
         SingletonFactory(typeof<'T>, fun sp -> box (factory sp))
 
+    /// Register a pre-built instance — reflection-free, AOT/trim-safe.
     let instance (value: 'T) =
         SingletonInstance(typeof<'T>, box value)
 
+    /// Transient registered by type. The container constructs 'TImpl by
+    /// reflection (ActivatorUtilities). For NativeAOT/trim, prefer transientFactory.
     let transient<'TService, 'TImpl> =
         Transient(typeof<'TService>, typeof<'TImpl>)
 
+    /// Transient built by an explicit factory — reflection-free, AOT/trim-safe.
     let transientFactory (factory: IServiceProvider -> 'T) =
         TransientFactory(typeof<'T>, fun sp -> box (factory sp))
 
+    /// Scoped registered by type. The container constructs 'TImpl by
+    /// reflection (ActivatorUtilities). For NativeAOT/trim, prefer scopedFactory.
     let scoped<'TService, 'TImpl> =
         Scoped(typeof<'TService>, typeof<'TImpl>)
 
+    /// Scoped built by an explicit factory — reflection-free, AOT/trim-safe.
     let scopedFactory (factory: IServiceProvider -> 'T) =
         ScopedFactory(typeof<'T>, fun sp -> box (factory sp))
 

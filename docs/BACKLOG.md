@@ -92,4 +92,5 @@ Firefly is part of a cohesive F# ecosystem:
 - [ ] Distributed cache / session backend (Redis abstraction); session store is in-memory only
 
 ### Performance (future)
-- [ ] Source-generated DI (F# source generator)
+- [x] AOT/trim-safe DI guidance — documented composition-root + factory pattern (F# has no Roslyn source generators; the hand-written graph gives the same compile-time validation)
+- [ ] Source-generated DI proper — Myriad plugin or `firefly gen di` (build → reflect constructors → emit factories), only if demand appears
