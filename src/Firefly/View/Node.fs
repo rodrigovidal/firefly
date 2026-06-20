@@ -127,11 +127,6 @@ type Html =
     static member element (tag: string) (children: Node list) = Element(tag, [], children)
     static member elementWithAttrs (tag: string) (attrs: Attr list, children: Node list) = Element(tag, attrs, children)
 
-module Component =
-    let client (name: string) (props: 'T) : Node =
-        let json = System.Text.Json.JsonSerializer.Serialize(props)
-        Element("div", [ Data("fire-component", name); Data("fire-props", json) ], [])
-
 module Meta =
     let description (text: string) : Node =
         Element("meta", [ Custom("name", "description"); Custom("content", text) ], [])

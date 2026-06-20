@@ -36,7 +36,7 @@ Firefly is part of a cohesive F# ecosystem:
 - [x] JSON Schema generation
 
 ### View engine
-- [x] Server-side DSL (`Html` / `Node` / `Render`), `Component.client` helper
+- [x] Server-side DSL (`Html` / `Node` / `Render`), layout + error-boundary middleware
 - [x] Vite dev proxy + asset helpers, Live reload
 
 ### Real-time
@@ -81,10 +81,6 @@ Firefly is part of a cohesive F# ecosystem:
 ### Real-time depth
 - [ ] WebSocket ergonomics — room / channel / broadcast patterns
 - [ ] Streaming responses — `Response.streamJson` for NDJSON / large datasets
-
-### View engine Phase 2 + client navigation
-- [ ] `QueryCache`, `Query.prefetch`, `View.withQueryCache` (F#)
-- [ ] `@fire/fire-react` npm package — hydration + client-side nav (wire up the existing `Partial.middleware` SPA shell-strip)
 
 ### Ecosystem integrations
 - [ ] Flare — `Flare.get/post` with Flame schemas + an example

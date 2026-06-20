@@ -19,7 +19,6 @@ The contacts app is a small CRUD application that stores contacts in an in-memor
 - Typed routing with `Route.start`, `Route.get`/`Route.post`, and `%i` path captures
 - Redirects (`Response.redirect`), JSON responses (`Response.json`), and status codes (`Response.status`)
 - App startup with `App.defaults`, `App.port`, `App.middleware Log.toConsole`, and `App.run`
-- The Phase 2 view engine extras: `QueryCache`, `Query.prefetch`, `Component.client`, `View.withQueryCache`, `View.withScript`
 
 ## Types and schemas
 
@@ -134,8 +133,6 @@ let apiCreateContact (req: Request) = task {
 }
 ```
 
-There is also an `/interactive` demo handler that uses the Phase 2 view engine — it builds a `QueryCache`, prefetches data with `Query.prefetch`, emits a client component with `Component.client "ContactActions"`, and attaches both with `View.withQueryCache` and `View.withScript`.
-
 ## Routes
 
 Routes are built by piping onto `Route.start`. `%i` captures an integer path segment and passes it to the handler before the `Request`.
@@ -144,7 +141,6 @@ Routes are built by piping onto `Route.start`. `%i` captures an integer path seg
 let routes =
     Route.start
     |> Route.get  "/"                    listContacts
-    |> Route.get  "/interactive"         interactivePage
     |> Route.get  "/contacts/new"        newContact
     |> Route.post "/contacts"            createContact
     |> Route.get  "/contacts/%i"         showContact

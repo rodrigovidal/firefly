@@ -58,12 +58,9 @@
     <Compile Include="NodeTests.fs" />
     <Compile Include="RenderTests.fs" />
     <Compile Include="ViewTests.fs" />
-    <Compile Include="ComponentTests.fs" />
-    <Compile Include="QueryTests.fs" />
     <Compile Include="ViteTests.fs" />
     <Compile Include="RedirectTests.fs" />
     <Compile Include="SseTests.fs" />
-    <Compile Include="PartialTests.fs" />
     <Compile Include="CsrfPolishTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="QueryBindingTests.fs" />

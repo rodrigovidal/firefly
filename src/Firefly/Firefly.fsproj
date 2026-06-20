@@ -19,7 +19,6 @@
   <ItemGroup>
     <Compile Include="View/Node.fs" />
     <Compile Include="View/Render.fs" />
-    <Compile Include="View/Query.fs" />
     <Compile Include="Request.fs" />
     <Compile Include="Response.fs" />
     <Compile Include="ResponsePool.fs" />
@@ -67,7 +66,6 @@
     <Compile Include="Sse.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Grpc.fs" />
-    <Compile Include="Partial.fs" />
     <Compile Include="Env.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />
