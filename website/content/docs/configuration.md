@@ -94,7 +94,23 @@ Missing required environment variables: DATABASE_URL, PORT
 
 ## Environment Priority
 
-Real environment variables take precedence over `.env` file values. The `.env` file is only used to fill in variables that are not already set in the process environment. This is useful for local development without affecting deployed environments.
+`Env.load` layers values from three sources, highest priority first:
+
+1. **Real environment variables** — always win; `.env` files only fill in what is not already set in the process environment.
+2. **`.env.{environment}`** — a profile file selected by `ASPNETCORE_ENVIRONMENT` (or `DOTNET_ENVIRONMENT`), e.g. `.env.Development` or `.env.Production`.
+3. **`.env`** — the shared base file.
+
+```bash
+# .env  (shared defaults)
+PORT=8080
+LOG_LEVEL=info
+
+# .env.Development  (overrides the base in dev)
+PORT=5005
+LOG_LEVEL=debug
+```
+
+With `ASPNETCORE_ENVIRONMENT=Development`, `Env.load` resolves `PORT=5005`; in any other environment it falls back to the base `8080`. A real `PORT` env var still overrides both. Commit `.env` and `.env.{environment}` profiles, but keep secrets in real environment variables.
 
 ## Usage with DI
 

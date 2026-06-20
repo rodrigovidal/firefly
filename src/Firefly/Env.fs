@@ -22,6 +22,41 @@ module Env =
                 result.Append(Char.ToUpperInvariant(c)) |> ignore
         result.ToString()
 
+    /// Parse .env file lines into key/value pairs. Skips blank lines and comments
+    /// (lines starting with '#'); splits on the first '='; strips a matching pair
+    /// of surrounding single or double quotes from the value.
+    let parseEnvLines (lines: string seq) : (string * string) list =
+        [ for line in lines do
+            let trimmed = line.Trim()
+            if trimmed.Length > 0 && not (trimmed.StartsWith("#")) then
+                match trimmed.IndexOf('=') with
+                | -1 -> ()
+                | i ->
+                    let key = trimmed.Substring(0, i).Trim()
+                    let value =
+                        let raw = trimmed.Substring(i + 1).Trim()
+                        if raw.Length >= 2
+                           && ((raw.StartsWith("\"") && raw.EndsWith("\"")) || (raw.StartsWith("'") && raw.EndsWith("'"))) then
+                            raw.Substring(1, raw.Length - 2)
+                        else raw
+                    if key.Length > 0 then yield (key, value) ]
+
+    /// Layer env entries: `high` wins over `low` for any shared key.
+    let mergeLayers (high: (string * string) list) (low: (string * string) list) : (string * string) list =
+        let highKeys = high |> List.map fst |> Set.ofList
+        high @ (low |> List.filter (fun (k, _) -> not (highKeys.Contains k)))
+
+    let private readEntries (path: string) : (string * string) list =
+        if File.Exists(path) then parseEnvLines (File.ReadAllLines(path)) else []
+
+    let private currentEnvironment () =
+        match Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") with
+        | null | "" ->
+            match Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") with
+            | null | "" -> None
+            | e -> Some e
+        | e -> Some e
+
     let mutable private envFileLoaded = false
     let private envFileLock = obj()
 
@@ -29,23 +64,17 @@ module Env =
         if not envFileLoaded then
             lock envFileLock (fun () ->
                 if not envFileLoaded then
-                    let path = Path.Combine(Directory.GetCurrentDirectory(), ".env")
-                    if File.Exists(path) then
-                        for line in File.ReadAllLines(path) do
-                            let trimmed = line.Trim()
-                            if trimmed.Length > 0 && not (trimmed.StartsWith("#")) then
-                                match trimmed.IndexOf('=') with
-                                | -1 -> ()
-                                | i ->
-                                    let key = trimmed.Substring(0, i).Trim()
-                                    let value =
-                                        let raw = trimmed.Substring(i + 1).Trim()
-                                        if (raw.StartsWith("\"") && raw.EndsWith("\"")) || (raw.StartsWith("'") && raw.EndsWith("'")) then
-                                            raw.Substring(1, raw.Length - 2)
-                                        else raw
-                                    // Only set if not already in environment (env vars win)
-                                    if Environment.GetEnvironmentVariable(key) = null then
-                                        Environment.SetEnvironmentVariable(key, value)
+                    let dir = Directory.GetCurrentDirectory()
+                    // Precedence: real env vars > .env.{environment} > .env
+                    let baseEntries = readEntries (Path.Combine(dir, ".env"))
+                    let envEntries =
+                        match currentEnvironment () with
+                        | Some e -> readEntries (Path.Combine(dir, $".env.{e}"))
+                        | None -> []
+                    for (key, value) in mergeLayers envEntries baseEntries do
+                        // Only set if not already in environment (real env vars win)
+                        if Environment.GetEnvironmentVariable(key) = null then
+                            Environment.SetEnvironmentVariable(key, value)
                     envFileLoaded <- true
             )
 

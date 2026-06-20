@@ -38,6 +38,13 @@ module App =
     let configure fn config = { config with Configure = Some fn }
     let grpc (service: GrpcServiceConfig) config = { config with GrpcServices = config.GrpcServices @ [service] }
 
+    /// Wire the Vite dev proxy with an auto-detected port, but only when running
+    /// in Development (ASPNETCORE_ENVIRONMENT/DOTNET_ENVIRONMENT). A no-op in
+    /// production so the same pipeline is safe to ship.
+    let vite config =
+        if Vite.isDevelopment () then middleware (Vite.devAuto ()) config
+        else config
+
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
         for entry in routes.Routes |> List.rev do

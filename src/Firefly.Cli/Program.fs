@@ -77,7 +77,7 @@ let private fireReferenceItems () =
   </ItemGroup>"""
     | None ->
         """  <ItemGroup>
-    <PackageReference Include="Fire" Version="0.1.0" />
+    <PackageReference Include="Firefly.Server" Version="0.1.0-alpha.3" />
   </ItemGroup>"""
 
 let private fireTestReferenceItems () =
@@ -89,7 +89,7 @@ let private fireTestReferenceItems () =
   </ItemGroup>"""
     | None ->
         """  <ItemGroup>
-    <PackageReference Include="Fire" Version="0.1.0" />
+    <PackageReference Include="Firefly.Server" Version="0.1.0-alpha.3" />
   </ItemGroup>"""
 
 let private writeFile (path: string) (contents: string) =
@@ -146,16 +146,10 @@ let private createNewProject (options: NewOptions) =
     writeFile (Path.Combine(targetDir, $"{options.Name}.sln")) (solutionTemplate options.Name)
     substituteFireReference (Path.Combine(targetDir, "src", options.Name, $"{options.Name}.fsproj"))
     substituteFireReference (Path.Combine(targetDir, "tests", $"{options.Name}.Tests", $"{options.Name}.Tests.fsproj"))
-    printfn $"Created Fire app at {targetDir}"
+    printfn $"Created Firefly app at {targetDir}"
 
 let private findProjectFromCurrentDirectory () =
-    let srcDir = Path.Combine(Environment.CurrentDirectory, "src")
-    if Directory.Exists(srcDir) then
-        Directory.GetFiles(srcDir, "*.fsproj", SearchOption.AllDirectories)
-        |> Array.tryFind (fun path -> not (path.EndsWith(".Tests.fsproj", StringComparison.OrdinalIgnoreCase)))
-    else
-        Directory.GetFiles(Environment.CurrentDirectory, "*.fsproj", SearchOption.TopDirectoryOnly)
-        |> Array.tryHead
+    DevManifest.findProjectIn Environment.CurrentDirectory
 
 let private startProcess (fileName: string) (arguments: string) (workingDir: string) =
     let psi = ProcessStartInfo(fileName, arguments)
@@ -204,8 +198,30 @@ let private runDev (projectPath: string option) =
             | Some path -> path
             | None -> failwith "No F# project found. Pass --project <path>."
 
+    let workingDir = Environment.CurrentDirectory
+    let manifestPath = Path.Combine(workingDir, DevManifest.manifestFileName)
+
+    // Run declared generators once on startup, and re-run when firefly.json changes.
+    let mutable watcher : FileSystemWatcher option = None
+    if File.Exists(manifestPath) then
+        let n = DevManifest.runGenerators workingDir
+        printfn $"firefly dev: ran {n} generator(s) from {DevManifest.manifestFileName}"
+        let w = new FileSystemWatcher(workingDir, DevManifest.manifestFileName)
+        w.NotifyFilter <- NotifyFilters.LastWrite ||| NotifyFilters.Size ||| NotifyFilters.FileName
+        let rerun _ =
+            try
+                DevManifest.runGenerators workingDir |> ignore
+                printfn $"firefly dev: regenerated from {DevManifest.manifestFileName}"
+            with ex -> eprintfn "firefly dev: %s" ex.Message
+        w.Changed.Add(rerun)
+        w.Created.Add(rerun)
+        w.EnableRaisingEvents <- true
+        watcher <- Some w
+
     let args = $"watch run --project \"{resolvedProject}\""
-    startProcess "dotnet" args Environment.CurrentDirectory
+    let exitCode = startProcess "dotnet" args Environment.CurrentDirectory
+    watcher |> Option.iter (fun w -> w.Dispose())
+    exitCode
 
 [<EntryPoint>]
 let main argv =
@@ -233,29 +249,19 @@ let main argv =
             createNewProject { Name = name; OutputDir = outputDir; Force = true }
             0
         | ["gen"; "controller"; name] ->
-            SimpleGenerator.generateController (Generator.capitalize name) Environment.CurrentDirectory
+            DevManifest.runGen Environment.CurrentDirectory "controller" name []
             0
         | ["gen"; "schema"; name] ->
             eprintfn "Usage: firefly gen schema <Name> field:type [field:type ...]"
             1
         | "gen" :: "schema" :: name :: fields when fields.Length > 0 ->
-            SimpleGenerator.generateSchema (Generator.capitalize name) (SimpleGenerator.parseFields fields) Environment.CurrentDirectory
+            DevManifest.runGen Environment.CurrentDirectory "schema" name fields
             0
         | ["gen"; "docker"] ->
-            SimpleGenerator.generateDocker Environment.CurrentDirectory
+            DevManifest.runGen Environment.CurrentDirectory "docker" "" []
             0
         | "gen" :: kind :: resource :: fields when fields.Length > 0 ->
-            let projectPath =
-                match findProjectFromCurrentDirectory () with
-                | Some path -> path
-                | None -> failwith "No F# project found. Run from project root."
-            Generator.generate {
-                Kind = kind
-                Resource = Generator.capitalize resource
-                Fields = Generator.parseFields fields
-                ProjectDir = Path.GetDirectoryName(projectPath)
-                Namespace = Path.GetFileNameWithoutExtension(projectPath)
-            }
+            DevManifest.runGen Environment.CurrentDirectory kind resource fields
             0
         | ["gen"] | ["gen"; _] ->
             eprintfn "Usage: firefly gen html|json <Resource> field:type [field:type ...]"

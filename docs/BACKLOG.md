@@ -65,11 +65,13 @@ Firefly is part of a cohesive F# ecosystem:
 
 ### DX & tooling
 - [x] DI — `App.services [ Service.singleton<I, T>; ... ]`
-- [x] Env config — `Env.load<AppConfig>()`
+- [x] Env config — `Env.load<AppConfig>()`, with `.env.{environment}` profile layering
 - [x] Testing — `TestClient.create` (direct) + `TestClient.start` (HTTP)
 - [x] OpenAPI — `OpenApi.handler` + `firefly openapi`
 - [x] Dev error page, graceful shutdown, health checks, Evlog integration
 - [x] CLI `firefly` — `new`, `dev`, `gen html|json|controller|schema|docker`, `openapi`
+- [x] Generators in `firefly dev` — `firefly.json` manifest, regenerated on change
+- [x] Vite dev proxy with auto-detected port — `App.vite` / `Vite.autoPort`
 - [x] Docker template via `firefly gen docker`
 
 ### Docs & perf
@@ -88,7 +90,6 @@ Firefly is part of a cohesive F# ecosystem:
 
 ### Smaller items
 - [ ] Distributed cache / session backend (Redis abstraction); session store is in-memory only
-- [ ] Dev-loop polish — wire generators into `firefly dev`, Dev/Prod config profiles, Vite dev-server auto-discovery (have `Route.pipe` / named middleware stacks)
 
 ### Performance (future)
 - [ ] Source-generated DI (F# source generator)

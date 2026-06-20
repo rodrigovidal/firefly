@@ -99,6 +99,23 @@ let ``Env.load fails with parse error`` () =
         Environment.SetEnvironmentVariable("DEBUG", null)
 
 [<Fact>]
+let ``parseEnvLines skips comments and blanks, strips quotes, splits on first =`` () =
+    let entries =
+        Env.parseEnvLines [ "# a comment"; "   "; "FOO=bar"; "QUOTED=\"hello world\""
+                            "SINGLE='x'"; "CONN=Host=localhost;Port=5432" ]
+    entries
+    |> should equal [ ("FOO", "bar"); ("QUOTED", "hello world"); ("SINGLE", "x"); ("CONN", "Host=localhost;Port=5432") ]
+
+[<Fact>]
+let ``mergeLayers gives precedence to the high layer`` () =
+    let high = [ ("PORT", "5005"); ("ONLY_DEV", "1") ]
+    let low = [ ("PORT", "8080"); ("ONLY_BASE", "2") ]
+    let merged = Env.mergeLayers high low |> Map.ofList
+    merged.["PORT"] |> should equal "5005" // env-specific overrides base
+    merged.["ONLY_DEV"] |> should equal "1"
+    merged.["ONLY_BASE"] |> should equal "2"
+
+[<Fact>]
 let ``toScreamingSnake converts PascalCase correctly`` () =
     // Test via round-trip: set env var, load config
     Environment.SetEnvironmentVariable("DATABASE_URL", "test")

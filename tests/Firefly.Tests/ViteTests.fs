@@ -95,3 +95,17 @@ let ``Vite.devMiddleware passes non-Vite requests through`` () = task {
     | ResponseBody.Text s -> s |> should equal "from fire"
     | _ -> failwith "expected Text body"
 }
+
+[<Fact>]
+let ``Vite.parsePort reads server.port from config`` () =
+    let config = "export default defineConfig({\n  server: {\n    port: 3001,\n    host: true\n  }\n})"
+    Vite.parsePort config |> should equal (Some 3001)
+
+[<Fact>]
+let ``Vite.parsePort returns None when no server port declared`` () =
+    let config = "export default defineConfig({\n  plugins: [react()]\n})"
+    Vite.parsePort config |> should equal (None: int option)
+
+[<Fact>]
+let ``Vite.parsePort returns None for empty input`` () =
+    Vite.parsePort "" |> should equal (None: int option)

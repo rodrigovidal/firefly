@@ -92,7 +92,46 @@ window.__vite_plugin_react_preamble_installed__ = true
     let dev () : Middleware = devMiddleware defaultPort
     let devWithPort (port: int) : Middleware = devMiddleware port
 
-    let private isDevelopment () =
+    /// Parse the Vite dev-server port from a vite.config file's text.
+    /// Looks for a `port: <n>` inside the `server { ... }` block. Returns None
+    /// when no server port is declared (Vite's own default is then 5173).
+    let parsePort (configText: string) : int option =
+        if String.IsNullOrEmpty configText then None
+        else
+            let m =
+                System.Text.RegularExpressions.Regex.Match(
+                    configText,
+                    @"server\s*:\s*\{[^}]*?\bport\s*:\s*(\d+)",
+                    System.Text.RegularExpressions.RegexOptions.Singleline)
+            if m.Success then
+                match Int32.TryParse(m.Groups.[1].Value) with
+                | true, p -> Some p
+                | _ -> None
+            else None
+
+    /// Auto-detect the Vite dev-server port: read vite.config.{ts,js,mjs} from the
+    /// working directory, else the VITE_PORT env var, else the default 5173.
+    let autoPort () : int =
+        let dir = IO.Directory.GetCurrentDirectory()
+        let fromConfig =
+            [ "vite.config.ts"; "vite.config.js"; "vite.config.mjs" ]
+            |> List.map (fun f -> IO.Path.Combine(dir, f))
+            |> List.tryFind IO.File.Exists
+            |> Option.bind (fun path -> parsePort (IO.File.ReadAllText path))
+        match fromConfig with
+        | Some p -> p
+        | None ->
+            match Environment.GetEnvironmentVariable("VITE_PORT") with
+            | null | "" -> defaultPort
+            | v ->
+                match Int32.TryParse v with
+                | true, p -> p
+                | _ -> defaultPort
+
+    /// Dev proxy middleware using the auto-detected Vite port.
+    let devAuto () : Middleware = devMiddleware (autoPort ())
+
+    let isDevelopment () =
         let env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
         String.Equals(env, "Development", StringComparison.OrdinalIgnoreCase)
         || String.Equals(env, "dev", StringComparison.OrdinalIgnoreCase)

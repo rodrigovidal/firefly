@@ -76,6 +76,33 @@ Options:
 firefly dev --project src/MyApp/MyApp.fsproj
 ```
 
+#### Generators in dev (`firefly.json`)
+
+Drop a `firefly.json` manifest in the project root to declare generators that should run as part of `firefly dev`. Each entry is the equivalent of a `firefly gen` invocation:
+
+```json
+{
+  "generators": [
+    { "kind": "schema",     "name": "User",    "fields": ["name:string", "age:int"] },
+    { "kind": "controller", "name": "Health" },
+    { "kind": "html",       "name": "Contact", "fields": ["email:string"] }
+  ]
+}
+```
+
+`kind` is one of `schema`, `controller`, `html`, `json`, or `docker`; `fields` is omitted for `controller` and `docker`. When `firefly dev` starts it runs every declared generator once, then watches `firefly.json` and regenerates whenever you edit it — no restart required. Without a `firefly.json`, `firefly dev` behaves exactly as before.
+
+#### Vite dev proxy
+
+If your app has a Vite frontend, `App.vite` wires the dev proxy with an auto-detected port and is a no-op outside Development, so the same pipeline is safe to ship:
+
+```fsharp
+App.defaults
+|> App.vite   // proxies Vite assets in dev only; production untouched
+```
+
+The port is detected from `vite.config.{ts,js,mjs}` (`server.port`), falling back to the `VITE_PORT` env var, then Vite's default `5173`.
+
 ### firefly gen controller
 
 Generate a controller file:

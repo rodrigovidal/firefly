@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GeneratorTests.fs" />
+    <Compile Include="DevManifestTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Firefly.Cli\Firefly.Cli.fsproj" />

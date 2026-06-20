@@ -11,12 +11,13 @@
     <Description>CLI for the Firefly F# web framework — scaffolding, code generation, dev server, and OpenAPI.</Description>
     <PackageTags>fsharp;web;framework;cli;firefly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/rodrigovidal/fire</RepositoryUrl>
+    <RepositoryUrl>https://github.com/rodrigovidal/firefly</RepositoryUrl>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Generator.fs" />
     <Compile Include="SimpleGenerator.fs" />
     <Compile Include="OpenApiGenerator.fs" />
+    <Compile Include="DevManifest.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
