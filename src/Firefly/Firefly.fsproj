@@ -3,6 +3,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Firefly</AssemblyName>
     <RootNamespace>Firefly</RootNamespace>
+    <!-- Keep the FSharp.Core floor stable (don't let the build SDK raise it). -->
+    <DisableImplicitFSharpCoreReference>true</DisableImplicitFSharpCoreReference>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <ParallelCompilation>true</ParallelCompilation>
     <PackageId>Firefly.Server</PackageId>
@@ -81,7 +83,8 @@
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.16.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Flame" Version="0.1.0-alpha.9" />
+    <PackageReference Include="FSharp.Core" Version="10.0.100" />
+    <PackageReference Include="Flame" Version="0.1.0-alpha.12" />
     <PackageReference Include="Grpc.AspNetCore.Server" Version="2.71.0" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.71.0" />
     <PackageReference Include="Google.Protobuf" Version="3.30.2" />

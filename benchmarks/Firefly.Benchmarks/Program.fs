@@ -726,7 +726,8 @@ module ValidationBenchmark =
     type UserDto =
         { Name: string
           Email: string
-          Age: int }
+          Age: int
+          Country: string }
 
     type UserValidator() as this =
         inherit AbstractValidator<UserDto>()
@@ -734,20 +735,22 @@ module ValidationBenchmark =
             this.RuleFor(fun u -> u.Name).NotEmpty().MaximumLength(100) |> ignore
             this.RuleFor(fun u -> u.Email).NotEmpty().EmailAddress() |> ignore
             this.RuleFor(fun u -> u.Age).InclusiveBetween(0, 150) |> ignore
+            this.RuleFor(fun u -> u.Country).Must(fun c -> c = "US" || c = "BR" || c = "DE") |> ignore
 
     let private userSchema =
         schema {
             let! name = S.required "Name" S.string [ S.nonempty; S.maxLength 100 ]
             let! email = S.required "Email" S.string [ S.email ]
             let! age = S.required "Age" S.int [ S.min 0; S.max 150 ]
-            return { Name = name; Email = email; Age = age }
+            let! country = S.required "Country" S.string [ S.oneOf [ "US"; "BR"; "DE" ] ]
+            return { Name = name; Email = email; Age = age; Country = country }
         }
 
     [<MemoryDiagnoser>]
     type JsonValidationBenchmark() =
         let jsonBytes =
             System.Text.Encoding.UTF8.GetBytes
-                """{"Name":"Alice Johnson","Email":"alice@example.com","Age":30}"""
+                """{"Name":"Alice Johnson","Email":"alice@example.com","Age":30,"Country":"US"}"""
         let validator = UserValidator()
 
         [<Benchmark(Description = "Firefly + Flame: parse + validate", Baseline = true)>]

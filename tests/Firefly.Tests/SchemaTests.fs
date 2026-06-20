@@ -32,7 +32,7 @@ let createUserSchema = schema {
 
 let taskSchema = schema {
     let! title = Schema.required "title" Schema.string []
-    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
+    let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
     return {| Title = title; Priority = priority |}
 }
 
@@ -359,7 +359,7 @@ let ``Schema parsePipe rejects invalid JSON`` () = task {
 [<Fact>]
 let ``Schema.min rule rejects value below minimum`` () =
     let s = schema {
-        let! age = Schema.required "age" Schema.int [ Schema.min 18.0 ]
+        let! age = Schema.required "age" Schema.int [ Schema.min 18 ]
         return {| Age = age |}
     }
     let json = """{"age":10}"""
@@ -370,7 +370,7 @@ let ``Schema.min rule rejects value below minimum`` () =
 [<Fact>]
 let ``Schema.min rule allows value at minimum`` () =
     let s = schema {
-        let! age = Schema.required "age" Schema.int [ Schema.min 18.0 ]
+        let! age = Schema.required "age" Schema.int [ Schema.min 18 ]
         return {| Age = age |}
     }
     let json = """{"age":18}"""
@@ -722,7 +722,7 @@ let ``Schema collects errors from multiple fields`` () =
 let ``Schema collects errors from all invalid fields`` () =
     let s = schema {
         let! name = Schema.required "name" Schema.string [ Schema.minLength 3 ]
-        let! age = Schema.required "age" Schema.int [ Schema.min 18.0 ]
+        let! age = Schema.required "age" Schema.int [ Schema.min 18 ]
         return {| Name = name; Age = age |}
     }
     let json = """{"name":"ab","age":5}"""
@@ -766,7 +766,7 @@ let ``Schema.optional field with parse error returns error`` () =
 let ``Schema.optional field with failing rule returns errors`` () =
     let s = schema {
         let! title = Schema.required "title" Schema.string []
-        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
+        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
         return {| Title = title; Priority = priority |}
     }
     let json = """{"title":"test","priority":"urgent"}"""
@@ -909,7 +909,7 @@ let ``Schema.required parse error via JsonElement`` () =
 let ``Schema.optional rule failure via JsonElement`` () =
     let s = schema {
         let! title = Schema.required "title" Schema.string []
-        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.enum' ["low"; "medium"; "high"] ]
+        let! priority = Schema.optional "priority" Schema.string "medium" [ Schema.oneOf ["low"; "medium"; "high"] ]
         return {| Title = title; Priority = priority |}
     }
     let json = """{"title":"test","priority":"urgent"}"""
@@ -1478,7 +1478,7 @@ type GeneratedScalarRecord = {
     Tags: string list
 }
 
-type UnsupportedGeneratedRecord = {
+type GuidRecord = {
     Value: Guid
 }
 
@@ -1778,17 +1778,18 @@ let ``fromType treats explicit null option fields as None`` () =
 
 [<Fact>]
 let ``fromType fallback types still generate JSON schema`` () =
-    let s = Schema.fromType<UnsupportedGeneratedRecord> ()
+    let s = Schema.fromType<GuidRecord> ()
     let jsonSchema = Schema.toJsonSchema s
     jsonSchema |> should haveSubstring "\"Value\""
     jsonSchema |> should haveSubstring "\"string\""
 
 [<Fact>]
-let ``fromType reports unsupported type parse errors`` () =
-    let s = Schema.fromType<UnsupportedGeneratedRecord> ()
+let ``fromType surfaces Guid parse errors`` () =
+    // Guid is now a supported type; an invalid value surfaces a field parse error.
+    let s = Schema.fromType<GuidRecord> ()
     use doc = JsonDocument.Parse("""{"Value":"nope"}""")
     match Schema.parseJson s doc.RootElement with
-    | Error errs -> errs |> List.exists (fun e -> e.Contains("unsupported type Guid")) |> should be True
+    | Error errs -> errs |> List.exists (fun e -> e.Contains("GUID") || e.Contains("Guid")) |> should be True
     | Ok _ -> failwith "expected Error"
 
 [<Fact>]
@@ -1823,7 +1824,10 @@ let ``SchemaCompiler handles nullable nested values`` () =
     reader.Read() |> ignore
     reader.Read() |> ignore
     let value = SchemaCompiler.readValue (SchemaCompiler.FNullable (SchemaCompiler.FNested([||], [||], ctor))) &reader
-    (value :?> string option) |> should equal (Some "nested")
+    // Flame's readValue now returns a FieldValue union; nested/boxed values come back as FVObj.
+    match value with
+    | FVObj o -> (o :?> string option) |> should equal (Some "nested")
+    | other -> failwithf "expected FVObj, got %A" other
 
 [<Fact>]
 let ``Fire re-exports Schema.req`` () =
