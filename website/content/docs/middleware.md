@@ -338,12 +338,24 @@ Records metrics:
 | `firefly.http.duration` | Histogram | Request duration in ms |
 | `firefly.http.active_requests` | UpDownCounter | Currently active requests |
 
-Configure exporters using the source name `"Firefly"` and meter name `"Firefly"`:
+Export over OTLP in one line. `Telemetry.otlp` reads the endpoint, headers, and
+protocol from the standard `OTEL_EXPORTER_OTLP_*` environment variables (default
+endpoint `http://localhost:4317`):
+
+```fsharp
+App.defaults
+|> App.services [ Telemetry.otlp "my-service" ]
+|> App.middleware Telemetry.middleware
+```
+
+For a custom exporter, wire it yourself using the source and meter names:
 
 ```fsharp
 Telemetry.sourceName  // "Firefly"
 Telemetry.meterName   // "Firefly"
 ```
+
+See [Deployment → OpenTelemetry](/docs/deployment#opentelemetry) for the full setup.
 
 ## Upload Size Limit
 

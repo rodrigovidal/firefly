@@ -87,7 +87,7 @@ Firefly is part of a cohesive F# ecosystem:
 ### Observability
 - [x] Structured request logging — `Log.structured` (JSON per request) + Evlog request-scoped logger
 - [x] OpenTelemetry traces + metrics built in — `Telemetry.middleware` emits `ActivitySource` spans and `Meter` counters/histograms; wire exporters via `Telemetry.sourceName` / `Telemetry.meterName`
-- [ ] Optional convenience helper to register OTLP exporters in one line
+- [x] One-line OTLP exporter helper — `Telemetry.otlp "service-name"` (reads `OTEL_EXPORTER_OTLP_*` env vars)
 
 ### Smaller items
 - [ ] API versioning — `Route.version "v1"` (URL or header based)

@@ -3,6 +3,11 @@ namespace Firefly
 open System.Collections.Generic
 open System.Diagnostics
 open System.Diagnostics.Metrics
+open Microsoft.Extensions.DependencyInjection
+open OpenTelemetry
+open OpenTelemetry.Resources
+open OpenTelemetry.Trace
+open OpenTelemetry.Metrics
 
 [<RequireQualifiedAccess>]
 module Telemetry =
@@ -67,3 +72,19 @@ module Telemetry =
 
     /// The Meter name for configuring OpenTelemetry metrics exporters.
     let meterName = "Firefly"
+
+    /// Registers OpenTelemetry tracing + metrics for Firefly's ActivitySource and
+    /// Meter, exporting over OTLP. Endpoint, headers, and protocol are read from the
+    /// standard OTEL_EXPORTER_OTLP_* environment variables (default endpoint
+    /// http://localhost:4317). Pair with Telemetry.middleware to emit per-request data.
+    ///
+    ///   App.defaults
+    ///   |> App.services [ Telemetry.otlp "my-service" ]
+    ///   |> App.middleware Telemetry.middleware
+    let otlp (serviceName: string) : ServiceRegistration =
+        Service.raw (fun services ->
+            services.AddOpenTelemetry()
+                .ConfigureResource(fun r -> r.AddService(serviceName) |> ignore)
+                .WithTracing(fun t -> t.AddSource(sourceName).AddOtlpExporter() |> ignore)
+                .WithMetrics(fun m -> m.AddMeter(meterName).AddOtlpExporter() |> ignore)
+            |> ignore)

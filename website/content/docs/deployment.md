@@ -171,7 +171,20 @@ services:
 
 ### OpenTelemetry
 
-Enable tracing and metrics:
+Enable tracing and metrics with one line. `Telemetry.otlp` registers an OTLP
+exporter for Firefly's spans and metrics; the endpoint, headers, and protocol are
+read from the standard `OTEL_EXPORTER_OTLP_*` environment variables (default
+endpoint `http://localhost:4317`):
+
+```fsharp
+App.defaults
+|> App.services [ Telemetry.otlp "my-service" ]
+|> App.middleware Telemetry.middleware
+```
+
+Prefer to wire the exporters yourself (for a non-OTLP exporter, sampling, or extra
+sources)? `Telemetry.sourceName` and `Telemetry.meterName` give you the names to
+register:
 
 ```fsharp
 App.defaults
