@@ -4,9 +4,13 @@ open ContactsApp
 
 let (routes, config) = App.create ()
 
-let config' = config |> App.middleware Log.toConsole
+let config' =
+    config
+    |> App.dashboard "/dashboard"
+    |> App.middleware Log.toConsole
 
 printfn "Contacts app running on http://localhost:3000"
+printfn "  GET  /dashboard            - live metrics dashboard"
 printfn "  GET  /                     - list contacts"
 printfn "  GET  /contacts/new         - new contact form"
 printfn "  POST /contacts             - create contact"

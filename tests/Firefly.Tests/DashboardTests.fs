@@ -10,7 +10,7 @@ open Firefly
 let ``Collector records totals, average, and percentiles`` () =
     let c = DashboardCollector()
     for i in 1..100 do
-        c.Record(200, float i)
+        c.Record("GET /x", 200, float i)
     let s = c.Snapshot()
     s.TotalRequests |> should equal 100L
     s.ErrorCount |> should equal 0L
@@ -22,9 +22,9 @@ let ``Collector records totals, average, and percentiles`` () =
 [<Fact>]
 let ``Collector counts 5xx as errors`` () =
     let c = DashboardCollector()
-    c.Record(200, 1.0)
-    c.Record(503, 1.0)
-    c.Record(500, 1.0)
+    c.Record("GET /a", 200, 1.0)
+    c.Record("GET /a", 503, 1.0)
+    c.Record("POST /b", 500, 1.0)
     let s = c.Snapshot()
     s.TotalRequests |> should equal 3L
     s.ErrorCount |> should equal 2L
@@ -38,6 +38,26 @@ let ``Collector tracks in-flight gauge`` () =
     c.Snapshot().InFlight |> should equal 2
     c.DecInFlight()
     c.Snapshot().InFlight |> should equal 1
+
+[<Fact>]
+let ``normalizeRoute collapses id-like segments`` () =
+    Dashboard.normalizeRoute "GET" "/contacts/42" |> should equal "GET /contacts/:id"
+    Dashboard.normalizeRoute "GET" "/contacts/new" |> should equal "GET /contacts/new"
+    Dashboard.normalizeRoute "POST" "/" |> should equal "POST /"
+
+[<Fact>]
+let ``Collector aggregates per-route stats`` () =
+    let c = DashboardCollector()
+    c.Record("GET /a", 200, 2.0)
+    c.Record("GET /a", 200, 4.0)
+    c.Record("GET /b", 500, 1.0)
+    let routes = c.Snapshot().Routes
+    let a = routes |> List.find (fun r -> r.Route = "GET /a")
+    a.Count |> should equal 2L
+    a.AvgMs |> should (equalWithin 0.001) 3.0
+    a.Errors |> should equal 0L
+    let b = routes |> List.find (fun r -> r.Route = "GET /b")
+    b.Errors |> should equal 1L
 
 // --- Middleware tests ---
 
