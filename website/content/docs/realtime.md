@@ -74,6 +74,28 @@ The hub is safe to share across connections — each socket is written only by i
 
 The `onMessage` callback receives `(hub, connId, msg)`; malformed inbound frames are ignored. Use the same hub instance across multiple routes to model multiple rooms.
 
+### Distributed broadcast (across nodes)
+
+By default a hub is local — `Broadcast` only reaches sockets in the same process. To fan out across a cluster, give the hub a **shared name** and an `IPubSub` backplane. Every node that constructs `WsHub<'T>(name, backplane)` with the same name participates: a broadcast on one node reaches members on all of them.
+
+```fsharp
+// Each node builds the hub with the same name and a shared backplane.
+let bus  = PubSub.inProcess ()          // process-local default (single node / tests)
+let chat = WsHub<ChatMsg>("chat", bus)
+
+// hub.Broadcast / hub.BroadcastAll now reach every node on the backplane.
+```
+
+`PubSub.inProcess ()` is the built-in backplane — it fans out within a process (and lets tests simulate multiple nodes by sharing one instance), but does **not** cross process boundaries. For real multi-node deployments, supply an `IPubSub` implementation backed by a cross-process transport (Redis pub/sub, NATS, …):
+
+```fsharp
+type IPubSub =
+    abstract Publish: topic: string * payload: byte[] -> unit
+    abstract Subscribe: topic: string * handler: (byte[] -> unit) -> IDisposable
+```
+
+Firefly core never depends on Redis — the transport is an opt-in implementation you register. `hub.Send(connId, msg)` targets a connection on the local node only.
+
 ## Server-Sent Events (SSE)
 
 ### Handler-Driven SSE

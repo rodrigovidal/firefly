@@ -64,6 +64,7 @@
     <Compile Include="Hateoas.fs" />
     <Compile Include="Bulk.fs" />
     <Compile Include="Sse.fs" />
+    <Compile Include="PubSub.fs" />
     <Compile Include="WebSocket.fs" />
     <Compile Include="Grpc.fs" />
     <Compile Include="Env.fs" />

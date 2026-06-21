@@ -85,3 +85,50 @@ let ``Default room is empty string`` () =
     hub.Subscribe() |> ignore
     hub.RoomCount("") |> should equal 1
     hub.Count |> should equal 1
+
+// --- Distributed fan-out over a shared backplane (two hubs = two nodes) ---
+
+[<Fact>]
+let ``Broadcast fans out to another node over the backplane`` () = task {
+    let bus = PubSub.inProcess ()
+    let nodeA = new WsHub<Msg>("chat", bus)
+    let nodeB = new WsHub<Msg>("chat", bus)
+    // A member connected on node B, in room "room-a"
+    let (_, rB) = nodeB.Subscribe("room-a")
+    // Broadcast originates on node A
+    nodeA.Broadcast("room-a", { Text = "cross-node" })
+    let! m = readOne rB
+    m.Text |> should equal "cross-node"
+}
+
+[<Fact>]
+let ``BroadcastAll fans out to another node`` () = task {
+    let bus = PubSub.inProcess ()
+    let nodeA = new WsHub<Msg>("chat", bus)
+    let nodeB = new WsHub<Msg>("chat", bus)
+    let (_, rB) = nodeB.Subscribe("any-room")
+    nodeA.BroadcastAll({ Text = "everyone" })
+    let! m = readOne rB
+    m.Text |> should equal "everyone"
+}
+
+[<Fact>]
+let ``Broadcast delivers locally exactly once with a backplane`` () = task {
+    let bus = PubSub.inProcess ()
+    let node = new WsHub<Msg>("chat", bus)
+    let (_, r) = node.Subscribe("room-a")
+    // The publisher's own local member must not get a duplicate from the echo.
+    node.Broadcast("room-a", { Text = "once" })
+    let! m = readOne r
+    m.Text |> should equal "once"
+    r.Count |> should equal 0 // no second copy queued
+}
+
+[<Fact>]
+let ``Hubs with different names do not cross-talk`` () =
+    let bus = PubSub.inProcess ()
+    let chat = new WsHub<Msg>("chat", bus)
+    let alerts = new WsHub<Msg>("alerts", bus)
+    let (_, rAlerts) = alerts.Subscribe("room-a")
+    chat.Broadcast("room-a", { Text = "chat-only" })
+    rAlerts.Count |> should equal 0
