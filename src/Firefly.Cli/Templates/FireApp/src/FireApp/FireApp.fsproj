@@ -6,19 +6,13 @@
   <ItemGroup>
     <Compile Include="Config\Dev.fs" />
     <Compile Include="Config\Prod.fs" />
-    <Compile Include="Layouts\RootLayout.fs" />
-    <Compile Include="Components\CoreComponents.fs" />
-    <Compile Include="Views\PageView.fs" />
-    <Compile Include="Controllers\PageController.fs" />
+    <Compile Include="Todos.fs" />
+    <Compile Include="Controllers\HomeController.fs" />
+    <Compile Include="Controllers\TodoController.fs" />
     <Compile Include="Router.fs" />
     <Compile Include="Endpoint.fs" />
     <Compile Include="Testing.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>
   __FIRE_REFERENCE_ITEMS__
-  <ItemGroup>
-    <Content Include="Assets\**\*" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="Static\**\*" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="wwwroot\**\*" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
 </Project>

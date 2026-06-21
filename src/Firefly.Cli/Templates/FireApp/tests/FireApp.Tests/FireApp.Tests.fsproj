@@ -12,6 +12,7 @@
   <ItemGroup>
     <Compile Include="Fixtures.fs" />
     <Compile Include="ControllerTests.fs" />
+    <Compile Include="ApiTests.fs" />
     <Compile Include="IntegrationTests.fs" />
   </ItemGroup>
   <ItemGroup>

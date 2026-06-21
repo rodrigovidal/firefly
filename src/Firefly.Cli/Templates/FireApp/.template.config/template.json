@@ -1,10 +1,10 @@
 {
   "$schema": "http://json.schemastore.org/template",
   "author": "Rodrigo Vidal",
-  "classifications": [ "Web", "F#", "Fire" ],
-  "name": "Fire App",
-  "identity": "Fire.App",
-  "shortName": "fire",
+  "classifications": [ "Web", "F#", "Firefly", "API" ],
+  "name": "Firefly App",
+  "identity": "Firefly.App",
+  "shortName": "firefly",
   "sourceName": "FireApp",
   "preferNameDirectory": true,
   "symbols": {

@@ -5,7 +5,7 @@ open FsUnit.Xunit
 open FireApp
 
 [<Fact>]
-let ``health endpoint returns json`` () = task {
+let ``health endpoint returns json over HTTP`` () = task {
     let! client = FireApp.Testing.startClient ()
     let! response = client |> FireApp.Testing.get "/health"
     response.Status |> should equal 200
