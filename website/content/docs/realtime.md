@@ -96,6 +96,39 @@ type IPubSub =
 
 Firefly core never depends on Redis — the transport is an opt-in implementation you register. `hub.Send(connId, msg)` targets a connection on the local node only.
 
+### Presence
+
+`Presence` tracks who is in each topic, with metadata, and notifies on join/leave. Like the hub, it is single-node by default and replicates across nodes when given a shared name + `IPubSub` backplane.
+
+```fsharp
+type UserMeta = { Name: string; Online: bool }
+
+let presence = Presence("chat", bus)   // or Presence() for a single node
+
+// when a user joins a room:
+presence.Track("room-42", userId, { Name = "Ada"; Online = true })
+
+// who's here (metadata deserialized to your type):
+let here : (string * UserMeta) list = presence.List<UserMeta>("room-42")
+
+// react to changes (broadcast "X joined", update a roster, …):
+use _sub = presence.OnChange(fun d ->
+    printfn "%s %s room %s" d.Key (if d.Joined then "joined" else "left") d.Topic)
+
+// when they leave:
+presence.Untrack("room-42", userId)
+```
+
+| Member | Description |
+|--------|-------------|
+| `presence.Track(topic, key, meta)` | Mark `key` present with metadata |
+| `presence.Untrack(topic, key)` | Remove `key` |
+| `presence.List<'M>(topic)` | Everyone present, metadata typed as `'M` |
+| `presence.Count(topic)` | Number present in `topic` |
+| `presence.OnChange(handler)` | Join/leave callback (`PresenceDiff`); dispose to stop |
+
+Presence shares the same backplane story: across nodes it merges each node's tracked entries. The current version has no heartbeat/expiry, so a crashed node's entries linger until untracked — single-node use is exact; multi-node is best-effort.
+
 ## Server-Sent Events (SSE)
 
 ### Handler-Driven SSE

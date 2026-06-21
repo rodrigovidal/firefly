@@ -147,11 +147,10 @@ type WsHub<'T>(?name: string, ?pubsub: IPubSub) =
     /// Total number of connected subscribers on this node across all rooms.
     member _.Count = subscribers.Count
 
+    /// Dispose the backplane subscription (a no-op for a local hub). Hubs are
+    /// usually app-lifetime, so this is rarely needed.
     member _.Dispose() =
         subscription |> Option.iter (fun d -> d.Dispose())
-
-    interface IDisposable with
-        member this.Dispose() = this.Dispose()
 
 [<RequireQualifiedAccess>]
 module WS =

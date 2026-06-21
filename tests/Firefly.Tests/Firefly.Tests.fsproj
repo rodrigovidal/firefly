@@ -63,6 +63,7 @@
     <Compile Include="RedirectTests.fs" />
     <Compile Include="SseTests.fs" />
     <Compile Include="WsHubTests.fs" />
+    <Compile Include="PresenceTests.fs" />
     <Compile Include="CsrfPolishTests.fs" />
     <Compile Include="MiddlewareTests.fs" />
     <Compile Include="QueryBindingTests.fs" />

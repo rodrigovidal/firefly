@@ -43,6 +43,8 @@ Firefly is part of a cohesive F# ecosystem:
 - [x] WebSocket — basic send/receive (`WS.handler` / `WsConn`)
 - [x] WebSocket rooms / broadcast — typed `WsHub<'T>` + `WS.hub` (room/channel/broadcast)
 - [x] SSE — server-sent events with broadcast
+- [x] PubSub backplane — `IPubSub` abstraction + `PubSub.inProcess` default; cluster-wide `WsHub` broadcast (cross-process transport is an opt-in impl, no Redis in core)
+- [x] Presence — `Presence.Track`/`List`/`OnChange`, replicated over the backplane (v1: no heartbeat/CRDT)
 
 ### API patterns
 - [x] Pagination (cursor + offset, `Pagination.parse`)

@@ -66,6 +66,7 @@
     <Compile Include="Sse.fs" />
     <Compile Include="PubSub.fs" />
     <Compile Include="WebSocket.fs" />
+    <Compile Include="Presence.fs" />
     <Compile Include="Grpc.fs" />
     <Compile Include="Env.fs" />
     <Compile Include="App.fs" />
