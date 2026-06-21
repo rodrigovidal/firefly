@@ -242,6 +242,35 @@ let testStore = Session.SessionStore()
 App.defaults |> App.middleware (Session.withStore testStore)
 ```
 
+Session values are stored as JSON, so any type passed to `Session.set` must be JSON-serializable (records, primitives, collections).
+
+### Distributed sessions
+
+`Session.middleware` keeps sessions in process memory — fine for a single node, but they don't survive a restart or scale across instances. For a shared backend, use `Session.distributed`, which stores sessions in any registered `IDistributedCache`:
+
+```fsharp
+App.defaults
+|> App.services [
+    // In-memory IDistributedCache (single node) — both are in the shared framework:
+    Service.raw (fun s -> s.AddDistributedMemoryCache() |> ignore)
+]
+|> App.middleware Session.distributed
+```
+
+To make sessions **shared and durable**, register a Redis-backed `IDistributedCache` instead. The Redis package lives in your app — Firefly never depends on it:
+
+```fsharp
+// dotnet add package Microsoft.Extensions.Caching.StackExchangeRedis
+App.defaults
+|> App.services [
+    Service.raw (fun s ->
+        s.AddStackExchangeRedisCache(fun o -> o.Configuration <- "localhost:6379") |> ignore)
+]
+|> App.middleware Session.distributed
+```
+
+Any `IDistributedCache` implementation works (Redis, SQL Server, Garnet, NCache, …) — `Session.distributed` resolves whatever is registered. The same `Session.get`/`set`/`remove`/`clear` API is used for both backends. Pass an explicit cache with `Session.withCache cache`, or custom expiration with `Session.withCacheOptions cache options` (the default is a 20-minute sliding expiration).
+
 ## Idempotency
 
 Cache responses for requests with an `Idempotency-Key` header to ensure safe retries:

@@ -59,9 +59,11 @@ Firefly is part of a cohesive F# ecosystem:
 ### Real-time (responses)
 - [x] Streaming responses — `Response.streamJson` / `streamJsonAsync` for NDJSON / large datasets
 
-### Caching
+### Caching & sessions
 - [x] Response-caching middleware (`Cache.maxAge`, `Cache.varyBy`)
 - [x] Auto ETag generation (304 on match)
+- [x] In-memory sessions (`Session.middleware` / `withStore`)
+- [x] Distributed sessions — `Session.distributed` over `IDistributedCache` (in-memory default, Redis/SQL/etc. opt-in in the user's app; no Redis dependency in core)
 
 ### DX & tooling
 - [x] DI — `App.services [ Service.singleton<I, T>; ... ]`
@@ -87,9 +89,6 @@ Firefly is part of a cohesive F# ecosystem:
 > Flare and Rhinox are separate opt-in packages, not bundled with the core framework. Firefly stays minimal; these are integrations users add only if they want them.
 - [ ] Flare — `Flare.get/post` with Flame schemas + an example
 - [ ] Rhinox — connection/transaction middleware maturity, `firefly gen migration`, full Firefly+Rhinox CRUD example
-
-### Smaller items
-- [ ] Distributed cache / session backend (Redis abstraction); session store is in-memory only
 
 ### Performance (future)
 - [x] AOT/trim-safe DI guidance — documented composition-root + factory pattern (F# has no Roslyn source generators; the hand-written graph gives the same compile-time validation)
