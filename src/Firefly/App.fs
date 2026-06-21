@@ -45,6 +45,12 @@ module App =
         if Vite.isDevelopment () then middleware (Vite.devAuto ()) config
         else config
 
+    /// Serve a live metrics dashboard at `mount` (page) and `mount/stream` (SSE):
+    /// request rate, latency percentiles, error rate, in-flight, and system stats.
+    /// Add it early so it measures the full pipeline; protect the route in production.
+    let dashboard (mount: string) config =
+        middleware (Dashboard.middleware mount) config
+
     let private buildTrie (routes: RouteTable) : TrieNode =
         let mutable trie = Trie.empty
         for entry in routes.Routes |> List.rev do

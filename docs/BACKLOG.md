@@ -82,6 +82,7 @@ Firefly is part of a cohesive F# ecosystem:
 - [x] Documentation site + guides (fireflyframework.dev)
 - [x] Route-matching + framework-comparison benchmarks; JSON-validation benchmark vs FluentValidation
 - [x] Response pooling
+- [x] Live metrics dashboard — `App.dashboard "/dashboard"` (SSE-fed req rate, latency percentiles, errors, GC/memory/threads; no build, no deps)
 
 ## Next Up
 

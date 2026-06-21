@@ -69,6 +69,7 @@
     <Compile Include="Presence.fs" />
     <Compile Include="Grpc.fs" />
     <Compile Include="Env.fs" />
+    <Compile Include="Dashboard.fs" />
     <Compile Include="App.fs" />
     <Compile Include="TestClient.fs" />
   </ItemGroup>

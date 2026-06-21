@@ -386,6 +386,31 @@ Telemetry.meterName   // "Firefly"
 
 See [Deployment → OpenTelemetry](/docs/deployment#opentelemetry) for the full setup.
 
+## Live Metrics Dashboard
+
+Serve a built-in, real-time dashboard in one line:
+
+```fsharp
+App.defaults |> App.dashboard "/dashboard"
+```
+
+This mounts a live page at `/dashboard` and an SSE stream at `/dashboard/stream`. The page (no build step, no external assets) updates once per second with:
+
+- **Requests/sec** with a live sparkline, plus total requests
+- **Error rate** (5xx) and current **in-flight** requests
+- **Latency** p50 / p95 / p99 and average (ms)
+- **System**: managed memory, GC collection counts (gen 0/1/2), thread-pool threads, and uptime
+
+Metrics are collected in-process by the middleware itself, so it works with or without `Telemetry.middleware`. Add it early in the pipeline so it measures the full request path. The dashboard requests themselves are not counted as application traffic.
+
+Protect the route in production — put it behind your own auth/network controls, since it exposes operational metrics:
+
+```fsharp
+App.defaults
+|> App.middleware myAdminGuard   // your own middleware that rejects non-admins
+|> App.dashboard "/dashboard"
+```
+
 ## Upload Size Limit
 
 Restrict request body size:
